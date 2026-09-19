@@ -16,10 +16,12 @@ configured separately for each environment. See `design/tooling-selection.md` fo
 ## GitHub Actions setup
 
 The repository's **Repository secrets** must contain `CLOUDFLARE_ACCOUNT_ID` and
-`CLOUDFLARE_API_TOKEN`. The Cloudflare account token needs Workers Admin for the first creation of
-these Workers and Workers Routes Write for the `timmy.academy` zone. Once both Workers and custom
-domains exist, replace it with a narrower deployment token if practical. Never put a token value in
-this repository or a workflow log.
+`CLOUDFLARE_API_TOKEN`. The current Cloudflare token has Workers Admin for the first creation of both
+Workers and Workers Routes Write for the `timmy.academy` zone. It has no expiration. After the first
+manual production deployment creates the production Worker and custom domain, replace this bootstrap
+token with a narrower Workers Editor token and revoke the original token. Keep Workers Routes Write
+for the zone if future deployments change custom-domain bindings. Never put a token value in this
+repository or a workflow log.
 
 `.github/workflows/deploy.yml` checks pull requests to `master`. A push to `master` runs the same
 checks and deploys staging on success. To deploy production, open **Actions → Check and deploy →
