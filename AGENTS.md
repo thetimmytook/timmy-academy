@@ -19,4 +19,4 @@ Timmy Academy is currently in the design stage. The Windows Benchmark applicatio
 - Merge pull requests with a merge commit. Do not squash or rebase PRs; preserve branch history.
 - Keep commit messages and PR descriptions focused on the change summary. Do not add generic verification sections or command lists unless the user requests them or a material test limitation needs explanation.
 - Keep generated benchmark captures, run results, temporary output, build artifacts and secrets out of Git unless the user explicitly asks to version a sanitized example.
-- Do not poll remote CI or deployment jobs unless the user asks. After starting one, provide its link and current status.
+- Do not inspect or poll remote CI, deployment jobs, or their status after a push or merge unless the user explicitly asks to check them. The user will say when to verify. When a run is started, provide its link without querying its status.
