@@ -1,6 +1,6 @@
 # Tooling selection from `D:/Downloads/template`
 
-Status: agreed design. A minimal workspace scaffold was added on 2026-09-19; CI/CD and deployment remain future steps.
+Status: agreed design. A minimal workspace scaffold and deployment configuration were added on 2026-09-19.
 
 ## Proposed structure when implementation begins
 
@@ -18,6 +18,16 @@ infrastructure/   # deployment and environment configuration when needed
 ## Web rendering decision
 
 Keep the initial `apps/web` architecture simple: React + Vite with client-side rendering for the interactive Academy and benchmark UI. Do not introduce Astro, per-run SSR or a static-HTML generation pipeline for individual benchmark reports before a concrete indexing need justifies it. The public run detail URL remains stable and can initially load its data from the API. News pages, if introduced, may be generated as static HTML. Revisit rendering choices when the actual UI and indexing requirements are known.
+
+## Deployment and request routing decision
+
+- Build `apps/web` as static Vite assets. Publish those assets together with the `apps/api` Hono Worker as one Cloudflare deployment per environment. Keep the web and API source code in their existing separate workspaces.
+- Cloudflare Workers Static Assets serves the SPA's HTML, JavaScript, CSS and images without invoking the Worker script. Configure the SPA fallback to `index.html` for browser navigation. Route only `/api/*` to the Worker script with selective `assets.run_worker_first`. Do not set `run_worker_first: true` for every request.
+- Use `timmy.academy` for production and `staging.timmy.academy` for staging. The web app calls same-origin `/api/...` endpoints in each environment. Keep their deployment configuration and secrets separate.
+- There is no initial need for a separate Cloudflare Pages project, R2 bucket or S3-like store for the SPA. Revisit separate deployments only if a concrete operational need appears.
+- Wrangler and GitHub Actions now encode this scheme. Cloudflare-side Worker creation and live deployment are pending the first workflow runs.
+
+See Cloudflare's [Static Assets routing](https://developers.cloudflare.com/workers/static-assets/) and [billing rules](https://developers.cloudflare.com/workers/static-assets/billing-and-limitations/) for current platform behavior.
 
 ## Agreed package, contract and environment decisions
 

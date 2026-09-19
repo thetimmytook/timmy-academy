@@ -4,8 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev --config ../../infrastructure/wrangler.jsonc --local --port 8787",
+    "dev": "npm run build -w @timmy/web && wrangler dev --config ../../infrastructure/wrangler.jsonc --local --port 8787",
     "build": "wrangler deploy --config ../../infrastructure/wrangler.jsonc --dry-run --env= --outdir dist",
+    "deploy:staging": "wrangler deploy --config ../../infrastructure/wrangler.jsonc --env staging",
+    "deploy:production": "wrangler deploy --config ../../infrastructure/wrangler.jsonc --env production",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"

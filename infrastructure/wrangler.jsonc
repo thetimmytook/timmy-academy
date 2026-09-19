@@ -3,8 +3,20 @@
   "name": "timmy-academy-api-local",
   "main": "../apps/api/src/index.ts",
   "compatibility_date": "2026-09-19",
+  "workers_dev": false,
+  "assets": {
+    "directory": "../apps/web/dist",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"],
+  },
   "env": {
-    "staging": { "name": "timmy-academy-api-staging" },
-    "production": { "name": "timmy-academy-api-production" },
+    "staging": {
+      "name": "timmy-academy-staging",
+      "routes": [{ "pattern": "staging.timmy.academy", "custom_domain": true }],
+    },
+    "production": {
+      "name": "timmy-academy-production",
+      "routes": [{ "pattern": "timmy.academy", "custom_domain": true }],
+    },
   },
 }
