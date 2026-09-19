@@ -1,0 +1,10 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "timmy-academy-api-local",
+  "main": "../apps/api/src/index.ts",
+  "compatibility_date": "2026-09-19",
+  "env": {
+    "staging": { "name": "timmy-academy-api-staging" },
+    "production": { "name": "timmy-academy-api-production" },
+  },
+}

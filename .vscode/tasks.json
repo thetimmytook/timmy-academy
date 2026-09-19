@@ -1,0 +1,58 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Academy: build contracts",
+      "type": "shell",
+      "command": "npm run build -w @timmy/contracts",
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": {
+        "reveal": "never",
+        "panel": "shared",
+        "close": true,
+        "showReuseMessage": false
+      },
+      "problemMatcher": [],
+      "hide": true
+    },
+    {
+      "label": "Academy: watch contracts",
+      "type": "shell",
+      "command": "npm run dev -w @timmy/contracts",
+      "options": { "cwd": "${workspaceFolder}" },
+      "isBackground": true,
+      "presentation": { "reveal": "always", "focus": false, "panel": "dedicated" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Academy: API",
+      "type": "shell",
+      "command": "npm run dev -w @timmy/api",
+      "options": { "cwd": "${workspaceFolder}" },
+      "isBackground": true,
+      "presentation": { "reveal": "always", "focus": false, "panel": "dedicated" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Academy: Web",
+      "type": "shell",
+      "command": "npm run dev -w @timmy/web",
+      "options": { "cwd": "${workspaceFolder}" },
+      "isBackground": true,
+      "presentation": { "reveal": "always", "focus": false, "panel": "dedicated" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Academy: start services",
+      "dependsOrder": "parallel",
+      "dependsOn": ["Academy: watch contracts", "Academy: API", "Academy: Web"],
+      "hide": true
+    },
+    {
+      "label": "Academy: dev",
+      "group": { "kind": "build", "isDefault": true },
+      "dependsOrder": "sequence",
+      "dependsOn": ["Academy: build contracts", "Academy: start services"]
+    }
+  ]
+}
