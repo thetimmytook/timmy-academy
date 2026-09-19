@@ -29,4 +29,5 @@ npm run build
 ```
 
 `npm run test:watch` runs Vitest in watch mode. Husky installs a pre-commit hook during `npm ci`;
-lint-staged formats and lints staged source files. No CI/CD or deployment is configured yet.
+lint-staged formats and lints staged source files. Deployment and GitHub Actions setup are described
+in [infrastructure/README.md](infrastructure/README.md).
