@@ -1,2 +1,14 @@
-node_modules
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.vite/
+.wrangler/
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
+*.log
 *.bkp
+.DS_Store
+Thumbs.db

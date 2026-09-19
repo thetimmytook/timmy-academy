@@ -1,6 +1,6 @@
 # Tooling selection from `D:/Downloads/template`
 
-Status: design proposal with agreed monorepo and environment decisions, 2026-09-18. No configuration files or application code are part of this decision yet.
+Status: agreed design. A minimal workspace scaffold was added on 2026-09-19; CI/CD and deployment remain future steps.
 
 ## Proposed structure when implementation begins
 
@@ -31,7 +31,7 @@ Keep the initial `apps/web` architecture simple: React + Vite with client-side r
 ## Take from the template, adapted to this project
 
 - npm workspaces for the monorepo; Node 24 baseline if compatible with the chosen Cloudflare and Vite versions at implementation time.
-- `.editorconfig` and Prettier style: UTF-8, LF, 2 spaces, single quotes, trailing commas, 100 columns, semicolons.
+- Prettier style: UTF-8, LF, 2 spaces, single quotes, trailing commas, 100 columns, semicolons. No `.editorconfig` is needed.
 - ESLint flat config with `@eslint/js`, `typescript-eslint`, `eslint-plugin-import-x`, `eslint-plugin-sonarjs`, `eslint-plugin-security` and `eslint-config-prettier`. Keep meaningful type-aware checks, including floating/misused promises, unsafe arguments and ignored error paths. Add React Hooks rules for the web and separate browser/Worker globals.
 - TypeScript strict mode, isolated modules, unused checks, consistent casing, no implicit returns and no fallthrough. Choose module resolution per target: Vite/browser/Worker packages should not inherit the NestJS NodeNext output assumptions.
 - Vitest and separate type checking. Test configuration should follow actual app boundaries when they exist.

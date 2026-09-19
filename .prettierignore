@@ -1,0 +1,8 @@
+node_modules
+dist
+coverage
+.wrangler
+package-lock.json
+design
+*.drawio
+*.svg

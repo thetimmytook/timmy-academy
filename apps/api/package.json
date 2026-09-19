@@ -1,0 +1,21 @@
+{
+  "name": "@timmy/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --config ../../infrastructure/wrangler.jsonc --local --port 8787",
+    "build": "wrangler deploy --config ../../infrastructure/wrangler.jsonc --dry-run --env= --outdir dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@timmy/contracts": "*",
+    "hono": "^4.13.8"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260919.1",
+    "wrangler": "^4.135.0"
+  }
+}

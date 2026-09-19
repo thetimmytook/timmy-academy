@@ -1,0 +1,51 @@
+{
+  "name": "timmy-academy",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "prepare": "husky",
+    "dev": "npm run build -w @timmy/contracts && concurrently -k -n contracts,api,web \"npm run dev -w @timmy/contracts\" \"npm run dev -w @timmy/api\" \"npm run dev -w @timmy/web\"",
+    "dev:web": "npm run build -w @timmy/contracts && npm run dev -w @timmy/web",
+    "dev:api": "npm run build -w @timmy/contracts && npm run dev -w @timmy/api",
+    "build": "npm run build -w @timmy/contracts && npm run build -w @timmy/api && npm run build -w @timmy/web",
+    "typecheck": "npm run build -w @timmy/contracts && npm run typecheck -w @timmy/contracts && npm run typecheck -w @timmy/api && npm run typecheck -w @timmy/web",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm run build -w @timmy/contracts && npm run test -w @timmy/contracts && npm run test -w @timmy/api && npm run test -w @timmy/web",
+    "test:watch": "npm run build -w @timmy/contracts && concurrently -k -n contracts-build,contracts,api,web \"npm run dev -w @timmy/contracts\" \"npm run test:watch -w @timmy/contracts\" \"npm run test:watch -w @timmy/api\" \"npm run test:watch -w @timmy/web\""
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,mjs}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,jsonc,css,html,md,yml,yaml}": "prettier --write"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.13.4",
+    "concurrently": "^10.0.5",
+    "eslint": "^10.11.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import-x": "^4.17.1",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-security": "^4.0.1",
+    "eslint-plugin-sonarjs": "^4.2.1",
+    "globals": "^17.12.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.5.1",
+    "prettier": "^3.9.8",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.70.0",
+    "vitest": "^5.0.1"
+  }
+}
