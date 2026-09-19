@@ -26,6 +26,7 @@
     },
     {
       "label": "Academy: API",
+      "icon": { "id": "gear", "color": "terminal.ansiBlue" },
       "type": "shell",
       "command": "npm run dev -w @timmy/api",
       "options": { "cwd": "${workspaceFolder}" },
@@ -35,6 +36,7 @@
     },
     {
       "label": "Academy: Web",
+      "icon": { "id": "browser", "color": "terminal.ansiGreen" },
       "type": "shell",
       "command": "npm run dev -w @timmy/web",
       "options": { "cwd": "${workspaceFolder}" },
