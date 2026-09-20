@@ -1,6 +1,6 @@
 # Timmy Academy benchmark backend — discussion draft
 
-Status: proposal for discussion, 2026-09-18. No implementation is implied by this document.
+Status: design decisions recorded through 2026-09-20. Remaining field mappings and operational thresholds are listed below. No implementation is implied by this document.
 
 ## Scope and sources
 
@@ -21,15 +21,148 @@ This draft covers public benchmark search, Position comparison, publication, and
 
 | Method and path                                        | Access           | Purpose                                                                                                                                                                                                                         |
 | ------------------------------------------------------ | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/bench/v1/runs`                               | anonymous        | Filtered, cursor-paginated public run search; explicit sort and bounded page size.                                                                                                                                              |
+| `GET /api/bench/v1/runs`                               | anonymous        | Filtered, cursor-paginated public run search. The browse view groups runs by CPU, GPU and RAM capacity; each displayed FPS belongs to one run.                                                                                                                                              |
 | `GET /api/bench/v1/runs/{publicRunId}`                 | anonymous        | One published run, public allowlist only; 404 after removal.                                                                                                                                                                    |
-| `POST /api/bench/v1/cohorts/query`                     | anonymous        | Position request using a local run's selected, sanitized comparison fields; returns criteria, quality, counts and example runs. POST avoids long URLs and browser history containing query details. It never publishes the run. |
+| `POST /api/bench/v1/cohorts/query`                     | anonymous        | Position request using a local run's selected comparison conditions; returns exact criteria, counts and individual examples. POST avoids long URLs and browser history containing query details. It never publishes the run. |
 | `POST /api/bench/v1/me/runs`                           | verified account | Publish one explicitly selected run, with `client_run_id` as the idempotency key.                                                                                                                                               |
 | `GET /api/bench/v1/me/runs`                            | owner            | List own submitted runs and publication/moderation state.                                                                                                                                                                       |
 | `GET /api/bench/v1/me/runs/by-client-id/{clientRunId}` | owner            | Recover an acknowledgement after timeout, including pending state.                                                                                                                                                              |
 | `DELETE /api/bench/v1/me/runs/{publicRunId}`            | owner            | Delete an owned publication; remove it from public reads and comparisons, with a separately anonymized measurement eligible for internal skill use. Repeated requests must not republish it.                                    |
 
-Naming: use plural `runs` for resources. `search` need not be a separate endpoint from filtered `GET /runs`. Keep the cohort query separate because it has selection policy and a local-run input, not ordinary pagination. `POST /cohorts/query` is a read operation and must have no publication side effect.
+Naming: use plural `runs` for resources. `search` need not be a separate endpoint from filtered `GET /runs`. Keep the cohort query separate because it uses the selected local run's comparison conditions, not ordinary search pagination. `POST /cohorts/query` is a read operation and must have no publication side effect.
+
+## HTTP contract conventions
+
+All paths below are relative to `/api/bench/v1`. JSON property names use `snake_case`, except the explicitly allowlisted saved-game keys inside `settings_snapshot`; timestamps are UTC ISO 8601 and `captured_day` is `YYYY-MM-DD`. `null` means unknown or unavailable and is never silently replaced with a Windows display value. Examples use fictional measurements and opaque IDs. `game_resolution` means the selected **in-game screen resolution** from the confirmed `Graphics.ini` mapping; it does not claim a measured swap-chain, internal render size or physical monitor mode. Unknown request fields and unsupported enum values return `422 invalid_input`; private fields are never echoed in errors. Anonymous responses use only the projections defined here. The server selects those fields explicitly, not by serializing its publication record.
+
+The initial public hardware tuple is normalized CPU model ID, normalized GPU model ID and normalized installed RAM capacity in GB. Equality of all three values defines a **navigation group**, not an aggregate measurement or a run. The normalization rules and IDs are server-owned. Additional RAM module models, GPU variants/version details and SSD information are neither grouping keys nor separate filters; their planned collection in the Windows Benchmark does not make them required public fields. One `public_run_id` identifies exactly one capture and is the only target of `Details`.
+
+### `GET /runs` — public search
+
+| Query parameter | Contract |
+| --- | --- |
+| `view` | `groups` (default) or `items`. `groups` pages hardware cards; `items` pages individual runs within one card. |
+| `group_key` | Required only for `view=items`; forbidden for `view=groups`. An opaque navigation token returned on a group, bound to its normalized hardware tuple, search filters, sort and snapshot. It is not a stable public ID or a detail URL. |
+| `cpu`, `gpu` | Exact server-normalized model IDs. No substring or fuzzy match in v1. |
+| `ram_gb` | Exact normalized installed-RAM capacity in GB, a positive integer. |
+| `map` | Exact canonical map ID. |
+| `execution` | `bsg_servers` or `local`. |
+| `game_width`, `game_height` | Positive integer selected in-game screen-resolution dimensions from the verified `DisplaySettings.Resolution` mapping; supply both or neither. Windows desktop resolution is not a substitute. |
+| `game_version` | Exact game build string; no compatibility expansion in v1. |
+| `sort` | `captured_desc` (default) or `captured_asc`. There is no relevance, normalized-FPS or ranking sort. |
+| `limit` | Number of groups for `view=groups` or runs for `view=items`; default 20, maximum 50. |
+| `cursor` | Opaque continuation token from the same view, group, filters, sort, limit and result snapshot. Omit on the first page. |
+
+Any subset of the four main filters (`cpu`, `gpu`, `ram_gb`, `map`), including none, returns results immediately. All supplied filters apply with AND semantics. A run whose value is unknown cannot satisfy a filter on that field, but remains visible when the field is not filtered. Unapproved graphics, render-scale and upscaling keys are not accepted as filters yet; add named, typed filters to this versioned contract only after their collection and semantics are verified. Do not accept arbitrary `settings.*` query keys.
+
+`groups` are ordered by the first matching run in each group under `sort`; ties use the group key. Within a group, runs are ordered by captured day, then server publication time, then public run ID in the requested direction. The preview contains at most one run per map and at most three maps, chosen from that run order. Thus each preview FPS is an individual run, including when multiple runs exist on the same map. `run_count`, `map_count`, `contributor_count` and `remaining_run_count` describe the filtered snapshot; no FPS is averaged. `items` returns all matching runs in its group using the same sort and filters. The `group_key` from a card is how the client gets runs omitted from its preview.
+
+The first page establishes a search snapshot. Subsequent cursors exclude later publications and keep group membership, counts and ordering fixed while the snapshot is valid. A cursor binds its exact normalized filters, view, group key, sort and limit; changing any of them returns `400 invalid_cursor` and the client starts a new first page. If deletion/moderation or expiry makes a snapshot unsafe to continue without skipped or repeated visible runs, return `409 cursor_stale`; restart from page one. A `group_key` used with changed filters/sort or an unavailable snapshot returns `409 group_key_stale`. Removed runs never remain publicly readable merely because a cursor was issued earlier. No offset pagination is offered.
+
+Example: a partial search, with one card containing four individual runs across two maps:
+
+```http
+GET /api/bench/v1/runs?gpu=geforce-rtx-4070-super&view=groups&sort=captured_desc&limit=20
+```
+
+```json
+{
+  "view": "groups",
+  "filters": {"cpu": null, "gpu": "geforce-rtx-4070-super", "ram_gb": null, "map": null, "execution": null, "game_width": null, "game_height": null, "game_version": null},
+  "sort": "captured_desc",
+  "limit": 20,
+  "summary": {"group_count": 1, "run_count": 4, "contributor_count": 2},
+  "groups": [{
+    "group_key": "hg_L7q8",
+    "hardware": {"cpu": {"id": "ryzen-7-7800x3d", "name": "Ryzen 7 7800X3D"}, "gpu": {"id": "geforce-rtx-4070-super", "name": "GeForce RTX 4070 SUPER"}, "ram_gb": 32},
+    "run_count": 4,
+    "map_count": 2,
+    "contributor_count": 2,
+    "preview_runs": [
+      {"public_run_id": "br_8N4qP2vK", "url": "/bench/runs/br_8N4qP2vK", "captured_day": "2026-09-16", "map": {"id": "lighthouse", "name": "Lighthouse"}, "execution": "bsg_servers", "game_resolution": {"width": 2560, "height": 1440}, "game_version": "0.16.9.0", "metrics": {"average_fps": 121.0, "one_percent_low_fps": 82.0}},
+      {"public_run_id": "br_3tQ7mW5a", "url": "/bench/runs/br_3tQ7mW5a", "captured_day": "2026-09-15", "map": {"id": "customs", "name": "Customs"}, "execution": "local", "game_resolution": {"width": 1920, "height": 1080}, "game_version": "0.16.9.0", "metrics": {"average_fps": 118.0, "one_percent_low_fps": 79.0}}
+    ],
+    "remaining_run_count": 2
+  }],
+  "next_cursor": null
+}
+```
+
+The group may have three Lighthouse runs, but its preview still shows only one Lighthouse measurement. To retrieve all four, including those not previewed, repeat the **same filters and sort** with the returned group key:
+
+```http
+GET /api/bench/v1/runs?gpu=geforce-rtx-4070-super&view=items&group_key=hg_L7q8&sort=captured_desc&limit=2
+```
+
+```json
+{
+  "view": "items",
+  "group_key": "hg_L7q8",
+  "filters": {"cpu": null, "gpu": "geforce-rtx-4070-super", "ram_gb": null, "map": null, "execution": null, "game_width": null, "game_height": null, "game_version": null},
+  "sort": "captured_desc",
+  "limit": 2,
+  "group": {"hardware": {"cpu": {"id": "ryzen-7-7800x3d", "name": "Ryzen 7 7800X3D"}, "gpu": {"id": "geforce-rtx-4070-super", "name": "GeForce RTX 4070 SUPER"}, "ram_gb": 32}, "run_count": 4, "map_count": 2, "contributor_count": 2},
+  "items": [
+    {"public_run_id": "br_8N4qP2vK", "url": "/bench/runs/br_8N4qP2vK", "captured_day": "2026-09-16", "map": {"id": "lighthouse", "name": "Lighthouse"}, "execution": "bsg_servers", "game_resolution": {"width": 2560, "height": 1440}, "game_version": "0.16.9.0", "metrics": {"average_fps": 121.0, "one_percent_low_fps": 82.0}},
+    {"public_run_id": "br_3tQ7mW5a", "url": "/bench/runs/br_3tQ7mW5a", "captured_day": "2026-09-15", "map": {"id": "customs", "name": "Customs"}, "execution": "local", "game_resolution": {"width": 1920, "height": 1080}, "game_version": "0.16.9.0", "metrics": {"average_fps": 118.0, "one_percent_low_fps": 79.0}}
+  ],
+  "next_cursor": "cur_K4p2"
+}
+```
+
+The next request keeps every query parameter above and adds `cursor=cur_K4p2`:
+
+```http
+GET /api/bench/v1/runs?gpu=geforce-rtx-4070-super&view=items&group_key=hg_L7q8&sort=captured_desc&limit=2&cursor=cur_K4p2
+```
+
+```json
+{"view":"items","group_key":"hg_L7q8","filters":{"cpu":null,"gpu":"geforce-rtx-4070-super","ram_gb":null,"map":null,"execution":null,"game_width":null,"game_height":null,"game_version":null},"sort":"captured_desc","limit":2,"group":{"hardware":{"cpu":{"id":"ryzen-7-7800x3d","name":"Ryzen 7 7800X3D"},"gpu":{"id":"geforce-rtx-4070-super","name":"GeForce RTX 4070 SUPER"},"ram_gb":32},"run_count":4,"map_count":2,"contributor_count":2},"items":[{"public_run_id":"br_6pD2sJ9n","url":"/bench/runs/br_6pD2sJ9n","captured_day":"2026-09-14","map":{"id":"lighthouse","name":"Lighthouse"},"execution":"bsg_servers","game_resolution":{"width":2560,"height":1440},"game_version":"0.16.9.0","metrics":{"average_fps":117.0,"one_percent_low_fps":78.0}},{"public_run_id":"br_5vR8hC1x","url":"/bench/runs/br_5vR8hC1x","captured_day":"2026-09-13","map":{"id":"lighthouse","name":"Lighthouse"},"execution":"bsg_servers","game_resolution":{"width":2560,"height":1440},"game_version":"0.16.9.0","metrics":{"average_fps":115.0,"one_percent_low_fps":76.0}}],"next_cursor":null}
+```
+
+With no matching runs, `GET /runs?map=lighthouse&cpu=ryzen-7-7800x3d&gpu=geforce-rtx-4070-super&ram_gb=32` returns `200` without substituting nearby hardware or maps:
+
+```json
+{"view":"groups","filters":{"cpu":"ryzen-7-7800x3d","gpu":"geforce-rtx-4070-super","ram_gb":32,"map":"lighthouse","execution":null,"game_width":null,"game_height":null,"game_version":null},"sort":"captured_desc","limit":20,"summary":{"group_count":0,"run_count":0,"contributor_count":0},"groups":[],"next_cursor":null}
+```
+
+### `GET /runs/{publicRunId}` — one public run
+
+The response is a single capture, not its hardware group. `game_resolution`, `game_version`, `render_scale`, `upscaling` and `settings` may be `null`; unknown values remain visible as unknown. `settings` contains only the approved public projection in [benchmark-settings-allowlist.md](benchmark-settings-allowlist.md), never the private selected-key snapshot. `author` is `null` or `{ "display_name": string, "avatar_url": string | null }` from an optional public profile. The avatar is not inferred from email.
+
+```http
+GET /api/bench/v1/runs/br_8N4qP2vK
+```
+
+```json
+{
+  "public_run_id": "br_8N4qP2vK",
+  "url": "/bench/runs/br_8N4qP2vK",
+  "captured_day": "2026-09-16",
+  "hardware": {"cpu": {"id": "ryzen-7-7800x3d", "name": "Ryzen 7 7800X3D"}, "gpu": {"id": "geforce-rtx-4070-super", "name": "GeForce RTX 4070 SUPER"}, "ram_gb": 32, "tuning_class": "unknown"},
+  "conditions": {"map": {"id": "lighthouse", "name": "Lighthouse"}, "execution": "bsg_servers", "game_resolution": {"width": 2560, "height": 1440}, "game_version": "0.16.9.0", "render_scale": null, "upscaling": null, "weather": "unknown", "time_of_day": "day"},
+  "capture": {"duration_sec": 118.7, "sample_count": 14363},
+  "metrics": {"average_fps": 121.0, "one_percent_low_fps": 82.0, "zero_point_one_percent_low_fps": 54.0, "average_frametime_ms": 8.26, "p95_frametime_ms": 11.8, "p99_frametime_ms": 16.4},
+  "settings": {"game": {"automatic_ram_cleaner": false, "only_use_physical_cores": true}, "graphics": {"screen_mode": "borderless", "texture_quality_code": 2, "shadows_quality_code": 0, "anti_aliasing": "TAA_High", "dlss_mode": "Off", "fsr2_mode": "Off", "fsr3_mode": "Off", "vsync": false, "high_quality_color": false}, "postfx": {"enabled": false}},
+  "quality_notes": [],
+  "author": null
+}
+```
+
+The example's PostFX state is the saved `EnablePostFx: false`, not the screenshot's temporary On state. Fields absent from the selected-key snapshot remain omitted; if no approved public settings are present, `settings` is `null`. `quality_notes` is an approved enum-code list, never free-text local warnings. A removed, unpublished or unknown ID returns `404 not_found` with the standard error shape.
+
+The anonymous allowlist is deliberately smaller than the publication DTO: search and Position run summaries contain only `public_run_id`, `url`, `captured_day`, map ID/name, execution, selected game screen resolution, game version, Average FPS and 1% low; a browse group additionally contains its normalized CPU/GPU ID/name, RAM GB and counts. Detail additionally contains the same hardware tuple, optional tuning class, bounded context, capture duration/sample count, 0.1% low and frametime metrics, individually approved settings, quality-note codes and optional public author name/avatar. Search and Position contain contributor **counts** but never contributor identifiers. No anonymous response contains email, private account or client run ID, local paths, raw hardware/machine IDs, private selected-key settings snapshot, raw capture, session data or moderation notes. Additional RAM module models, GPU version details and SSD information are absent from this v1 allowlist.
+
+### Benchmark screen data needs
+
+| Screen | Data source and request | User actions and navigation |
+| --- | --- | --- |
+| Search and browse | URL holds filters; `GET /api/bench/v1/runs` provides grouped cards, individual preview runs, counts and cursors. The source of selectable canonical filter options remains to be specified. `view=items` reveals the remaining runs in one hardware group. | Select or clear filters with immediate results; expand a group; open the selected run's public details. |
+| Public run details | `GET /api/bench/v1/runs/{publicRunId}` provides the one published run and approved details. | Copy the stable link or return to the last browse URL; direct visits need no sign-in. |
+| My Bench | Authenticated `GET /api/bench/v1/me/runs` provides only that account's server-submitted runs and publication/review states. | Open a published public run or confirm `DELETE /api/bench/v1/me/runs/{publicRunId}`. Pending review is not public. Complete local history stays in the Windows app. |
+| Email sign-in and code | The eventual auth provider handles challenge/session data; no benchmark endpoint is added for these steps. | Return to My Bench after sign-in if that was the destination; `BENCH` and back navigation restore the last browse URL. |
+
+Wireframe settings-profile and hardware-target concept pages remain outside the initial website scope and create no endpoints. Publishing is initiated only in the Windows Benchmark app.
 
 Auth provider selection is open; see `auth-provider-comparison.md`. The agreed auth boundary and browser-based Windows flow are in `auth-boundary.md`. Anonymous benchmark reads need no durable anonymous account. The Worker maps a verified provider identity to a stable private application account before owner operations. Product code remains independent of the provider.
 
@@ -41,7 +174,7 @@ Status: `design/wireframes/benchmark-user-paths.drawio` is the current approved 
 - The Academy-wide header is provisional. For the benchmark wireframes, show a `BENCH` link and a profile icon, without a separate `Search` or `My Bench` header link. `BENCH` returns to the last visited benchmark browse URL when one is known; search criteria are represented in that URL, so coming back from a run detail, sign-in or owner page restores the filters rather than clearing them. With no previous browse URL, open the unfiltered page. The guest profile menu leads to email-code sign-in; the signed-in profile menu offers `My Bench` and `Sign out`. A successful sign-in initiated for `My Bench` returns there. The exact Academy shell and route-state implementation remain open.
 - The core public task is finding results for a CPU, GPU, RAM capacity and map. Keep those in one prominent search flow; resolution, BSG servers versus Local and game version are relevant comparison conditions. Avoid a second `Apply filters` action detached from the main search.
 - Do not use unexplained `High quality`/`Good sample` badges, `Most relevant` sorting, or a website `Submit result` action. Submission is initiated only in the Microsoft Store Benchmark app. Expose concrete capture facts or warnings when useful.
-- The API's atomic result remains one published run: one capture, map, settings/context and metrics. For a hardware-first browse view, try cards headed by CPU, GPU and RAM capacity, with a short preview of at most three map rows and a way to reveal the remaining maps/runs. If several runs exist on one map, label the shown FPS as one actual run and show that more runs exist; never silently average runs with differing conditions. The row should focus on map, BSG/Local mode, game resolution, game version, Average FPS and 1% low. Do not put a generic `Settings` summary column in the compact list: the full settings belong in run details and optional filters. A grouped card must not imply that several maps were measured in one run or that differing conditions are identical. The exact view structure, preview selection and expansion behavior remain to be designed in wireframes.
+- The API's atomic result remains one published run: one capture, map, settings/context and metrics. The browse view groups runs under cards headed by CPU, GPU and RAM capacity, with a short preview of at most three map rows and a way to reveal the remaining maps/runs. If several runs exist on one map, label the shown FPS as one actual run and show that more runs exist; never silently average runs with differing conditions. The row focuses on map, BSG/Local mode, game resolution, game version, Average FPS and 1% low. Do not put a generic `Settings` summary column in the compact list: the reviewed settings belong in run details and optional filters. A grouped card must not imply that several maps were measured in one run or that differing conditions are identical.
 - A signed-in `My Bench` page lists the account's server-submitted runs and their publication/moderation states. Each published run has a trash button beside it. The confirmation dialog explains that deletion removes the publication from public search and comparisons while the local capture in the Benchmark app remains; use explicit `Yes, delete publication` / `No, keep it` choices. Anonymized measurement retention is disclosed before publication and in the privacy policy, not repeated in this short dialog. No ordinary edit action is offered. Distinguish these submitted runs from complete local history, which remains in the Windows app and is never uploaded automatically. The exact page label and layout remain open.
 - `Details` on a public search row opens that row's public run detail page; it is anonymous and does not require sign-in. `Open` in `My Bench` can lead to the same public page for a published run. Each detail page describes one run, not a user's private local capture. The existing collector reads installed RAM capacity and module data; it does not measure peak in-game RAM usage. Do not show uncollected `MIN FPS`, full frametime trace, fixed route, free-text tester notes or other fields absent from the approved public contract.
 
@@ -49,48 +182,224 @@ Status: `design/wireframes/benchmark-user-paths.drawio` is the current approved 
 
 Use a server-generated random opaque ID, independent of the local UUID and account ID. Store the local UUID privately only for owner idempotency. Never derive the public URL from an email, nickname, hardware string or timestamp.
 
-The publication request is a new versioned allowlist DTO, not `BenchmarkRun` serialized wholesale. It includes: schema version, client run ID, captured day, app version, known map ID, BSG/Local execution, game version, measured game output width/height when reliably known, render scale/upscaler, normalized hardware search fields plus sanitized display names, optional self-reported tuning class, validated graphics/PostFX fields, optional bounded context values, capture duration, sample count and performance metrics. The server derives normalized search keys. Unknown values stay explicitly unknown.
+The publication request is a new versioned, validated DTO, not `BenchmarkRun` serialized wholesale. It includes: schema version, private client run ID for idempotency, captured day, app version, known map ID, BSG/Local execution, game version, selected in-game screen width/height when available from the verified saved-settings mapping, sanitized CPU/GPU display names and normalized RAM capacity, optional self-reported tuning class, a private **selected-key** settings snapshot under the [v1 allowlist](benchmark-settings-allowlist.md), bounded weather/time context, actual capture duration, sample count and performance metrics. Render scale and upscaling are recorded as approved graphics settings; a separate derived field can be added only after its semantics are reviewed. The server derives normalized CPU/GPU search keys. Unknown values stay explicitly unknown. Public search and detail responses select their own smaller allowlists from accepted data.
 
-Do not accept arbitrary `system`, `settings`, `context` or `warnings` objects. The current model stores them as `object`. In the inspected current code, `system.gpu[].current_resolution` specifically comes from `Win32_VideoController`; the user identifies a separate game-resolution value in the game's settings files. Confirm its exact key and semantics, then map that game value explicitly into the public contract. Do not use the Windows display-mode field for strict cohorts. Reject extra properties and free-text fields unless specifically reviewed. In particular, exclude raw CSV, paths, host/user names, IPs, serials, machine IDs, pagefile paths, and unreviewed settings keys. Public nickname may change and is never an ownership key.
+The settings catalog is now proposed as `settings_snapshot.schema_version: 1` with exact accepted paths, types, values and public visibility. The server must independently reject unknown sections/keys, extra properties, malformed values, excessive size or depth, and free text that has not been reviewed; client-side sanitization is not sufficient against malicious requests. The current model stores `system`, `settings` and `context` as `object`, so none may be accepted or returned wholesale. In the inspected current code, `system.gpu[].current_resolution` comes from `Win32_VideoController` and must not populate `game_resolution`. Controlled game-UI changes confirmed `graphics.DisplaySettings.Resolution.Width/Height` as the selected game screen resolution across Borderless, Windowed and Fullscreen. The server cross-checks the top-level `game_resolution` against this accepted settings pair whenever both are supplied; a mismatch is invalid input. Exclude raw CSV, paths, host/user names, IPs, serials, machine IDs, pagefile paths and unreviewed settings keys from publication.
 
-Public detail responses contain only the approved display fields. Captured date should be day precision. Search/cohort responses use an even smaller projection. No email, account ID, client run ID, session data, moderation notes or internal source strings appear in any anonymous response.
+Public detail responses contain only the approved display fields. Captured date has day precision. Search/cohort responses use an even smaller projection. Optional author display name and avatar come from an explicitly public profile, never from the verified email or an implicit email-derived avatar. If the profile has no author information, omit it. The public author is never an ownership key. No email, account ID, client run ID, session data, moderation notes or internal source strings appear in any anonymous response.
 
-## Cohort policy proposal
+## Exact comparison policy
 
-1. Hard boundaries: exact map, BSG versus Local, known actual game output resolution, and a server-defined compatible game-version group. Start with exact game build; broaden to a reviewed compatibility group only after real data supports it. Unknown resolution/version never qualifies for a strict Position result, though such runs remain searchable and visible in detail.
-2. Within those boundaries, try exact CPU + GPU + RAM capacity. If sparse, return a documented broader hardware tier, such as same CPU and GPU with wider RAM capacity, then same GPU with broader CPU, without silently relaxing hard boundaries. Return the precise effective criteria and `match_quality` enum.
-3. Graphics settings, render scale, upscaling and tuning class are visible and optional filters. They are not default equality requirements. Label material differences in the result cards. Stock is the default baseline for tuning comparisons; unknown stays outside strict stock claims.
-4. Return raw Average FPS and counts of distinct contributors and accepted runs. One contributor supplies at most one representative run to any distribution, chosen deterministically (for example, most recent eligible run per exact settings profile, followed by one per contributor). Show all individual eligible runs in search; do not let prolific uploaders dominate cohort statistics.
-5. Initial safety rule to confirm with real data: show no rank/percentile unless there are at least 10 distinct contributors in a strict cohort and quality gates pass. For sparse or widened cohorts, show example bars with counts and reasons, no precise position. No universal normalized FPS score.
+1. A comparison uses exact canonical CPU, GPU and installed RAM capacity class, exact map, BSG versus Local, known selected in-game screen resolution and exact game build. It does not widen to another hardware model, RAM class, resolution, execution mode, map or version when no matches exist. Runs with unknown version or game resolution remain searchable and visible in detail but cannot satisfy those specified comparison conditions.
+2. Approved graphics settings, render scale, upscaling and tuning class can be visible and later become named optional search filters after their field semantics are verified. They are not default equality requirements. Label known material differences between displayed runs. A stock-versus-tuned claim requires a separately reviewed rule; unknown tuning does not mean stock.
+3. Every match is an individual published run. Return its real Average FPS and other approved metrics, plus counts of distinct contributors and matching runs. A prolific contributor's runs remain individually visible; these counts must not be presented as independent contributors. There is no widened match tier, aggregate FPS score, percentile, rank or hardware leaderboard in the initial contract.
+4. Return the exact criteria, bounded individual run examples and an explicit status. `matches` means one or more exact runs, `no_data` means zero exact runs, and `missing_conditions` means the request lacks a required reliable comparison value. Machine-readable reason codes explain states such as `unknown_game_resolution` or `game_version_missing`; they do not encode relaxation. A zero-match response does not provide runs from nearby hardware as substitutes.
 
-The server returns `status` such as `comparable`, `examples_only`, `no_data`, or `insufficient_data`; effective criteria; match quality and reasons; contributor/run counts; bounded example runs; and, only when eligible, distribution data. The Position query sends comparison criteria, not the local run's FPS or full settings document. The desktop app adds its local run as a highlighted bar on the client. Opening Position requires consent before this query.
+The Position query sends comparison criteria, not the local run's FPS or full settings document. The desktop app adds its local run as a highlighted bar on the client. Opening Position requires consent before this query. Search with partial filters is broader by definition and still works immediately; strict exact comparison applies only when comparing a specified set of conditions.
+
+### `POST /cohorts/query` — Position read
+
+This anonymous, side-effect-free request sends only hardware and comparison conditions after the Windows user consents. It does not send the local run ID, FPS, settings snapshot or author identity. Hardware names are normalized by the server using the same rules as search/publication. Nullable values allow a completed local run with missing game-version or game-selected resolution to receive `missing_conditions`, rather than a misleading empty cohort. Map the saved `DisplaySettings.Resolution` pair when both dimensions are present and valid; do not substitute the Windows display mode. A malformed or unsupported value is `422 invalid_input`.
+
+```http
+POST /api/bench/v1/cohorts/query
+Content-Type: application/json
+```
+
+```json
+{
+  "hardware": {"cpu_name": "Ryzen 7 7800X3D", "gpu_name": "GeForce RTX 4070 SUPER", "ram_gb": 32},
+  "map": "lighthouse",
+  "execution": "bsg_servers",
+  "game_resolution": {"width": 2560, "height": 1440},
+  "game_version": "0.16.9.0"
+}
+```
+
+The response returns the canonical **exact** criteria, counts of matching runs and distinct contributors, and at most 20 individual public run summaries in `runs`. `truncated: true` means more exact runs exist; the complete set can be browsed through `GET /runs` using the returned canonical criteria. Multiple runs from one contributor remain separate and do not inflate `contributor_count`. No ranking, percentile, distribution, average of runs or widened match quality is returned.
+
+```json
+{
+  "status": "matches",
+  "criteria": {"hardware": {"cpu": {"id": "ryzen-7-7800x3d", "name": "Ryzen 7 7800X3D"}, "gpu": {"id": "geforce-rtx-4070-super", "name": "GeForce RTX 4070 SUPER"}, "ram_gb": 32}, "map": {"id": "lighthouse", "name": "Lighthouse"}, "execution": "bsg_servers", "game_resolution": {"width": 2560, "height": 1440}, "game_version": "0.16.9.0"},
+  "counts": {"run_count": 1, "contributor_count": 1},
+  "runs": [
+    {"public_run_id": "br_8N4qP2vK", "url": "/bench/runs/br_8N4qP2vK", "captured_day": "2026-09-16", "map": {"id": "lighthouse", "name": "Lighthouse"}, "execution": "bsg_servers", "game_resolution": {"width": 2560, "height": 1440}, "game_version": "0.16.9.0", "metrics": {"average_fps": 121.0, "one_percent_low_fps": 82.0}}
+  ],
+  "truncated": false,
+  "reason_codes": []
+}
+```
+
+An exact query with no matching published run returns `200`, with the same criteria and no substitutes:
+
+```json
+{"status":"no_data","criteria":{"hardware":{"cpu":{"id":"ryzen-7-7800x3d","name":"Ryzen 7 7800X3D"},"gpu":{"id":"geforce-rtx-4070-super","name":"GeForce RTX 4070 SUPER"},"ram_gb":32},"map":{"id":"lighthouse","name":"Lighthouse"},"execution":"bsg_servers","game_resolution":{"width":2560,"height":1440},"game_version":"0.16.9.0"},"counts":{"run_count":0,"contributor_count":0},"runs":[],"truncated":false,"reason_codes":["no_exact_matches"]}
+```
+
+An unknown required condition does not query nearby cohorts:
+
+```json
+{
+  "status": "missing_conditions",
+  "criteria": {"hardware": {"cpu": {"id": "ryzen-7-7800x3d", "name": "Ryzen 7 7800X3D"}, "gpu": {"id": "geforce-rtx-4070-super", "name": "GeForce RTX 4070 SUPER"}, "ram_gb": 32}, "map": {"id": "lighthouse", "name": "Lighthouse"}, "execution": "bsg_servers", "game_resolution": null, "game_version": "0.16.9.0"},
+  "counts": null,
+  "runs": [],
+  "truncated": false,
+  "reason_codes": ["unknown_game_resolution"]
+}
+```
+
+`status` is exactly one of `matches`, `no_data`, `missing_conditions`; `reason_codes` is empty for matches and uses reviewed enum values for other states. The desktop adds its own local FPS bar client-side. It must not label a single exact public run as a statistical cohort or a hardware potential.
+
+### `POST /me/runs` — publish one selected local run
+
+Requires a verified-email account and the Windows app's explicit per-run publication action. Browser search, My Bench and Position never publish. The request is a versioned sanitized DTO, not local `BenchmarkRun` JSON. `client_run_id` is a private UUID used for idempotency and may appear only in authenticated owner responses. The server chooses the public ID, canonical CPU/GPU/map IDs, publication status and author profile; it never trusts a submitted account ID, email, `submitted` flag or public ID.
+
+The accepted top-level request keys are `schema_version`, `client_run_id`, `captured_day`, `app_version`, `hardware`, `map`, `execution`, `game_resolution`, `game_version`, `context`, `settings_snapshot`, `capture` and `metrics`. `hardware` contains required nonempty `cpu_name`, `gpu_name`, normalized positive-integer `ram_gb` and optional `tuning_class` (`stock`, `overclocked`, `undervolted`, `mixed`, `unknown`). `map` is a canonical map ID; `execution` is `bsg_servers` or `local`. `game_resolution` is a width/height object mapped from the selected in-game screen resolution or `null`; `game_version` is a build string or `null`. `context.weather` is `unknown`, `clear`, `cloudy`, `rain`, `fog` or `snow`; `context.time_of_day` is `unknown`, `day`, `night` or `dawn_dusk`, matching the current app's answer codes. `settings_snapshot` is `null` when no reviewed keys were available, or a selected-key object with its own `schema_version: 1` and only the exact paths, types and values in [benchmark-settings-allowlist.md](benchmark-settings-allowlist.md). Unknown keys, extra objects and free text fail validation; whole `Game.ini`, `Graphics.ini` and `PostFx.ini` files are never accepted.
+
+The selected-key settings snapshot is retained privately with the run; the public detail returns only fields whose visibility is approved in the settings allowlist. Extra RAM module models, GPU version details and SSD data are not required in this DTO and do not change search grouping. No raw CSV, local path, machine or hardware ID, email, Windows user/host name or client warnings may be sent.
+
+Example accepted request with selected settings; every metric is one capture and `capture.duration_sec` is measured from valid frames. Its `game_resolution` is the selected screen resolution mapped from the saved game settings:
+
+```http
+POST /api/bench/v1/me/runs
+Content-Type: application/json
+```
+
+```json
+{
+  "schema_version": 1,
+  "client_run_id": "0ac1d9d2-4c89-4cda-a399-c5134cd7e948",
+  "captured_day": "2026-09-16",
+  "app_version": "1.0.3.0",
+  "hardware": {"cpu_name": "Ryzen 7 7800X3D", "gpu_name": "GeForce RTX 4070 SUPER", "ram_gb": 32, "tuning_class": "unknown"},
+  "map": "lighthouse",
+  "execution": "bsg_servers",
+  "game_resolution": {"width": 2560, "height": 1440},
+  "game_version": "0.16.9.0",
+  "context": {"weather": "unknown", "time_of_day": "day"},
+  "settings_snapshot": {"schema_version": 1, "game": {"AutoEmptyWorkingSet": false, "SetAffinityToLogicalCores": true}, "graphics": {"DisplaySettings": {"FullScreenMode": 1, "Resolution": {"Width": 2560, "Height": 1440}}, "TextureQuality": 2, "ShadowsQuality": 0, "AntiAliasing": "TAA_High", "DLSSMode": "Off", "FSR2Mode": "Off", "FSR3Mode": "Off", "VSync": false, "HighQualityColor": false}, "postfx": {"EnablePostFx": false}},
+  "capture": {"duration_sec": 118.7, "sample_count": 14363},
+  "metrics": {"average_fps": 121.0, "one_percent_low_fps": 82.0, "zero_point_one_percent_low_fps": 54.0, "average_frametime_ms": 8.26, "p95_frametime_ms": 11.8, "p99_frametime_ms": 16.4}
+}
+```
+
+`201 Created` means publicly visible and returns:
+
+```json
+{"client_run_id":"0ac1d9d2-4c89-4cda-a399-c5134cd7e948","publication_status":"published","public_run_id":"br_8N4qP2vK","url":"/bench/runs/br_8N4qP2vK"}
+```
+
+`202 Accepted` means held for review, not in public reads or comparisons:
+
+```json
+{"client_run_id":"0ac1d9d2-4c89-4cda-a399-c5134cd7e948","publication_status":"pending_review","public_run_id":null,"url":null}
+```
+
+A retry with the same account, `client_run_id` and identical validated payload returns the existing result (`200` if published; `202` if pending) without creating another run. The same key with changed payload returns `409 idempotency_conflict`; a new client ID with an already accepted run fingerprint returns `409 duplicate_run`. Retrying a deleted publication returns `409 publication_deleted`, never republishes it. Invalid captures return `422 invalid_input`; an uncertain network response is recovered using the same client ID or the owner lookup below. Published measurements are immutable.
+
+### `GET /me/runs` and `GET /me/runs/by-client-id/{clientRunId}` — owner reads
+
+Both require verified account ownership. `GET /me/runs` accepts `status=all|published|pending_review|rejected` (default `all`), `limit` (default 20, maximum 50) and opaque `cursor`; it orders by server `submitted_at` descending with a stable private tie-breaker. It lists server submissions, not the Windows app's complete local history. Deleted publications are excluded. Its cursor binds status, limit and a stable result snapshot; changed parameters return `400 invalid_cursor`, and a no-longer-safe snapshot returns `409 cursor_stale`.
+
+```http
+GET /api/bench/v1/me/runs?status=all&limit=20
+```
+
+```json
+{
+  "status_filter": "all",
+  "limit": 20,
+  "items": [
+    {"client_run_id":"0ac1d9d2-4c89-4cda-a399-c5134cd7e948","publication_status":"published","public_run_id":"br_8N4qP2vK","url":"/bench/runs/br_8N4qP2vK","submitted_at":"2026-09-17T10:20:00Z","captured_day":"2026-09-16","hardware":{"cpu":"Ryzen 7 7800X3D","gpu":"GeForce RTX 4070 SUPER","ram_gb":32},"map":{"id":"lighthouse","name":"Lighthouse"},"execution":"bsg_servers","game_resolution":{"width":2560,"height":1440},"metrics":{"average_fps":121.0,"one_percent_low_fps":82.0},"status_reason":null},
+    {"client_run_id":"f775f5f5-48ad-4c17-bf59-04f079d382a9","publication_status":"pending_review","public_run_id":null,"url":null,"submitted_at":"2026-09-16T09:00:00Z","captured_day":"2026-09-16","hardware":{"cpu":"Ryzen 7 7800X3D","gpu":"GeForce RTX 4070 SUPER","ram_gb":32},"map":{"id":"streets","name":"Streets of Tarkov"},"execution":"bsg_servers","game_resolution":null,"metrics":{"average_fps":96.0,"one_percent_low_fps":61.0},"status_reason":null}
+  ],
+  "next_cursor": null
+}
+```
+
+`rejected` items have `public_run_id: null`, `url: null` and an approved `status_reason` code; internal moderation notes are never returned. An empty list returns `200`:
+
+```json
+{"status_filter":"all","limit":20,"items":[],"next_cursor":null}
+```
+
+The lookup by client ID returns `200` with `{ "item": <the same owner item shape> }` for published, pending or rejected submissions and `404 not_found` when absent or not owned. For a deleted submission it returns only `{ "item": {"client_run_id":"...","publication_status":"deleted","public_run_id":null,"url":null} }`, sufficient to prevent a lost acknowledgement from becoming a new publication. This lookup is owner-only and is never a public run URL.
+
+Example deleted acknowledgement recovery:
+
+```json
+{"item":{"client_run_id":"0ac1d9d2-4c89-4cda-a399-c5134cd7e948","publication_status":"deleted","public_run_id":null,"url":null}}
+```
+
+### `DELETE /me/runs/{publicRunId}` — remove publication
+
+Only the verified owner may remove a `published` run. A successful `200` response is returned after it has disappeared from search, detail, Position and public caches; local Windows history is unchanged. The retained internal measurement is anonymized under the policy below or discarded if that cannot be done safely. An owner retry returns the same deletion acknowledgement without recreating the run.
+
+```http
+DELETE /api/bench/v1/me/runs/br_8N4qP2vK
+```
+
+```json
+{"publication_status":"deleted","public_run_id":"br_8N4qP2vK"}
+```
+
+Afterward `GET /runs/br_8N4qP2vK` returns `404 not_found`. Another account's delete returns `403 not_owner`; an unknown public ID returns `404 not_found`. Deleting a `pending_review` submission remains a separate pre-implementation decision because it has no public run ID and this route cannot address it.
+
+### Error response
+
+All error responses use one flat JSON shape: `code` (stable machine code), English `message`, `request_id`, optional `field_errors` mapping field paths to reviewed error codes, and optional `retry_after_seconds`. They never echo rejected values, settings snapshots or credentials. Examples:
+
+```json
+{"code":"invalid_input","message":"The benchmark request is invalid.","request_id":"req_Q7n2","field_errors":{"capture.duration_sec":"too_short"}}
+```
+
+```json
+{"code":"authentication_required","message":"Sign in to manage your benchmark runs.","request_id":"req_H4m8"}
+```
+
+```json
+{"code":"not_found","message":"The public run was not found.","request_id":"req_J2b6"}
+```
+
+```json
+{"code":"cursor_stale","message":"Search results changed. Start from the first page.","request_id":"req_D5v3"}
+```
+
+```json
+{"code":"idempotency_conflict","message":"This local run ID was already submitted with different data.","request_id":"req_R8w1"}
+```
+
+Use `400 invalid_cursor`, `409 cursor_stale` or `409 group_key_stale` for paging tokens; `404 not_found` for absent public details or owner lookups; `401 authentication_required` and `403 email_verification_required`/`not_owner` for owner routes; `409 duplicate_run`, `idempotency_conflict` or `publication_deleted`; `422 invalid_input`; and `429 rate_limited` with `retry_after_seconds`. `no_data` and `missing_conditions` in Position are successful `200` responses, not errors. Network failures have no server JSON response and the desktop handles them separately.
 
 ## Publication, errors and abuse
 
 - Require verified email and explicit selection/review/affirmative publication choice for each submission. Saving locally and reading Position never submit. The user can keep a run local by not submitting it. Published measurement values cannot be edited; the owner can delete the published run from `My Bench` after confirmation. The existing local `submitted` Boolean and Google Form data provide no backend proof or migration source.
-- Enforce a small request-size limit before JSON parsing; validate schema, allowed fields and ranges with Zod; require complete captures with minimum duration and frame samples; cross-check sample count, duration, Average FPS and mean frametime within documented tolerance; reject impossible values and quarantine suspicious but plausible outliers. Do not silently rewrite measured FPS.
+- Enforce a small request-size limit before JSON parsing; validate schema, settings keys/values, allowed fields and ranges; require a complete capture and plausible metrics. The current Windows Benchmark requests a 120-second PresentMon capture and discards it if fewer than 110 seconds of valid frametime data were collected or fewer than 120 frame samples were parsed. Its saved top-level `duration_sec` is the requested 120 seconds, while `performance.duration_sec` is calculated from actual samples. The server must validate the actual measured duration and count independently rather than trusting the top-level duration or the client-valid flag. Cross-check sample count, duration, Average FPS and mean frametime within a documented tolerance; reject impossible values and quarantine suspicious but plausible outliers. Do not silently rewrite measured FPS. A stricter requirement of 120 valid measured seconds would require changing the desktop validation and is not the current rule.
 - Enforce uniqueness of `(account, client_run_id)` and compare a request fingerprint, without choosing the physical database design yet. Same key and same payload returns the original accepted or pending result; same key and different payload returns `409 idempotency_conflict`. A second distinct client ID with the same run fingerprint can return `409 duplicate_run`. An accepted response includes `public_run_id`, canonical URL and `publication_status: published`. A quarantined result returns `202` with `publication_status: pending_review`; the desktop app must not call that published.
-- Standard JSON error shape: `code`, `message`, `request_id`, optional field errors, and `retry_after_seconds`. Distinguish `400/422 invalid_input`, `401 authentication_required`, `403 not_owner`, `409 duplicate_run`/`idempotency_conflict`, `429 rate_limited`, and cohort `200` with explicit `no_data` or `insufficient_data`. The desktop handles network failure separately and retries with the same client run ID.
+- Standard JSON error shape: `code`, `message`, `request_id`, optional `field_errors` and `retry_after_seconds`. Use the exact status/code matrix above: `422 invalid_input` for malformed field values, `400 invalid_cursor` for mismatched cursors, `409 cursor_stale`/`group_key_stale` for expired search snapshots, `401 authentication_required`, `403 email_verification_required`/`not_owner`, `409 duplicate_run`/`idempotency_conflict`/`publication_deleted`, and `429 rate_limited`. Position `no_data`/`missing_conditions` are successful `200` responses. The desktop handles network failure separately and retries with the same client run ID.
 - Use approximate endpoint protection at the Worker edge, auth challenge throttling, and an exact per-account submission quota in authoritative server state. A nickname cannot be a limit key. Moderation changes visibility, not ownership. Turnstile can be added after abuse evidence.
 
 ## Data separation and exceptional removal
 
-Keep email, sessions and ownership metadata private and separate from the public benchmark projection. Public API responses must select only approved fields. Contributor counts and representative-run selection may use private ownership data internally, but may never expose its identifiers. Physical tables, relationships and indexes will be designed after the public contract and actual queries are agreed.
+Keep email, sessions and ownership metadata private and separate from the public benchmark projection. Public API responses must select only approved fields. Distinct-contributor counts may use private ownership data internally, but must never expose its identifiers. Individual matching runs remain separate; no representative-run selection or distribution is needed for the initial exact-match contract. Physical tables, relationships and indexes will be designed after the public contract and actual queries are agreed.
 
 Ordinary product flow does not edit published measurements. The authenticated owner can delete an individual publication in `My Bench`; ownership is checked against the private account ID, never a nickname. A successful deletion removes the run from anonymous search, cohorts, detail responses and caches; public detail then returns 404. The local capture in the Benchmark app is unaffected. Submission retries with the same `(account, client_run_id)` must not recreate a deleted publication; define the minimal private deletion marker and its retention before launch. This marker must not point to the retained measurement. The exact API response and behavior for pending-review submissions remain to be specified.
 
-After deletion, a measurement may remain in a separate internal pool for the Tarkov skill's benchmark analysis only if it has been irreversibly anonymized. Remove the owner/account link, public and client run IDs, nickname and any other direct or reasonably linkable identifiers; also assess whether the remaining combination of hardware, settings, context, metrics and date can single out or reconnect the contributor, including through earlier public pages or logs. Merely clearing `account_id` is insufficient. If a measurement cannot be made anonymous with reasonable confidence, discard it instead. The retained pool does not restore the deleted publication or supply individual public run examples. State this purpose and deletion behavior clearly before publication; update the privacy policy before launch. The retention period and desired quantity of anonymous measurements are deliberately undecided and will be set later.
+After deletion, retain a measurement in a separate internal pool for the Tarkov skill's benchmark analysis only after anonymization. Remove the owner/account link, public and client run IDs, public author name/avatar and any other direct or reasonably linkable identifiers. The source records contain no hardware machine ID, but still assess whether a rare combination of hardware, settings, context, metrics and captured day could reconnect the measurement to a prior public page or contributor. Merely clearing `account_id` is insufficient. Generalize or remove fields as needed; if the measurement cannot be made anonymous with reasonable confidence, discard it instead. The retained pool does not restore the deleted publication or supply individual public run examples. State this purpose and deletion behavior clearly before publication; update the privacy policy before launch. The retention period and desired quantity of anonymous measurements remain to be set later.
 
 This control does not replace other data-subject rights: before launch, choose and document a lawful basis for public publication, provide an accessible process for withdrawal/erasure or objection as applicable, and handle valid requests without undue delay. Do not impose a blanket one-year wait before requests can be made. If publication relies on GDPR consent, withdrawal must be possible at any time and as easily as consent was given. A private account link to a public run means that simply hiding the email or using an opaque run ID does not make the stored record anonymous. Moderation must also be able to quarantine or remove fraudulent, erroneous or privacy-sensitive material. Finalize account-deletion behavior and operational retention before launch and update `PRIVACY.md`. Keep auth and submission logs minimal and time-limited.
 
-## Decisions to settle before code
+## Decisions to settle before implementation
 
-1. Exact game-settings key for output resolution, its semantics with render scale/upscaling, and mapping from the current local schema to the public DTO. A missing or ambiguous value must be marked unknown for strict Position.
-2. Final game-version compatibility policy, initial duration/sample thresholds, outlier policy, cohort widening sequence, and minimum contributor threshold.
-3. Desktop sign-in return flow and secure local storage for its revocable session.
-4. Choose the publication's GDPR legal basis and define withdrawal/erasure/objection handling, moderation removal, account deletion, pending-review deletion, deletion-marker retention and replacement after an erroneous publication while keeping accepted measurement values immutable. Define and verify the anonymization procedure for retained internal skill measurements, then decide their retention period and quantity.
-5. Choose an outbound email provider when implementing verified-email sign-in. Provider selection and domain setup are outside the current concept-design stage.
+1. The selected game screen-resolution mapping was verified by controlled UI changes in Borderless, Windowed and Fullscreen; it is distinct from Windows display resolution and may now populate `game_resolution`. The field does not claim measured internal or monitor output resolution. The current `RaidLogReader` extracts game version from a 4- or 5-part numeric suffix in the log-folder name and stores `finalContext.GameVersion`; if absent, it is `null`. Exact build matching is agreed; the reliability of that source across supported installations still needs real-run validation.
+2. Define the canonical CPU/GPU model catalog, installed-RAM normalization rule, map IDs and source for selectable filter options. Group equality and query syntax are fixed above, but the precise normalization of raw Windows names and fractional RAM totals must be validated against examples. Extra RAM module models, GPU version details and SSD data remain outside the v1 grouping/filter contract.
+3. Review and approve the proposed [settings allowlist v1](benchmark-settings-allowlist.md) and make the Windows client map only those keys; the server rejects whole files and unlisted keys. The important graphics fields are accepted as bounded saved tokens/codes and shown in run details without inventing missing UI labels. Automatic RAM Cleaner, physical-cores and the three `FullScreenMode` values were confirmed by controlled UI changes; revisit them only if a later game version changes their semantics. Enumerate quality and upscaling code sets and slider ranges to refine labels and safety bounds; deferred paths remain rejected until reviewed. PostFX public detail needs only the saved enabled state; sliders remain outside search and Position. Set the request-size/depth limits and approved `quality_notes`/owner `status_reason` codes.
+4. Confirm publication metric consistency tolerances, suspicious-outlier handling and exact server acceptance thresholds against actual captures. The current desktop requests 120 seconds, requires at least 110 valid measured seconds and 120 parsed frame samples; it does not guarantee 120 valid seconds. Set the cursor/group-key lifetime and snapshot-expiry policy without weakening the pagination and removal guarantees above.
+5. Select and prove the verified-email auth provider, browser-to-Windows return and revocable credential storage. Define the optional public profile source and avatar hosting; neither may be inferred from email. No provider-specific fields enter benchmark product responses.
+6. Define pending-review deletion, rejection and moderation transitions, owner account deletion, deletion-marker retention, replacement after erroneous publication, and the anonymization/retention procedure for measurements kept for skill analysis. Document the publication's legal basis and withdrawal/erasure or objection process before launch. These choices must preserve the response states and public removal behavior specified above.
 
 ## Contract tests before release
 
-Test public allowlists by snapshotting search, detail, cohort and error responses against forbidden private keys; auth and owner isolation, including owner deletion and rejection of another account's deletion request; exact idempotent retry after lost acknowledgement; no republication after deletion and retry; conflict on changed payload; pending versus published state; immutable published measurements; removal from all public reads and caches; separation of deletion markers from retained measurements; anonymization and discard when anonymity cannot be established; malformed and oversized payloads; cohort hard boundaries, widening, contributor deduplication and sparse results; rate limits; and browser/Desktop session separation. Review `PRIVACY.md` against actual stored fields and retention.
+Test public allowlists by snapshotting search, detail, Position and error responses against forbidden private keys; auth and owner isolation, including owner deletion and rejection of another account's deletion request; exact idempotent retry and owner lookup after lost acknowledgement; no republication after deletion and retry; conflict on changed payload; pending versus published state; immutable published measurements; removal from all public reads and caches; separation of deletion markers from retained measurements; anonymization and discard when anonymity cannot be established; malformed, oversized and extra-key payloads; exact Position boundaries, `no_data` and `missing_conditions` without widening; partial-filter search and grouped cards that keep each run's metrics distinct; `items` continuation, cursor binding and stale snapshots after removals; rate limits; and browser/Desktop session separation. Review `PRIVACY.md` against actual stored fields and retention.
