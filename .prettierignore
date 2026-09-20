@@ -6,3 +6,4 @@ package-lock.json
 design
 *.drawio
 *.svg
+apps/web/styled-system

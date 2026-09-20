@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { healthResponseSchema } from '@timmy/contracts';
+import { css } from '../styled-system/css';
+import { button } from '../styled-system/recipes';
 
 export default function App() {
   const [apiStatus, setApiStatus] = useState('Checking API…');
@@ -24,10 +26,22 @@ export default function App() {
   }, []);
 
   return (
-    <main>
-      <h1>Hello, Timmy Academy</h1>
+    <main
+      className={css({
+        maxWidth: '40rem',
+        mx: 'auto',
+        py: '20',
+        px: '6',
+        display: 'grid',
+        gap: '4',
+      })}
+    >
+      <h1 className={css({ textStyle: 'h1' })}>Hello, Timmy Academy</h1>
       <p>Project skeleton is ready.</p>
       <p role="status">{apiStatus}</p>
+      <a href="/style-system" className={button({ variant: 'primary' })}>
+        Explore the Style System
+      </a>
     </main>
   );
 }
