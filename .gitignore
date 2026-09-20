@@ -12,3 +12,4 @@ coverage/
 *.bkp
 .DS_Store
 Thumbs.db
+apps/web/styled-system/

@@ -4,11 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --host 127.0.0.1",
-    "build": "vite build",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "dev": "panda codegen && vite --host 127.0.0.1",
+    "build": "panda codegen && vite build",
+    "typecheck": "panda codegen && tsc -p tsconfig.json --noEmit",
+    "test": "panda codegen && vitest run",
+    "test:watch": "panda codegen && vitest",
+    "prepare": "panda codegen"
   },
   "dependencies": {
     "@timmy/contracts": "*",
@@ -16,6 +17,7 @@
     "react-dom": "^19.3.0"
   },
   "devDependencies": {
+    "@pandacss/dev": "^1.12.1",
     "@testing-library/react": "^16.3.3",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
