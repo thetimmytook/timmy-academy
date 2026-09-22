@@ -10,7 +10,7 @@
 Each deployment includes the Vite build from `apps/web/dist` and the Hono Worker from `apps/api`.
 Cloudflare serves static files and SPA navigation without invoking the Worker script. Only `/api/*`
 invokes the Worker. The web app calls the API on the same origin. The two Worker names and domain
-bindings keep staging and production separate; future data and secret bindings must also be
+bindings keep staging and production separate. D1 bindings are separate too; future secrets must be
 configured separately for each environment. See `design/tooling-selection.md` for the routing decision.
 
 ## Staging indexing
@@ -49,3 +49,156 @@ intentional. The staging hostname must also have no conflicting CNAME.
 
 From the repository root, `npm run deploy:staging` and `npm run deploy:production` perform the same
 build and deploy locally if Wrangler is authenticated. They are not required for GitHub Actions.
+
+## D1 persistence and migrations
+
+The Worker requires `BENCHMARK_DB`. Local, staging and production have separate bindings and
+separate storage. The top-level `local-only` database ID is a local emulator identifier, not a
+remote database. `wrangler dev --local` and local migration/seed commands never use remote D1.
+An empty migrated database returns empty search/options and `no_data` for a recognized exact
+Position query. Missing bindings, missing schema or database errors fail closed; fixtures are
+never a runtime fallback.
+
+The source schema is `apps/api/src/db/schema.ts`. Generate reviewed SQL with `npm run db:generate`;
+commit the generated SQL and Drizzle metadata together when committing is requested. Wrangler is
+the only migration applier (its `d1_migrations` journal); do not use Drizzle push/migrate alongside it.
+`0001_visibility-revision.sql` is a Drizzle custom migration for triggers, which Drizzle's table
+schema cannot represent. Preserve these triggers when rebuilding the table in future migrations.
+
+Migration filenames currently use Drizzle Kit's sequential numbers, and its `meta/_journal.json`
+and snapshots form one shared history. Before merging a schema-changing branch, update it from
+`master`; if another migration landed meanwhile, regenerate the branch migration from the new
+history and review both its SQL and Drizzle metadata. Never rename or rewrite a migration already
+applied to staging or production: Wrangler records its filename in `d1_migrations`. Changing
+only the filename prefix to an epoch timestamp would not resolve concurrent edits to Drizzle's
+shared metadata or establish that independently generated migrations can run in either order.
+If parallel schema work becomes common, evaluate Drizzle's newer timestamp-based migration format
+and its compatibility with Wrangler as a separate tooling change.
+
+`benchmark_runs` stores an explicitly projected public document, a separate private contributor
+key, publication time, visibility and an AUTOINCREMENT ingestion sequence. Generated columns
+extract filter/sort keys from the document, preventing divergent duplicate values. HTTP responses
+still pass through explicit field allowlists, including nested settings, even if a future stored
+record acquires private properties. The private contributor key is used only for distinct counts.
+There is no account model, publication endpoint or new public profile source in this change.
+
+Runtime access uses `drizzle-orm/d1` on the primary binding. Detail, observed options, exact
+Position, counts, item pages and navigation-token reads/writes use the typed query builder and
+columns from `schema.ts`. Filter predicates explicitly map each contract field to its column;
+row types come from the schema. Grouped search remains one statement built with Drizzle CTEs,
+with narrow parameterized `sql` expressions for window functions and ordered JSON preview
+aggregation. There are no direct `D1Database.prepare()` calls in runtime repository code.
+Migration/seed SQL and direct database mutations used by integration tests remain unchanged.
+
+Search predicates, exact counts, grouping, ordering, keyset continuation and map selection run in
+SQLite. Only <= 51 group heads and <= 3 preview documents per head, <= 51 item rows, or <= 20
+Position examples cross into the Worker. Group queries have a fixed number of round trips, not
+one query per returned group. Exact unfiltered counts and window-based first-per-group/map
+selection necessarily scan the matching set inside SQLite; they do not hydrate the table in JS.
+The initial indexes cover visibility + chronological order, hardware/exact cohort, GPU/RAM,
+map, and resolution/version. Filter-options uses DISTINCT public values and may scan the public
+catalog; the existing unpaginated contract needs redesign before a very large catalog is supported.
+No FPS aggregate is stored or computed.
+
+### Navigation lifetime and removal policy
+
+- A new dataset snapshot fixes an ingestion watermark, a dataset revision and an absolute expiry
+  **30 minutes** later. Fresh searches reuse that snapshot while the dataset is unchanged and the
+  snapshot is live; they do not extend its lifetime. Later inserts are excluded even if their capture/publication dates are old.
+- Opaque cursor/group tokens are persisted in D1. Cursors are random; group keys are hashes of
+  their bound navigation state, stable on replay of the same snapshot for browser Back/reload. They survive Worker restarts and
+  deployments. Cursors bind normalized filters, sort, view, group key and page limit. Group keys
+  bind filters/sort and the hardware tuple; item limits may differ from the groups page limit.
+- Continuation uses the last returned run's `(captured_day, published_at, public_id)` key, never
+  an offset. Groups use their first matching run's total order; the unique public ID resolves ties.
+- Every UPDATE or DELETE of a run increments the global revision through database triggers.
+  This conservatively invalidates **all** previous navigation, including unrelated groups.
+  Visibility changes, restoration and document corrections therefore cannot silently alter pages.
+  Writers must omit the ingestion sequence on INSERT; do not reset `sqlite_sequence` or disable
+  triggers. A future publication service must preserve these rules and immutable measurements.
+- All reads use the primary D1 binding, without replica sessions. A final revision check rejects
+  removal that happens between the component queries. A completed removal is never served via
+  a historical snapshot. Detail is a single current-visibility query. An in-flight response can
+  only promise visibility at its final database read, not after that response leaves the server.
+- Changed cursor bindings/malformed cursors return `400 invalid_cursor`. Expired, removed or
+  unavailable cursor snapshots return `409 cursor_stale`; group equivalents return
+  `409 group_key_stale`. Restart from page one. Expiry never slides on continuation.
+- Expired token rows are removed in indexed batches of up to 500 on fresh searches. A quiet
+  database may retain expired rows, but they are unusable. Tokens contain navigation state only,
+  never stored run sets, account IDs or contributor keys. API responses remain `no-store`.
+
+See [Cloudflare primary/replica semantics](https://developers.cloudflare.com/d1/best-practices/read-replication/)
+and [Wrangler migration support](https://developers.cloudflare.com/d1/reference/migrations/).
+
+### Commands
+
+| Command                         | Effect                                                                           |
+| ------------------------------- | -------------------------------------------------------------------------------- |
+| `npm run db:migrate:local`      | Apply migrations to the local Wrangler database                                  |
+| `npm run db:seed:local`         | Apply local migrations, then idempotently insert fictional fixtures              |
+| `npm run db:reset:local`        | Clear local Benchmark runs and tokens; keep schema and migration history         |
+| `npm run db:prepare:staging`    | Explicit remote staging migrations → seed; requires credentials on that executor |
+| `npm run db:migrate:production` | Explicit production schema migration only; never seed                            |
+
+Normal `npm run dev` preserves whatever local data is present and never seeds automatically.
+`db:reset:local` deletes local Benchmark runs and navigation tokens, including manually added
+local runs. It keeps tables, migration history and the ingestion sequence. Stop the local API
+before resetting; run `db:seed:local` afterwards to restore fictional scenarios. The reset
+command has no remote target and never accesses staging or production.
+The seed refuses every target except `local` and `staging`, uses stable `br_test_*` IDs and
+`ON CONFLICT(public_id) DO NOTHING`, and never deletes/updates existing rows. A hidden fixture
+stays hidden on rerun. Extra real or test records are preserved. Production has no seed command,
+seed workflow, copy mechanism or automatic fixture population.
+
+### One-time Cloudflare setup (no local authentication required)
+
+1. In Cloudflare **Storage & databases → D1 SQL Database**, create empty databases named
+   `timmy-academy-benchmark-staging` and `timmy-academy-benchmark-production` in the deployment account.
+2. In `wrangler.jsonc`, replace only the respective `SET_STAGING_D1_DATABASE_ID` and
+   `SET_PRODUCTION_D1_DATABASE_ID` placeholders with each database's ID. Keep the local binding
+   unchanged. IDs are configuration, not credentials; do not paste them into task/workflow logs.
+3. Grant the GitHub Actions Cloudflare token **Account → D1 → Edit** for the deployment account,
+   keeping the existing Workers/Routes permissions. If replacing the token, update the repository
+   secret `CLOUDFLARE_API_TOKEN`; retain `CLOUDFLARE_ACCOUNT_ID`. Never commit tokens or copy them
+   into local configuration. No additional GitHub token is needed by the workflow.
+4. After these changes are committed/pushed on request and available on `master`, the existing
+   staging deploy builds/checks, applies staging migrations, then deploys the Worker. To load
+   fictional data explicitly, run **Actions → Prepare staging Benchmark data → Run workflow → master**.
+   This workflow migrates/seeds staging only; it does not deploy or touch production. Use the
+   staging site/Bruno smoke flow below after the Worker version has been deployed.
+5. Production deployment remains the manual **Check and deploy** workflow from `master`.
+   It builds/checks, applies production migrations, then deploys the Worker. With no publications,
+   production search is empty. Never run a seed command against that database.
+
+Deployment and staging-data jobs share per-environment concurrency locks. In-progress migrations
+are not cancelled by newer pushes. Migration failure stops Worker deployment; deployment failure
+leaves the additive schema in place for the old Worker and a safe retry. Future schema changes
+must be backward-compatible expand/contract migrations: add first, deploy consumers, remove only
+in a later release after old versions are retired. A D1 migration may briefly interrupt database
+requests; this is not a zero-downtime claim. Database command output redacts UUIDs/account IDs.
+
+### Fictional staging acceptance cases
+
+The seed reuses all 24 existing fictional captures and adds only one hidden and one deleted copy.
+Expected totals below assume no additional rows; rerunning seed does not remove other data.
+Open Bruno's `Staging` environment and run `Smoke flow`, or use `Local` against port 8787.
+The UI has no Position page; Position cases are exercised in Bruno.
+
+| Case              | Stable IDs / input                                                                    | Expected result                                                                                                                             |
+| ----------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hardware          | `br_test_01`–`08`; `09`–`16`; `17`–`24`                                               | 7800X3D/4070 SUPER/32 GB; same CPU/GPU/64 GB; i5-12400F/3060 Ti/16 GB. 3 groups, 24 runs, 6 contributors                                    |
+| Preview           | Unfiltered newest first                                                               | Each group: 8 runs, 4 maps, 2 contributors, 3 preview maps, 5 remaining runs. 32 GB previews: `02`, `01`, `04` (Customs, Lighthouse, Woods) |
+| Same map/settings | RAM 32 GB + Lighthouse: `01`, `05`                                                    | 2 individual runs, one contributor; different DLSS settings and FPS (120 vs 108), never averaged                                            |
+| Group pagination  | UI configurations/page = 2; Bruno uses `limit=1`                                      | UI 2 then 1 groups; Bruno 1 per page; unchanged totals                                                                                      |
+| Run pagination    | Expand a group; Bruno items `limit=2`                                                 | UI 5 then 3 runs; Bruno four pages of 2; no repeated IDs                                                                                    |
+| Exact Position    | Ryzen 7 7800X3D / GeForce RTX 4070 SUPER / 32, Lighthouse, BSG, 2560×1440, `0.16.9.0` | `matches`, IDs `01`, `05`, 2 runs / 1 contributor                                                                                           |
+| No exact Position | Same criteria, build `no-match`                                                       | `no_data`, zero runs, no substitutes                                                                                                        |
+| Missing Position  | Same criteria, resolution and version `null`                                          | `missing_conditions`, two reason codes, no runs                                                                                             |
+| Unknown values    | `br_test_07`; `br_test_08`                                                            | `07`: unknown build; `08`: unknown resolution and settings. Details preserve `null`                                                         |
+| Empty filter      | `/bench/?ram_gb=32&map=woods&execution=local&game_version=0.16.9.0`                   | Empty results; no automatic widening                                                                                                        |
+| Visibility        | `br_test_hidden`, `br_test_deleted`                                                   | Detail 404, absent from search, Position and options                                                                                        |
+
+Automated `apps/api/src/benchmark/d1.api.test.ts` uses workerd/Miniflare's real local D1 binding,
+executes the checked-in SQL migrations and seed, and covers the HTTP routes, removal/expiry,
+idempotency, primary storage failures and privacy projections. It does not mock the repository
+or connect to any remote database. The existing HTTP and UI tests explicitly inject fixtures.

@@ -1,6 +1,6 @@
 import type { FilterOptions, PublicRunDetail } from '@timmy/contracts';
 
-function namedOptions(values: { id: string; name: string }[]) {
+export function namedOptions(values: { id: string; name: string }[]) {
   return [
     ...new Map(values.map(value => [value.id, { id: value.id, name: value.name }])).values(),
   ].sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));

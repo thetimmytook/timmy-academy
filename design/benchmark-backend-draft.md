@@ -411,3 +411,14 @@ This control does not replace other data-subject rights: before launch, choose a
 ## Contract tests before release
 
 Test public allowlists by snapshotting search, detail, Position and error responses against forbidden private keys; auth and owner isolation, including owner deletion and rejection of another account's deletion request; exact idempotent retry and owner lookup after lost acknowledgement; no republication after deletion and retry; conflict on changed payload; pending versus published state; immutable published measurements; removal from all public reads and caches; separation of deletion markers from retained measurements; anonymization and discard when anonymity cannot be established; malformed, oversized and extra-key payloads; exact Position boundaries, `no_data` and `missing_conditions` without widening; partial-filter search and grouped cards that keep each run's metrics distinct; `items` continuation, cursor binding and stale snapshots after removals; rate limits; and browser/Desktop session separation. Review `PRIVACY.md` against actual stored fields and retention.
+
+## D1 storage implementation decision (2026-09-22)
+
+The public read implementation now uses persistent D1 with Drizzle schema and generated Wrangler
+migrations. Navigation snapshots have a fixed 30-minute lifetime, exclude later ingestion sequences,
+and conservatively become stale after any run UPDATE or DELETE. Opaque server-stored tokens bind
+filters/sort/view/group/page limit and use keyset continuation. Reads go to primary D1; removed runs
+are never read from historic documents. Production has no fixture fallback or seed. See
+[infrastructure/README.md](../infrastructure/README.md#d1-persistence-and-migrations) for the precise
+expiry/removal rules, schema organization, query costs, safe deployment order and staging cases.
+This resolves navigation expiry in open question 4; publication/auth/ownership remain out of scope.

@@ -25,7 +25,7 @@ const exact: CohortQuery = {
   game_resolution: { width: 2560, height: 1440 },
   game_version: '0.16.9.0',
 };
-const app = createApp();
+const app = createApp(new InMemoryBenchmarkRepository());
 async function groups(query = '', application = app) {
   const response = await application.request(`${base}/runs?${query}`);
   expect(response.status).toBe(200);
@@ -110,7 +110,7 @@ describe('public search and navigation', () => {
   it.each(['captured_asc', 'captured_desc'])(
     'has stable group and item pagination in %s order across instances',
     async sort => {
-      const application = createApp();
+      const application = createApp(new InMemoryBenchmarkRepository());
       const first = await groups(`sort=${sort}&limit=1`);
       const allKeys: string[] = [];
       let page = first;

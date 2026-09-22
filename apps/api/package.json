@@ -14,10 +14,14 @@
   },
   "dependencies": {
     "@timmy/contracts": "*",
+    "drizzle-orm": "^0.45.3",
     "hono": "^4.13.8"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260919.1",
+    "drizzle-kit": "^0.31.11",
+    "miniflare": "^5.20260918.0-alpha",
+    "tsx": "^4.23.15",
     "wrangler": "^4.135.0"
   }
 }

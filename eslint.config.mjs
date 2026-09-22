@@ -7,6 +7,8 @@ import sonarjs from 'eslint-plugin-sonarjs';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
+const typedFiles = ['**/*.{ts,tsx}', 'infrastructure/**/*.mjs'];
+
 export default tseslint.config(
   {
     ignores: [
@@ -23,10 +25,10 @@ export default tseslint.config(
   importConfigs.recommended,
   ...tseslint.configs.recommendedTypeChecked.map(config => ({
     ...config,
-    files: ['**/*.{ts,tsx}'],
+    files: typedFiles,
   })),
   {
-    files: ['**/*.{ts,tsx}'],
+    files: typedFiles,
     languageOptions: {
       parserOptions: { projectService: true },
     },
@@ -35,6 +37,11 @@ export default tseslint.config(
       '@typescript-eslint/no-misused-promises': 'error',
       '@typescript-eslint/no-unsafe-argument': 'error',
       '@typescript-eslint/only-throw-error': 'error',
+    },
+  },
+  {
+    files: ['**/*.{ts,tsx,js,mjs}'],
+    rules: {
       'import-x/no-duplicates': 'error',
       'import-x/order': [
         'warn',
@@ -57,8 +64,8 @@ export default tseslint.config(
       'security/detect-object-injection': 'warn',
     },
   },
-  ...['apps/api', 'apps/web', 'packages/contracts'].map(workspace => ({
-    files: [`${workspace}/**/*.{ts,tsx}`],
+  ...['apps/api', 'apps/web', 'packages/contracts', 'infrastructure'].map(workspace => ({
+    files: [`${workspace}/**/*.{ts,tsx,js,mjs}`],
     settings: {
       'import-x/resolver': {
         typescript: { project: `${workspace}/tsconfig.json` },

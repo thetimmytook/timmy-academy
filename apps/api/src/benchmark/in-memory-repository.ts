@@ -11,23 +11,12 @@ import { publicFilterOptions } from './filter-options';
 import { createSyntheticRuns, syntheticHardware, syntheticMaps, type StoredRun } from './fixtures';
 import { projectDetail, projectHardware, projectSummary } from './projection';
 import { BenchmarkRequestError, type BenchmarkRepository } from './repository';
+import { searchFilters } from './search-filters';
 
 async function digest(value: unknown): Promise<string> {
   const bytes = new TextEncoder().encode(JSON.stringify(value));
   const result = await crypto.subtle.digest('SHA-256', bytes);
   return Array.from(new Uint8Array(result), byte => byte.toString(16).padStart(2, '0')).join('');
-}
-export function searchFilters(query: RunSearchQuery): BenchmarkFilters {
-  return {
-    cpu: query.cpu ?? null,
-    gpu: query.gpu ?? null,
-    ram_gb: query.ram_gb ?? null,
-    map: query.map ?? null,
-    execution: query.execution ?? null,
-    game_width: query.game_width ?? null,
-    game_height: query.game_height ?? null,
-    game_version: query.game_version ?? null,
-  };
 }
 function matches(run: StoredRun, filters: BenchmarkFilters): boolean {
   const { hardware, conditions } = run.detail;

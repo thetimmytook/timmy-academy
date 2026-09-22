@@ -1,0 +1,18 @@
+meta {
+  name: 11 Filter options
+  type: http
+  seq: 11
+}
+get {
+  url: {{base_url}}/api/bench/v1/filter-options
+  body: none
+  auth: none
+}
+tests {
+  test('observed public options', function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().ram_gb).to.deep.equal([16, 32, 64]);
+    expect(res.getBody().maps).to.have.lengthOf(4);
+    expect(res.getBody().game_versions).not.to.include(null);
+  });
+}

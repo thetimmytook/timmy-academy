@@ -8,7 +8,7 @@ import {
   type PublicSettings,
 } from '@timmy/contracts';
 
-import type { StoredRun } from './fixtures';
+import type { StoredRun } from './stored-run';
 
 function definedFields(fields: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined));
