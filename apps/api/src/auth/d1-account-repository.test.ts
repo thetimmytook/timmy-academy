@@ -4,6 +4,7 @@ import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { D1AccountRepository } from './d1-account-repository';
+import { resolveApplicationPrincipal } from './resolve-principal';
 
 let mf: Miniflare;
 let db: D1Database;
@@ -59,6 +60,32 @@ afterAll(async () => {
 });
 
 describe('private D1 account repository', () => {
+  it('resolves browser and desktop principals through D1 to the same persistent account', async () => {
+    const now = 1_800_000_000_000;
+    const principals = await Promise.all(
+      (['browser', 'desktop'] as const).map(kind =>
+        resolveApplicationPrincipal(
+          {
+            ...identity,
+            emailVerified: true,
+            session: { kind, expiresAt: now + 60_000 },
+          },
+          repository(),
+          () => now,
+        ),
+      ),
+    );
+    const accountId = await repository().findOrCreateAccount(identity);
+    expect(principals).toEqual(
+      ['browser', 'desktop'].map(kind => ({
+        accountId,
+        emailVerified: true,
+        session: { kind, expiresAt: now + 60_000 },
+      })),
+    );
+    await expectCounts(1, 1);
+  });
+
   it('persists the account across repeated sign-ins and repository instances', async () => {
     const accountId = await repository().findOrCreateAccount(identity);
     expect(accountId).toEqual(expect.any(String));
