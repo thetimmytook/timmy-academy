@@ -1,0 +1,28 @@
+meta {
+  name: 06 Run details
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{base_url}}/api/bench/v1/runs/{{public_run_id}}
+  body: none
+  auth: none
+}
+
+tests {
+  test('shows one public run without private identity', function () {
+    expect(res.getStatus()).to.equal(200);
+    const body = res.getBody();
+    expect(body.public_run_id).to.equal(bru.getVar('public_run_id'));
+    expect(body.url).to.equal('/bench/runs/' + body.public_run_id);
+    expect(body.metrics.average_fps).to.be.a('number');
+    for (const key of ['email', 'account_id', 'client_run_id', 'raw_capture', 'hostname']) {
+      expect(JSON.stringify(body)).to.not.contain('"' + key + '"');
+    }
+  });
+}
+
+docs {
+  Works alone with the fictional Local environment ID. Request 04 replaces it with an ID from search.
+}

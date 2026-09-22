@@ -1,0 +1,21 @@
+meta {
+  name: Search groups
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{base_url}}/api/bench/v1/runs
+  body: none
+  auth: none
+}
+
+script:post-response {
+  if (res.getStatus() === 200 && res.getBody().groups?.length) {
+    bru.setVar('group_key', res.getBody().groups[0].group_key);
+  }
+}
+
+docs {
+  Edit the query parameters to filter by CPU, GPU, RAM, map, execution, game resolution or version. The first returned group key is saved for Runs in group. Keep the same filters and sort when opening that group.
+}

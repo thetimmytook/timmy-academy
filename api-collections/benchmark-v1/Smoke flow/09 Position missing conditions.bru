@@ -1,0 +1,39 @@
+meta {
+  name: 09 Position missing conditions
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{base_url}}/api/bench/v1/cohorts/query
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "hardware": {
+      "cpu_name": "Ryzen 7 7800X3D",
+      "gpu_name": "GeForce RTX 4070 SUPER",
+      "ram_gb": 32
+    },
+    "map": "lighthouse",
+    "execution": "bsg_servers",
+    "game_resolution": null,
+    "game_version": null
+  }
+}
+
+tests {
+  test('reports missing comparison conditions', function () {
+    expect(res.getStatus()).to.equal(200);
+    const body = res.getBody();
+    expect(body.status).to.equal('missing_conditions');
+    expect(body.runs).to.deep.equal([]);
+    expect(body.reason_codes).to.include.members(['unknown_game_resolution', 'game_version_missing']);
+  });
+}

@@ -1,0 +1,44 @@
+meta {
+  name: 07 Position exact match
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{base_url}}/api/bench/v1/cohorts/query
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "hardware": {
+      "cpu_name": "Ryzen 7 7800X3D",
+      "gpu_name": "GeForce RTX 4070 SUPER",
+      "ram_gb": 32
+    },
+    "map": "lighthouse",
+    "execution": "bsg_servers",
+    "game_resolution": { "width": 2560, "height": 1440 },
+    "game_version": "0.16.9.0"
+  }
+}
+
+tests {
+  test('returns exact individual measurements', function () {
+    expect(res.getStatus()).to.equal(200);
+    const body = res.getBody();
+    expect(body.status).to.equal('matches');
+    expect(body.counts.run_count).to.be.greaterThan(0);
+    expect(body.runs).to.have.lengthOf.at.least(1);
+    expect(body.criteria.game_resolution).to.deep.equal({ width: 2560, height: 1440 });
+  });
+}
+
+docs {
+  Position sends comparison conditions only. No local FPS, client run ID or settings are submitted.
+}

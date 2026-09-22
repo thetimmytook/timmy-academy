@@ -1,0 +1,25 @@
+meta {
+  name: 03 Next groups page
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{base_url}}/api/bench/v1/runs?gpu=geforce-rtx-4070-super&limit=1&cursor={{groups_cursor}}
+  body: none
+  auth: none
+}
+
+tests {
+  test('continues the same search', function () {
+    expect(res.getStatus()).to.equal(200);
+    const body = res.getBody();
+    expect(body.view).to.equal('groups');
+    expect(body.groups).to.have.lengthOf(1);
+    expect(body.groups[0].group_key).to.not.equal(bru.getVar('group_key'));
+  });
+}
+
+docs {
+  Run 02 Search groups first to obtain the cursor. The GPU filter and limit must stay unchanged.
+}

@@ -1,0 +1,7 @@
+{
+  "version": "1",
+  "name": "Timmy Academy Benchmark v1",
+  "type": "collection",
+  "defaultEnvironment": "Local",
+  "ignore": ["node_modules", ".git"]
+}

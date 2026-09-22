@@ -1,0 +1,28 @@
+meta {
+  name: 04 Runs in group
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{base_url}}/api/bench/v1/runs?view=items&group_key={{group_key}}&gpu=geforce-rtx-4070-super&limit=2
+  body: none
+  auth: none
+}
+
+tests {
+  test('expands the selected group into individual runs', function () {
+    expect(res.getStatus()).to.equal(200);
+    const body = res.getBody();
+    expect(body.view).to.equal('items');
+    expect(body.items).to.have.lengthOf(2);
+    expect(body.items[0].metrics.average_fps).to.be.a('number');
+    expect(body.next_cursor).to.match(/^cur_/);
+    bru.setVar('public_run_id', body.items[0].public_run_id);
+    bru.setVar('runs_cursor', body.next_cursor);
+  });
+}
+
+docs {
+  Run 02 Search groups first. This request keeps the original GPU filter and uses its group key.
+}

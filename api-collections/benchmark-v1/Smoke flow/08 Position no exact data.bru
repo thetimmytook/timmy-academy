@@ -1,0 +1,39 @@
+meta {
+  name: 08 Position no exact data
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{base_url}}/api/bench/v1/cohorts/query
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "hardware": {
+      "cpu_name": "Ryzen 7 7800X3D",
+      "gpu_name": "GeForce RTX 4070 SUPER",
+      "ram_gb": 48
+    },
+    "map": "lighthouse",
+    "execution": "bsg_servers",
+    "game_resolution": { "width": 2560, "height": 1440 },
+    "game_version": "0.16.9.0"
+  }
+}
+
+tests {
+  test('does not widen a missing cohort', function () {
+    expect(res.getStatus()).to.equal(200);
+    const body = res.getBody();
+    expect(body.status).to.equal('no_data');
+    expect(body.runs).to.deep.equal([]);
+    expect(body.reason_codes).to.deep.equal(['no_exact_matches']);
+  });
+}

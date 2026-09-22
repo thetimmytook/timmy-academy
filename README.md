@@ -30,6 +30,17 @@ Try `http://127.0.0.1:8787/api/bench/v1/runs?ram_gb=32&map=lighthouse` after `np
 Repeat the same filters and sort with a returned `group_key` and `view=items` to see every run.
 Copy a run's `public_run_id` into the detail route. A group is navigation, not an FPS aggregate.
 
+For manual API exploration, open `api-collections/benchmark-v1` as a collection in Bruno, select
+the `Local` environment, and start `npm run dev:api`. The `API` folder has one editable request
+per public endpoint. Start with Search groups, then Runs in group and Run details; returned IDs
+are saved automatically. If you change search filters or sort, repeat them when opening a group.
+The `Smoke flow` folder contains ordered requests with checks for search, pagination, details,
+Position and an invalid filter. Run that folder to check the complete flow. With Bruno CLI
+installed, run `bru run "Smoke flow" --env Local` from `api-collections/benchmark-v1`.
+These plain-text collection files live beside the API code in Git; there is no second repository
+or filesystem link to maintain. The collection uses only synthetic public data and sends no
+authentication or publication request.
+
 Runtime Zod schemas and inferred types live in `packages/contracts/src/benchmark.ts`.
 HTTP route registration and transport validation live in `apps/api/src/**/*.api.ts`;
 `apps/api/src/index.ts` assembles the app and shared error handling; `apps/api/src/benchmark/` contains
