@@ -45,6 +45,7 @@ afterEach(() => {
 });
 
 const sessionId = 'private-session-fixture';
+const signInLabel = 'Sign in with email';
 
 describe('isolated browser auth harness with stubbed Clerk components', () => {
   it.each(['', 'pk_live_fixture', 'sk_test_fixture', 'pk_test_REPLACE'])(
@@ -67,9 +68,15 @@ describe('isolated browser auth harness with stubbed Clerk components', () => {
 
   it('links a signed-out browser to the isolated sign-in route', () => {
     render(<AuthPocPage />);
-    expect(screen.getByRole('link', { name: 'Sign in with email' }).getAttribute('href')).toBe(
-      '/sign-in',
-    );
+    expect(screen.getByRole('link', { name: signInLabel }).getAttribute('href')).toBe('/sign-in');
+  });
+
+  it('opens the sign-in form after clicking the shared navigation link', () => {
+    render(<AuthPocPage />);
+    fireEvent.click(screen.getByRole('link', { name: signInLabel }));
+    expect(window.location.pathname).toBe('/sign-in');
+    expect(screen.getByText('Email sign-in widget')).toBeTruthy();
+    expect(screen.queryByRole('link', { name: signInLabel })).toBeNull();
   });
 
   it('logs out only the current browser session without exposing its ID', async () => {

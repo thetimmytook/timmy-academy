@@ -4,6 +4,7 @@ import { css } from '../../styled-system/css';
 import { BrowserAuthAdapter } from '../auth-poc/browser-auth-adapter';
 import { Button } from '../elements/Button';
 import { Message } from '../elements/Message';
+import { useUrl } from '../routing';
 
 import type { BrowserSession } from '../auth-poc/browser-auth-adapter';
 import type { JSX } from 'react';
@@ -54,7 +55,8 @@ function screenForPath(path: string): 'home' | 'sign-in' | 'sign-up' | 'consent'
 }
 
 export function AuthPocPage(): JSX.Element {
-  const screen = screenForPath(window.location.pathname);
+  const url = useUrl();
+  const screen = screenForPath(new URL(url, window.location.origin).pathname);
 
   return (
     <main className={css({ maxWidth: '720px', margin: 'auto', padding: '6' })}>
