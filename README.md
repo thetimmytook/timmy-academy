@@ -143,10 +143,11 @@ npm run build
 lint-staged formats and lints staged source files. Deployment and GitHub Actions setup are described
 in [infrastructure/README.md](infrastructure/README.md).
 
-## Follow-up after the D1 merge request
+## Tooling follow-up
 
-1. Fix the ESLint configuration and remaining lint failures at their source. Make local checks,
-   pre-commit checks and CI agree; retain useful type-aware rules instead of broadly disabling them.
-2. Migrate infrastructure `.mjs` scripts to TypeScript where the runtime and tooling allow it.
-   Keep `.mjs` only where a tool requires JavaScript configuration or a TypeScript entry point
-   would add unnecessary runtime complexity.
+Infrastructure scripts, the Drizzle configuration and the ESLint configuration use TypeScript.
+Node.js 24 runs the standalone database commands directly; the seed command uses `tsx` because
+it imports application modules. ESLint loads its TypeScript configuration through `jiti`.
+
+The remaining lint warnings still need review. Keep local, pre-commit and CI checks aligned,
+and retain useful type-aware rules instead of broadly disabling them.

@@ -2,19 +2,22 @@ import { readFileSync } from 'node:fs';
 
 import { parse } from 'jsonc-parser';
 
-/**
- * @typedef {{ binding: string, database_id: string, database_name: string, remote?: boolean }} DatabaseBinding
- * @typedef {{ d1_databases?: DatabaseBinding[] }} EnvironmentConfig
- * @typedef {EnvironmentConfig & { env?: { staging?: EnvironmentConfig, production?: EnvironmentConfig } }} DatabaseConfig
- */
+type DatabaseBinding = {
+  binding: string;
+  database_id: string;
+  database_name: string;
+  remote?: boolean;
+};
+type EnvironmentConfig = { d1_databases?: DatabaseBinding[] };
+type DatabaseConfig = EnvironmentConfig & {
+  env?: { staging?: EnvironmentConfig; production?: EnvironmentConfig };
+};
 
-/** @param {string} environment */
-export function checkDatabaseTarget(environment) {
-  /** @type {unknown} */
-  const parsed = parse(readFileSync('infrastructure/wrangler.jsonc', 'utf8'));
-  const config = /** @type {DatabaseConfig} */ (parsed);
-  /** @param {DatabaseBinding[] | undefined} list */
-  const binding = list => list?.find(value => value.binding === 'BENCHMARK_DB');
+export function checkDatabaseTarget(environment: string): void {
+  const parsed: unknown = parse(readFileSync('infrastructure/wrangler.jsonc', 'utf8'));
+  const config = parsed as DatabaseConfig;
+  const binding = (list: DatabaseBinding[] | undefined) =>
+    list?.find(value => value.binding === 'BENCHMARK_DB');
   const local = binding(config.d1_databases);
 
   if (local?.database_id !== 'local-only' || local?.remote === true) {
