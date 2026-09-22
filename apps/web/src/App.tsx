@@ -18,6 +18,7 @@ export default function App() {
   const detail = /^\/bench\/runs\/(br_[A-Za-z0-9_-]+)\/?$/.exec(path);
   let content = <NotFoundPage back={back} />;
   let title = 'Page not found · Timmy Academy';
+
   if (browse) {
     content = <BenchPage url={back} />;
     title = 'Benchmark · Timmy Academy';
@@ -43,6 +44,7 @@ export default function App() {
   if (path === '/') {
     return null;
   }
+
   return (
     <>
       <a

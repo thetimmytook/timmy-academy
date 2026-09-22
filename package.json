@@ -17,7 +17,7 @@
     "build": "npm run build -w @timmy/contracts && npm run build -w @timmy/web && npm run build -w @timmy/api",
     "deploy:staging": "npm run build && npm run db:migrate:staging && npm run deploy:staging -w @timmy/api",
     "deploy:production": "npm run build && npm run db:migrate:production && npm run deploy:production -w @timmy/api",
-    "typecheck": "npm run build -w @timmy/contracts && npm run typecheck -w @timmy/contracts && npm run typecheck -w @timmy/api && npm run typecheck -w @timmy/web && npm run typecheck:infrastructure",
+    "typecheck": "npm run build -w @timmy/contracts && npm run typecheck -w @timmy/contracts && npm run typecheck -w @timmy/api && npm run typecheck -w @timmy/web && npm run typecheck:infrastructure && tsc -p tsconfig.json",
     "typecheck:infrastructure": "tsc -p infrastructure/tsconfig.json",
     "lint": "npm run build -w @timmy/contracts && eslint .",
     "lint:fix": "npm run build -w @timmy/contracts && eslint . --fix",
@@ -25,17 +25,17 @@
     "format:check": "prettier --check .",
     "test": "npm run build -w @timmy/contracts && npm run test -w @timmy/contracts && npm run test -w @timmy/api && npm run test -w @timmy/web",
     "test:watch": "npm run build -w @timmy/contracts && concurrently -k -n contracts-build,contracts,api,web \"npm run dev -w @timmy/contracts\" \"npm run test:watch -w @timmy/contracts\" \"npm run test:watch -w @timmy/api\" \"npm run test:watch -w @timmy/web\"",
-    "db:generate": "drizzle-kit generate --config infrastructure/drizzle.config.mjs",
-    "db:migrate:local": "node infrastructure/migrate.mjs local",
-    "db:migrate:staging": "node infrastructure/migrate.mjs staging",
-    "db:migrate:production": "node infrastructure/migrate.mjs production",
-    "db:seed:local": "npm run db:migrate:local && npm run build -w @timmy/contracts && tsx infrastructure/seed.mjs local",
-    "db:seed:staging": "npm run build -w @timmy/contracts && tsx infrastructure/seed.mjs staging",
-    "db:reset:local": "node infrastructure/reset-local.mjs",
+    "db:generate": "drizzle-kit generate --config infrastructure/drizzle.config.ts",
+    "db:migrate:local": "node infrastructure/migrate.ts local",
+    "db:migrate:staging": "node infrastructure/migrate.ts staging",
+    "db:migrate:production": "node infrastructure/migrate.ts production",
+    "db:seed:local": "npm run db:migrate:local && npm run build -w @timmy/contracts && tsx infrastructure/seed.ts local",
+    "db:seed:staging": "npm run build -w @timmy/contracts && tsx infrastructure/seed.ts staging",
+    "db:reset:local": "node infrastructure/reset-local.ts",
     "db:prepare:staging": "npm run db:migrate:staging && npm run db:seed:staging"
   },
   "lint-staged": {
-    "*.{ts,tsx,js,mjs}": [
+    "*.{ts,tsx,mts,js,mjs}": [
       "eslint --fix",
       "prettier --write"
     ],
@@ -43,6 +43,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "@types/eslint-plugin-security": "^3.0.1",
     "@types/node": "^24.13.4",
     "concurrently": "^10.0.5",
     "eslint": "^10.11.0",
@@ -54,9 +56,11 @@
     "eslint-plugin-sonarjs": "^4.2.1",
     "globals": "^17.12.0",
     "husky": "^9.1.7",
+    "jiti": "^2.7.0",
     "jsonc-parser": "^3.3.1",
     "lint-staged": "^17.5.1",
     "prettier": "^3.9.8",
+    "tsx": "^4.23.15",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.70.0",
     "vitest": "^5.0.1"

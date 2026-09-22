@@ -19,6 +19,7 @@ export default function BenchPage({ url }: Readonly<{ url: string }>) {
   useEffect(() => {
     rememberBrowse(url);
   }, [url]);
+
   return (
     <div className={stack}>
       <div>

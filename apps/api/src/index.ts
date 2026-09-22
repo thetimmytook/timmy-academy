@@ -12,7 +12,10 @@ export function createApp(repository?: BenchmarkRepository) {
   app.use('*', async (context, next) => {
     await next();
     const bindings = context.env as { DISABLE_INDEXING?: string } | undefined;
-    if (bindings?.DISABLE_INDEXING === 'true') context.header('X-Robots-Tag', 'noindex');
+
+    if (bindings?.DISABLE_INDEXING === 'true') {
+      context.header('X-Robots-Tag', 'noindex');
+    }
   });
   registerBenchmarkApi(
     app,
@@ -35,6 +38,7 @@ export function createApp(repository?: BenchmarkRepository) {
 
   app.onError((error, context) => {
     const known = error instanceof BenchmarkRequestError;
+
     return context.json(
       benchmarkErrorSchema.parse({
         code: known ? error.code : 'internal_error',
@@ -44,6 +48,7 @@ export function createApp(repository?: BenchmarkRepository) {
       known ? error.status : 500,
     );
   });
+
   return app;
 }
 

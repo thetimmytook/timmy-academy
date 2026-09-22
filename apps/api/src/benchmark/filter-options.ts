@@ -11,6 +11,7 @@ export function publicFilterOptions(runs: PublicRunDetail[]): FilterOptions {
   const resolutions = runs.flatMap(run =>
     run.conditions.game_resolution ? [run.conditions.game_resolution] : [],
   );
+
   return {
     cpus: namedOptions(runs.map(run => run.hardware.cpu)),
     gpus: namedOptions(runs.map(run => run.hardware.gpu)),

@@ -37,7 +37,9 @@ export class D1Navigation {
       .where(eq(state.id, 1))
       .get();
 
-    if (!row) throw new Error('Benchmark migrations have not been applied.');
+    if (!row) {
+      throw new Error('Benchmark migrations have not been applied.');
+    }
 
     return { ...row, expires: this.now() + TOKEN_LIFETIME_MS };
   }
@@ -46,6 +48,7 @@ export class D1Navigation {
     const snapshot = await this.snapshot();
     const now = this.now();
     const payload = JSON.stringify(snapshot);
+
     // Atomic upsert keeps the original absolute expiry for concurrent searches.
     // Reuse the live snapshot so browser Back/reload keeps its expanded group.
     const row = await this.db
@@ -65,7 +68,9 @@ export class D1Navigation {
       .returning({ payload: tokens.payload })
       .get();
 
-    if (!row) throw new Error('Could not establish a search snapshot.');
+    if (!row) {
+      throw new Error('Could not establish a search snapshot.');
+    }
 
     return JSON.parse(row.payload) as Snapshot;
   }
@@ -73,16 +78,18 @@ export class D1Navigation {
   async assertFresh(snapshot: Snapshot, code: 'cursor_stale' | 'group_key_stale' = 'cursor_stale') {
     const current = await this.snapshot();
 
-    if (current.revision !== snapshot.revision || this.now() >= snapshot.expires)
+    if (current.revision !== snapshot.revision || this.now() >= snapshot.expires) {
       throw new BenchmarkRequestError(code);
+    }
   }
 
   async read(token: string, binding: string, kind: 'cur' | 'hg'): Promise<Navigation> {
     const invalid = kind === 'cur' ? 'invalid_cursor' : 'group_key_stale';
     const stale = kind === 'cur' ? 'cursor_stale' : 'group_key_stale';
 
-    if (!(kind === 'cur' ? /^cur_[a-f0-9]{32}$/ : /^hg_[a-f0-9]{32}$/).test(token))
+    if (!(kind === 'cur' ? /^cur_[a-f0-9]{32}$/ : /^hg_[a-f0-9]{32}$/).test(token)) {
       throw new BenchmarkRequestError(invalid);
+    }
 
     const row = await this.db
       .select({ payload: tokens.payload })
@@ -90,11 +97,15 @@ export class D1Navigation {
       .where(eq(tokens.token, token))
       .get();
 
-    if (!row) throw new BenchmarkRequestError(stale);
+    if (!row) {
+      throw new BenchmarkRequestError(stale);
+    }
 
     const navigation = JSON.parse(row.payload) as Navigation;
 
-    if (navigation.binding !== binding) throw new BenchmarkRequestError(invalid);
+    if (navigation.binding !== binding) {
+      throw new BenchmarkRequestError(invalid);
+    }
 
     await this.assertFresh(navigation.snapshot, stale);
 
@@ -130,6 +141,7 @@ export class D1Navigation {
         return `hg_${hex.slice(0, 32)}`;
       }),
     );
+
     // Three bound parameters per row; stay within D1's 100-parameter limit.
     for (let start = 0; start < navigations.length; start += 30) {
       const values = navigations.slice(start, start + 30).map((navigation, index) => ({
@@ -154,9 +166,11 @@ export class D1Navigation {
     await this.db.delete(tokens).where(inArray(tokens.token, expired)).run();
   }
 }
+
 export function groupBinding(query: RunSearchQuery) {
   return JSON.stringify([searchFilters(query), query.sort]);
 }
+
 export function cursorBinding(query: RunSearchQuery) {
   return JSON.stringify([groupBinding(query), query.view, query.group_key ?? null, query.limit]);
 }

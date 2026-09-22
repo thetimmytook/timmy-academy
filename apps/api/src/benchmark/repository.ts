@@ -32,7 +32,11 @@ export class BenchmarkRequestError extends Error {
   readonly status;
   constructor(readonly code: keyof typeof errors) {
     const error = errorsByCode.get(code);
-    if (!error) throw new Error('Unknown benchmark error code.');
+
+    if (!error) {
+      throw new Error('Unknown benchmark error code.');
+    }
+
     super(error.message);
     this.status = error.status;
   }

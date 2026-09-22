@@ -30,16 +30,21 @@ let db: D1Database;
 let now = 1000000;
 const app = () => createApp(new D1BenchmarkRepository(db, () => now));
 const request = (path: string) => app().request(base + path);
+
 const groups = async (query = '') => {
   const response = await request('/runs' + (query ? '?' + query : ''));
   expect(response.status).toBe(200);
+
   return groupSearchResponseSchema.parse(await response.json());
 };
+
 const items = async (key: string, suffix = '') => {
   const response = await request(`/runs?view=items&group_key=${key}${suffix}`);
   expect(response.status).toBe(200);
+
   return groupRunsResponseSchema.parse(await response.json());
 };
+
 const seed = () => db.batch(seedStatements().map(statement => db.prepare(statement)));
 const exact = {
   hardware: { cpu_name: 'Ryzen 7 7800X3D', gpu_name: 'GeForce RTX 4070 SUPER', ram_gb: 32 },
@@ -48,6 +53,7 @@ const exact = {
   game_resolution: { width: 2560, height: 1440 },
   game_version: '0.16.9.0',
 };
+
 const position = async (body: unknown = exact) => {
   const response = await app().request(`${base}/cohorts/query`, {
     method: 'POST',
@@ -55,8 +61,10 @@ const position = async (body: unknown = exact) => {
     body: JSON.stringify(body),
   });
   expect(response.status).toBe(200);
+
   return cohortResponseSchema.parse(await response.json());
 };
+
 async function insert(run: StoredRun, id: string) {
   const detail = { ...run.detail, public_run_id: id, url: `/bench/runs/${id}` };
   await db
@@ -78,6 +86,7 @@ beforeAll(async () => {
   );
   db = await mf.getD1Database('BENCHMARK_DB');
   const folder = new URL('../../../../infrastructure/migrations/', import.meta.url);
+
   for (const name of (await readdir(folder))
     .filter(name => name.endsWith('.sql'))
     .sort((a, b) => a.localeCompare(b))) {
@@ -107,6 +116,7 @@ describe('real local D1 public HTTP integration', { timeout: 30000 }, () => {
     const memory = new InMemoryBenchmarkRepository(
       seedRows().filter(row => row.visibility === 'published'),
     );
+
     for (const raw of [
       {},
       { sort: 'captured_asc' },
@@ -127,6 +137,7 @@ describe('real local D1 public HTTP integration', { timeout: 30000 }, () => {
       });
       expect(scrub(actual)).toEqual(scrub(expected));
     }
+
     const result = await groups();
     expect(result.summary).toEqual({ group_count: 3, run_count: 24, contributor_count: 6 });
     expect(
@@ -151,6 +162,7 @@ describe('real local D1 public HTTP integration', { timeout: 30000 }, () => {
       expect((await groups('limit=1&sort=' + sort)).groups[0]!.group_key).toBe(key);
       const ids: string[] = [];
       let cursor: string | null = null;
+
       do {
         const page = await items(
           key,
@@ -159,6 +171,7 @@ describe('real local D1 public HTTP integration', { timeout: 30000 }, () => {
         ids.push(...page.items.map(run => run.public_run_id));
         cursor = page.next_cursor;
       } while (cursor);
+
       expect(ids).toHaveLength(8);
       expect(new Set(ids).size).toBe(8);
     }
@@ -177,6 +190,7 @@ describe('real local D1 public HTTP integration', { timeout: 30000 }, () => {
     );
     expect((await items(key)).items.some(run => run.public_run_id === 'br_test_new')).toBe(false);
     expect((await groups()).summary.run_count).toBe(25);
+
     for (const suffix of [
       'limit=2',
       'limit=1&sort=captured_asc',
@@ -186,6 +200,7 @@ describe('real local D1 public HTTP integration', { timeout: 30000 }, () => {
       const response = await request(`/runs?${suffix}&cursor=${first.next_cursor}`);
       expect(response.status).toBe(400);
     }
+
     expect(
       (await request(`/runs?view=items&group_key=${key}&limit=3&cursor=${firstItems.next_cursor}`))
         .status,
@@ -200,19 +215,24 @@ describe('real local D1 public HTTP integration', { timeout: 30000 }, () => {
       const key = first.groups[0]!.group_key;
       expect((await groups('limit=1')).groups[0]!.group_key).toBe(key);
       const page = await items(key, '&limit=1');
-      if (visibility === 'physical-delete')
+
+      if (visibility === 'physical-delete') {
         await db.prepare("DELETE FROM benchmark_runs WHERE public_id = 'br_test_01'").run();
-      else
+      } else {
         await db
           .prepare("UPDATE benchmark_runs SET visibility = ? WHERE public_id = 'br_test_01'")
           .bind(visibility)
           .run();
+      }
+
       for (const path of [
         `/runs?limit=1&cursor=${first.next_cursor}`,
         `/runs?view=items&group_key=${key}`,
         `/runs?view=items&group_key=${key}&limit=1&cursor=${page.next_cursor}`,
-      ])
+      ]) {
         expect((await request(path)).status).toBe(409);
+      }
+
       expect((await request('/runs/br_test_01')).status).toBe(404);
       expect((await groups()).summary.run_count).toBe(23);
       expect((await position()).runs.map(run => run.public_run_id)).toEqual(['br_test_05']);
@@ -252,11 +272,16 @@ describe('real local D1 public HTTP integration', { timeout: 30000 }, () => {
       publicRunDetailSchema.parse(await (await request('/runs/br_test_07')).json()).conditions
         .game_version,
     ).toBeNull();
-    for (const id of ['br_test_hidden', 'br_test_deleted'])
+
+    for (const id of ['br_test_hidden', 'br_test_deleted']) {
       expect((await request(`/runs/${id}`)).status).toBe(404);
+    }
   });
   it('bounds Position examples without averaging and counts distinct contributors', async () => {
-    for (let index = 0; index < 22; index++) await insert(seedRows()[0]!, `br_test_extra_${index}`);
+    for (let index = 0; index < 22; index++) {
+      await insert(seedRows()[0]!, `br_test_extra_${index}`);
+    }
+
     const result = await position();
     expect(result.counts).toEqual({ run_count: 24, contributor_count: 1 });
     expect(result.runs).toHaveLength(20);
@@ -283,6 +308,7 @@ describe('real local D1 public HTTP integration', { timeout: 30000 }, () => {
       '$.settings.graphics.machine_id', 'PRIVATE_SENTINEL', '$.hardware.cpu.private_id', 'PRIVATE_SENTINEL')`,
       )
       .run();
+
     for (const response of [
       await groups(),
       await position(),
@@ -297,6 +323,7 @@ describe('real local D1 public HTTP integration', { timeout: 30000 }, () => {
   });
   it('supports the maximum group page size and uses the exact-cohort index', async () => {
     const run = seedRows()[0]!;
+
     for (let index = 0; index < 51; index++) {
       await insert(
         {
@@ -306,6 +333,7 @@ describe('real local D1 public HTTP integration', { timeout: 30000 }, () => {
         `br_test_page_${index}`,
       );
     }
+
     const first = await groups('limit=50');
     expect(first.groups).toHaveLength(50);
     const second = await groups(`limit=50&cursor=${first.next_cursor}`);
@@ -330,6 +358,7 @@ describe('real local D1 public HTTP integration', { timeout: 30000 }, () => {
           Number.MAX_SAFE_INTEGER,
         ),
       );
+
     // Inspect the generated runtime predicate, not a handwritten SQL equivalent.
     const plan = await orm.all<{ detail: string }>(sql`EXPLAIN QUERY PLAN ${query.getSQL()}`);
     expect(plan.map(row => row.detail).join(' ')).toContain('runs_hardware_cohort');

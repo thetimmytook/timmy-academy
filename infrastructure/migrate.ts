@@ -1,13 +1,16 @@
-import { checkDatabaseTarget } from './database-config.mjs';
-import { runWrangler } from './run-wrangler.mjs';
+import { checkDatabaseTarget } from './database-config.ts';
+import { runWrangler } from './run-wrangler.ts';
 
 const environment = process.argv[2];
+
 if (
   environment === undefined ||
   !['local', 'staging', 'production'].includes(environment) ||
   process.argv.length !== 3
-)
+) {
   throw new Error('Choose local, staging or production explicitly.');
+}
+
 checkDatabaseTarget(environment);
 runWrangler([
   'd1',

@@ -24,6 +24,7 @@ export const hardwareSchema = z.strictObject({
   gpu: namedModelSchema,
   ram_gb: positiveInteger,
 });
+
 // Observed values in the public dataset, not a universal hardware catalog.
 export const filterOptionsSchema = z.strictObject({
   cpus: z.array(namedModelSchema),
@@ -59,6 +60,7 @@ export const runSearchQuerySchema = z
     game_version: label.optional(),
     sort: sortSchema.default('captured_desc'),
     limit: queryInteger.pipe(positiveInteger.max(50)).default(20),
+
     // Token validation belongs to the repository so malformed cursors return 400 invalid_cursor.
     cursor: z.string().optional(),
   })
@@ -70,6 +72,7 @@ export const runSearchQuerySchema = z
         message: 'Invalid group selection.',
       });
     }
+
     if ((query.game_width === undefined) !== (query.game_height === undefined)) {
       context.addIssue({
         code: 'custom',
@@ -159,6 +162,7 @@ export const publicRunDetailSchema = z.strictObject({
     execution: executionSchema,
     game_resolution: resolutionSchema.nullable(),
     game_version: label.nullable(),
+
     // Derived semantics have not been approved in v1. Recorded modes live in settings.
     render_scale: z.null(),
     upscaling: z.null(),
@@ -168,6 +172,7 @@ export const publicRunDetailSchema = z.strictObject({
   capture: z.strictObject({ duration_sec: z.number().positive(), sample_count: positiveInteger }),
   metrics: metricsSchema,
   settings: publicSettingsSchema.nullable(),
+
   // No quality-note codes have been approved yet; do not invent or accept free text.
   quality_notes: z.array(z.never()),
   author: z.strictObject({ display_name: label, avatar_url: z.url().nullable() }).nullable(),

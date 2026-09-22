@@ -1,5 +1,5 @@
-import { checkDatabaseTarget } from './database-config.mjs';
-import { runWrangler } from './run-wrangler.mjs';
+import { checkDatabaseTarget } from './database-config.ts';
+import { runWrangler } from './run-wrangler.ts';
 
 checkDatabaseTarget('local');
 runWrangler([

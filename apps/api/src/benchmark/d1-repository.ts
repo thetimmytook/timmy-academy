@@ -59,12 +59,14 @@ export class D1BenchmarkRepository implements BenchmarkRepository {
     const snapshot = await this.navigation.snapshot();
     const result = await queryFilterOptions(this.db);
     await this.navigation.assertFresh(snapshot);
+
     return result;
   }
   async cohort(query: CohortQuery) {
     const snapshot = await this.navigation.snapshot();
     const result = await queryCohort(this.db, query, snapshot.watermark);
     await this.navigation.assertFresh(snapshot);
+
     return result;
   }
   async search(query: RunSearchQuery): Promise<RunSearchResponse> {
@@ -79,18 +81,25 @@ export class D1BenchmarkRepository implements BenchmarkRepository {
         : await this.navigation.read(query.group_key, groupBinding(query), 'hg');
     const snapshot =
       cursor?.snapshot ?? group?.snapshot ?? (await this.navigation.searchSnapshot());
-    if (!cursor && !group) await this.navigation.cleanExpired();
+
+    if (!cursor && !group) {
+      await this.navigation.cleanExpired();
+    }
+
     const result =
       query.view === 'groups'
         ? await this.groups(query, snapshot, cursor)
         : await this.items(query, snapshot, group, cursor);
+
     // Catch removal between separate SQL statements; never return a mixed snapshot.
     const staleCode = !query.cursor && query.group_key ? 'group_key_stale' : 'cursor_stale';
     await this.navigation.assertFresh(snapshot, staleCode);
+
     return result;
   }
   private async next(query: RunSearchQuery, snapshot: Snapshot, rows: RunRow[]) {
     const last = rows.at(query.limit - 1);
+
     return rows.length > query.limit && last
       ? this.navigation.save('cur', {
           snapshot,
@@ -107,7 +116,10 @@ export class D1BenchmarkRepository implements BenchmarkRepository {
       .where(where)
       .get();
 
-    if (!counts?.run_count) throw new BenchmarkRequestError('group_key_stale');
+    if (!counts?.run_count) {
+      throw new BenchmarkRequestError('group_key_stale');
+    }
+
     return { hardware: projectHardware(stored(first)), ...counts };
   }
   private async items(
@@ -116,7 +128,10 @@ export class D1BenchmarkRepository implements BenchmarkRepository {
     group?: Navigation,
     cursor?: Navigation,
   ): Promise<GroupRunsResponse> {
-    if (!group?.hardware || !query.group_key) throw new BenchmarkRequestError('group_key_stale');
+    if (!group?.hardware || !query.group_key) {
+      throw new BenchmarkRequestError('group_key_stale');
+    }
+
     const where = predicate(searchFilters(query), snapshot.watermark, group.hardware);
     const page = pagePredicate(query.sort === 'captured_asc', cursor?.after);
     const rows = await this.db
@@ -127,7 +142,11 @@ export class D1BenchmarkRepository implements BenchmarkRepository {
       .limit(query.limit + 1)
       .all();
     const first = rows[0];
-    if (!first) throw new BenchmarkRequestError('group_key_stale');
+
+    if (!first) {
+      throw new BenchmarkRequestError('group_key_stale');
+    }
+
     return {
       view: 'items',
       filters: searchFilters(query),
@@ -159,7 +178,11 @@ export class D1BenchmarkRepository implements BenchmarkRepository {
       .where(where)
       .get();
     const result = await groupPage(this.db, this.navigation, query, snapshot, cursor?.after);
-    if (!totals) throw new Error('Missing search totals.');
+
+    if (!totals) {
+      throw new Error('Missing search totals.');
+    }
+
     return {
       view: 'groups',
       filters,

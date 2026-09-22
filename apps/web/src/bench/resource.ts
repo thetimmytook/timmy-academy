@@ -16,12 +16,14 @@ const errorMessages = new Map([
 async function read<T>(url: string, schema: Parser<T>, signal: AbortSignal) {
   const response = await fetch(url, { signal });
   const body: unknown = await response.json();
+
   if (!response.ok) {
     const parsed = benchmarkErrorSchema.safeParse(body);
     throw new Error(
       parsed.success ? (errorMessages.get(parsed.data.code) ?? unavailable) : unavailable,
     );
   }
+
   return schema.parse(body);
 }
 
@@ -47,9 +49,11 @@ export function useResource<T>(url: string, schema: Parser<T>) {
           });
         }
       });
+
     return () => controller.abort();
   }, [url, schema, attempt]);
   const current = result?.url === url ? result : undefined;
+
   return {
     data: current?.data,
     error: current?.error,

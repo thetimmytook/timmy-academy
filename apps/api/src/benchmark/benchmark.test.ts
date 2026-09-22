@@ -26,11 +26,14 @@ const exact: CohortQuery = {
   game_version: '0.16.9.0',
 };
 const app = createApp(new InMemoryBenchmarkRepository());
+
 async function groups(query = '', application = app) {
   const response = await application.request(`${base}/runs?${query}`);
   expect(response.status).toBe(200);
+
   return groupSearchResponseSchema.parse(await response.json());
 }
+
 async function position(body: unknown = exact, application = app) {
   const response = await application.request(`${base}/cohorts/query`, {
     method: 'POST',
@@ -38,8 +41,10 @@ async function position(body: unknown = exact, application = app) {
     body: JSON.stringify(body),
   });
   expect(response.status).toBe(200);
+
   return cohortResponseSchema.parse(await response.json());
 }
+
 async function errorAt(path: string, status: number, code: string, application = app) {
   const response = await application.request(`${base}${path}`);
   expect(response.status).toBe(status);
@@ -55,6 +60,7 @@ describe('public search and navigation', () => {
     expect(result.groups.map(group => group.hardware.ram_gb).sort((a, b) => a - b)).toEqual([
       16, 32, 64,
     ]);
+
     for (const group of result.groups) {
       expect(group).toMatchObject({
         run_count: 8,
@@ -87,12 +93,17 @@ describe('public search and navigation', () => {
   it('navigates group → every run → details, preserving raw metrics and unknown values', async () => {
     const result = await groups('ram_gb=32');
     const group = result.groups[0];
-    if (!group) throw new Error(missingGroup);
+
+    if (!group) {
+      throw new Error(missingGroup);
+    }
+
     const response = await app.request(
       `${base}/runs?view=items&ram_gb=32&group_key=${group.group_key}`,
     );
     const items = groupRunsResponseSchema.parse(await response.json());
     expect(items.items).toHaveLength(8);
+
     for (const item of items.items) {
       const response = await app.request(`${base}/runs/${item.public_run_id}`);
       const detail = publicRunDetailSchema.parse(await response.json());
@@ -102,6 +113,7 @@ describe('public search and navigation', () => {
       expect(detail.metrics.average_fps).toBe(item.metrics.average_fps);
       expect(detail.conditions.game_resolution).toEqual(item.game_resolution);
     }
+
     expect(items.items.some(run => run.game_resolution === null)).toBe(true);
     expect(items.items.some(run => run.game_version === null)).toBe(true);
     expect((await groups('ram_gb=32&game_version=0.16.9.0')).summary.run_count).toBe(6);
@@ -114,18 +126,29 @@ describe('public search and navigation', () => {
       const first = await groups(`sort=${sort}&limit=1`);
       const allKeys: string[] = [];
       let page = first;
+
       while (true) {
         allKeys.push(...page.groups.map(group => group.group_key));
-        if (!page.next_cursor) break;
+
+        if (!page.next_cursor) {
+          break;
+        }
+
         page = await groups(`sort=${sort}&limit=1&cursor=${page.next_cursor}`, application);
       }
+
       expect(allKeys).toHaveLength(3);
       expect(new Set(allKeys).size).toBe(3);
       const group = first.groups[0];
-      if (!group) throw new Error(missingGroup);
+
+      if (!group) {
+        throw new Error(missingGroup);
+      }
+
       const query = `view=items&group_key=${group.group_key}&sort=${sort}&limit=2`;
       const ids: string[] = [];
       let cursor: string | null = null;
+
       do {
         const continuation = cursor ? `&cursor=${cursor}` : '';
         const response = await application.request(`${base}/runs?${query}${continuation}`);
@@ -133,6 +156,7 @@ describe('public search and navigation', () => {
         ids.push(...items.items.map(run => run.public_run_id));
         cursor = items.next_cursor;
       } while (cursor);
+
       const full = groupRunsResponseSchema.parse(
         await (
           await app.request(`${base}/runs?view=items&group_key=${group.group_key}&sort=${sort}`)
@@ -152,9 +176,14 @@ describe('public search and navigation', () => {
         detail: { ...run.detail, captured_day: '2026-09-19' },
       }));
     const application = createApp(new InMemoryBenchmarkRepository(fixtures));
+
     for (const sort of ['captured_asc', 'captured_desc']) {
       const first = (await groups(`sort=${sort}`, application)).groups[0];
-      if (!first) throw new Error(missingGroup);
+
+      if (!first) {
+        throw new Error(missingGroup);
+      }
+
       const response = await application.request(
         `${base}/runs?view=items&sort=${sort}&group_key=${first.group_key}`,
       );
@@ -162,12 +191,17 @@ describe('public search and navigation', () => {
       const expected = fixtures
         .map(run => run.detail.public_run_id)
         .sort((left, right) => (left < right ? -1 : Number(left > right)));
-      if (sort === 'captured_desc') expected.reverse();
+
+      if (sort === 'captured_desc') {
+        expected.reverse();
+      }
+
       expect(items.items.map(run => run.public_run_id)).toEqual(expected);
     }
   });
   it('binds cursors to filters, view, group, sort and limit', async () => {
     const first = await groups('limit=1');
+
     for (const query of [
       'limit=2',
       'limit=1&sort=captured_asc',
@@ -176,8 +210,13 @@ describe('public search and navigation', () => {
     ]) {
       await errorAt(`/runs?${query}&cursor=${first.next_cursor}`, 400, 'invalid_cursor');
     }
+
     const group = first.groups[0];
-    if (!group) throw new Error(missingGroup);
+
+    if (!group) {
+      throw new Error(missingGroup);
+    }
+
     await errorAt(
       `/runs?view=items&group_key=${group.group_key}&limit=1&cursor=${first.next_cursor}`,
       400,
@@ -201,7 +240,11 @@ describe('public search and navigation', () => {
     const other = (await groups()).groups.find(
       candidate => candidate.group_key !== group.group_key,
     );
-    if (!other) throw new Error('Expected another group.');
+
+    if (!other) {
+      throw new Error('Expected another group.');
+    }
+
     await errorAt(
       `/runs?view=items&group_key=${other.group_key}&limit=1&cursor=${itemPage.next_cursor}`,
       400,
@@ -214,7 +257,11 @@ describe('public search and navigation', () => {
     const key = before.groups[0]?.group_key;
     const fixtures = createSyntheticRuns();
     const removed = fixtures[0];
-    if (!removed) throw new Error(missingRun);
+
+    if (!removed) {
+      throw new Error(missingRun);
+    }
+
     const afterRemoval = createApp(new InMemoryBenchmarkRepository(fixtures.slice(1)));
     await errorAt(`/runs?limit=1&cursor=${before.next_cursor}`, 409, 'cursor_stale', afterRemoval);
     await errorAt(`/runs?view=items&group_key=${key}`, 409, 'group_key_stale', afterRemoval);
@@ -298,7 +345,11 @@ describe('exact Position comparison', () => {
   });
   it('bounds examples to 20 while retaining full counts', async () => {
     const first = createSyntheticRuns()[0];
-    if (!first) throw new Error(missingRun);
+
+    if (!first) {
+      throw new Error(missingRun);
+    }
+
     const runs = Array.from({ length: 23 }, (_, index) => ({
       ...first,
       detail: { ...first.detail, public_run_id: `br_synthetic${index}` },
@@ -359,7 +410,11 @@ describe('public allowlist and error privacy', () => {
     const search = await groups('', application);
     const group = search.groups[0];
     const run = runs[0];
-    if (!group || !run) throw new Error('Expected fixtures.');
+
+    if (!group || !run) {
+      throw new Error('Expected fixtures.');
+    }
+
     const detail = publicRunDetailSchema.parse(
       await (await application.request(`${base}/runs/${run.detail.public_run_id}`)).json(),
     );
@@ -369,21 +424,30 @@ describe('public allowlist and error privacy', () => {
       ).json(),
     );
     const cohort = await position(exact, application);
+
     for (const output of [search, items, detail, cohort]) {
       const json = JSON.stringify(output);
+
       for (const [key, value] of Object.entries(privateFields)) {
         expect(json).not.toContain(`"${key}"`);
         expect(json).not.toContain(value);
       }
-      for (const key of ['rank', 'percentile', 'normalized_fps', 'contributor_id', 'publishedAt'])
+
+      for (const key of ['rank', 'percentile', 'normalized_fps', 'contributor_id', 'publishedAt']) {
         expect(json).not.toContain(`"${key}"`);
+      }
     }
+
     expect(detail.settings?.graphics?.texture_quality_code).toBe(0);
     expect(detail.conditions.game_resolution).toEqual({ width: 2560, height: 1440 });
   });
   it('selects public settings without rejecting private internal fields', async () => {
     const first = createSyntheticRuns()[0];
-    if (!first) throw new Error(missingRun);
+
+    if (!first) {
+      throw new Error(missingRun);
+    }
+
     const poisoned = {
       ...first,
       detail: {
@@ -402,6 +466,7 @@ describe('public allowlist and error privacy', () => {
     expect(response.status).toBe(200);
     const detail = publicRunDetailSchema.parse(await response.json());
     expect(detail.settings).toEqual(first.detail.settings);
+
     for (const [key, value] of Object.entries(privateFields)) {
       expect(JSON.stringify(detail)).not.toContain(`"${key}"`);
       expect(JSON.stringify(detail)).not.toContain(value);
@@ -432,7 +497,11 @@ describe('public allowlist and error privacy', () => {
   });
   it('rejects unknown fields on detail and Position requests and prevents response caching', async () => {
     const first = createSyntheticRuns()[0];
-    if (!first) throw new Error(missingRun);
+
+    if (!first) {
+      throw new Error(missingRun);
+    }
+
     await errorAt(`/runs/${first.detail.public_run_id}?email=private`, 422, 'invalid_input');
     const response = await app.request(`${base}/cohorts/query?private=1`, {
       method: 'POST',

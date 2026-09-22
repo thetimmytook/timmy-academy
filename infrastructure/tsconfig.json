@@ -3,11 +3,9 @@
   "compilerOptions": {
     "lib": ["ES2024"],
     "types": ["node"],
-    "allowJs": true,
-    "checkJs": true,
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": ["**/*.mjs", "**/*.ts"],
+  "include": ["**/*.ts"],
   "exclude": [".wrangler", "node_modules", "dist"]
 }

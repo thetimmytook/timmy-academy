@@ -18,6 +18,7 @@ const request = vi.fn((path: string) => app.request(path));
 
 function start(url = '/bench/') {
   window.history.replaceState(null, '', url);
+
   return render(<App />);
 }
 
@@ -28,6 +29,7 @@ async function results() {
 async function choose(label: string, value: string) {
   await waitFor(() => expect(screen.getByLabelText<HTMLSelectElement>(label).disabled).toBe(false));
   fireEvent.change(screen.getByLabelText<HTMLSelectElement>(label), { target: { value } });
+
   return results();
 }
 
@@ -55,6 +57,7 @@ describe('public benchmark UI', () => {
       expect(window.location.pathname + window.location.search).toBe('/bench/' + query);
       expect(document.title).toBe('Benchmark · Timmy Academy');
       expect(push).not.toHaveBeenCalled();
+
       if (query) {
         expect(screen.getByLabelText<HTMLSelectElement>('RAM').value).toBe('32');
         expect(screen.getAllByRole('article')).toHaveLength(1);
@@ -102,6 +105,7 @@ describe('public benchmark UI', () => {
     expect(
       within(region).getByText('3 hardware configurations · 24 runs · 6 contributors'),
     ).toBeTruthy();
+
     for (const article of within(region).getAllByRole('article')) {
       expect(within(article).getAllByRole('listitem')).toHaveLength(3);
       const links = within(article).getAllByRole('link', { name: /Details for/ });
@@ -110,6 +114,7 @@ describe('public benchmark UI', () => {
         new Set(links.map(link => link.getAttribute('aria-label')?.split(' run ')[0])).size,
       ).toBe(3);
     }
+
     expect(request.mock.calls.some(([url]) => url.includes('view=items'))).toBe(false);
     expect(screen.queryByRole('link', { name: 'Search' })).toBeNull();
   });
@@ -159,9 +164,11 @@ describe('public benchmark UI', () => {
     await choose('Map', 'lighthouse');
     const params = new URLSearchParams(window.location.search);
     expect(params.get('map')).toBe('lighthouse');
+
     for (const key of ['cursor', 'expanded', 'item_cursor']) {
       expect(params.has(key)).toBe(false);
     }
+
     expect(screen.getAllByRole('listitem')).toHaveLength(2);
   });
   it('applies all main and additional filters using canonical API values', async () => {

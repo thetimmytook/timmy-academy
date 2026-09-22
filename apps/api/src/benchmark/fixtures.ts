@@ -19,11 +19,16 @@ export function createSyntheticRuns(): StoredRun[] {
   return syntheticHardware.flatMap((hardware, groupIndex) =>
     ids.map((id, index) => {
       const map = syntheticMaps[index % syntheticMaps.length];
-      if (!map) throw new Error('Missing synthetic map.');
+
+      if (!map) {
+        throw new Error('Missing synthetic map.');
+      }
+
       const average = 120 - groupIndex * 20 - index * 3;
       const resolution =
         index === 1 ? { width: 1920, height: 1080 } : { width: 2560, height: 1440 };
       const version = index === 3 ? '0.16.8.0' : '0.16.9.0';
+
       return {
         contributor: `fictional-contributor-${groupIndex}-${index % 2}`,
         publishedAt: `2026-09-20T10:0${index}:00Z`,

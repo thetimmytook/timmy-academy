@@ -15,7 +15,10 @@ function definedFields(fields: Record<string, unknown>): Record<string, unknown>
 }
 
 export function projectPublicSettings(settings: PublicSettings | null): PublicSettings | null {
-  if (settings === null) return null;
+  if (settings === null) {
+    return null;
+  }
+
   const game = definedFields({
     automatic_ram_cleaner: settings.game?.automatic_ram_cleaner,
     only_use_physical_cores: settings.game?.only_use_physical_cores,
@@ -58,11 +61,13 @@ export function projectPublicSettings(settings: PublicSettings | null): PublicSe
     ...(Object.keys(graphics).length > 0 ? { graphics } : {}),
     ...(Object.keys(postfx).length > 0 ? { postfx } : {}),
   };
+
   return Object.keys(projection).length === 0 ? null : publicSettingsSchema.parse(projection);
 }
 
 export function projectHardware(run: StoredRun) {
   const { cpu, gpu, ram_gb } = run.detail.hardware;
+
   return hardwareSchema.parse({
     cpu: { id: cpu.id, name: cpu.name },
     gpu: { id: gpu.id, name: gpu.name },
@@ -73,6 +78,7 @@ export function projectHardware(run: StoredRun) {
 export function projectSummary(run: StoredRun): PublicRunSummary {
   const detail = run.detail;
   const { map, execution, game_resolution, game_version } = detail.conditions;
+
   return publicRunSummarySchema.parse({
     public_run_id: detail.public_run_id,
     url: `/bench/runs/${detail.public_run_id}`,
@@ -94,6 +100,7 @@ export function projectSummary(run: StoredRun): PublicRunSummary {
 export function projectDetail(run: StoredRun): PublicRunDetail {
   const detail = run.detail;
   const summary = projectSummary(run);
+
   // Select public fields before validation; private additions never enter the DTO.
   return publicRunDetailSchema.parse({
     public_run_id: summary.public_run_id,

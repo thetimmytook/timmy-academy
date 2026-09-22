@@ -6,6 +6,7 @@ import { projectDetail } from './projection';
 export function seedRows() {
   const rows = createSyntheticRuns().map((run, index) => {
     const publicId = `br_test_${String(index + 1).padStart(2, '0')}`;
+
     return {
       ...run,
       visibility: 'published',
@@ -13,7 +14,11 @@ export function seedRows() {
     };
   });
   const first = rows[0];
-  if (!first) throw new Error('Missing seed fixture.');
+
+  if (!first) {
+    throw new Error('Missing seed fixture.');
+  }
+
   for (const visibility of ['hidden', 'deleted']) {
     const publicId = `br_test_${visibility}`;
     rows.push({
@@ -26,9 +31,12 @@ export function seedRows() {
       },
     });
   }
+
   return rows;
 }
+
 const quote = (value: string) => `'${value.replaceAll("'", "''")}'`;
+
 export function seedStatements() {
   return seedRows().map(
     run =>

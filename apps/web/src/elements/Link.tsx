@@ -9,6 +9,7 @@ export function Link({ href, onClick, ...props }: Readonly<ComponentPropsWithRef
       href={href}
       onClick={event => {
         onClick?.(event);
+
         if (
           event.defaultPrevented ||
           event.button !== 0 ||
@@ -23,6 +24,7 @@ export function Link({ href, onClick, ...props }: Readonly<ComponentPropsWithRef
         ) {
           return;
         }
+
         event.preventDefault();
         navigate(href);
       }}

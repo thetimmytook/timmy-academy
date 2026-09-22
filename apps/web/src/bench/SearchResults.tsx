@@ -18,6 +18,7 @@ export function SearchResults({ params }: Readonly<{ params: URLSearchParams }>)
     `/api/bench/v1/runs?${query}`,
     groupSearchResponseSchema,
   );
+
   if (error) {
     return (
       <>
@@ -28,9 +29,11 @@ export function SearchResults({ params }: Readonly<{ params: URLSearchParams }>)
       </>
     );
   }
+
   if (!data) {
     return <p role="status">Loading benchmark results…</p>;
   }
+
   return (
     <section aria-label="Search results" className={stack}>
       <p role="status">

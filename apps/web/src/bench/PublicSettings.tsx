@@ -27,6 +27,7 @@ function settingValue(value: string | number | boolean | undefined) {
   if (typeof value === 'boolean') {
     return value ? 'On' : 'Off';
   }
+
   return value === undefined ? 'Unknown' : String(value);
 }
 

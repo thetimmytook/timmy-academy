@@ -22,6 +22,7 @@ export function RunDetails({ run }: Readonly<{ run: PublicRunDetail }>) {
     ['p95 frametime', run.metrics.p95_frametime_ms, 'ms'],
     ['p99 frametime', run.metrics.p99_frametime_ms, 'ms'],
   ];
+
   return (
     <>
       <div>

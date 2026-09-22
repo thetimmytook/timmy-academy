@@ -62,12 +62,15 @@ describe('shared elements', () => {
     cleanup();
     render(<Button href="/bench/">Open</Button>);
     const link = screen.getByRole('link', { name: 'Open' });
+
     // Observe whether React prevented the event, then suppress jsdom's navigation.
     const prevented: boolean[] = [];
+
     const intercept = (event: MouseEvent) => {
       prevented.push(event.defaultPrevented);
       event.preventDefault();
     };
+
     document.addEventListener('click', intercept);
     fireEvent.click(link, { ctrlKey: true });
     fireEvent.click(link, { metaKey: true });
