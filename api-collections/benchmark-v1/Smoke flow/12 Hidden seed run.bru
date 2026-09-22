@@ -1,0 +1,16 @@
+meta {
+  name: 12 Hidden seed run
+  type: http
+  seq: 12
+}
+get {
+  url: {{base_url}}/api/bench/v1/runs/br_test_hidden
+  body: none
+  auth: none
+}
+tests {
+  test('hidden run is unavailable', function () {
+    expect(res.getStatus()).to.equal(404);
+    expect(res.getBody().code).to.equal('not_found');
+  });
+}

@@ -13,9 +13,12 @@ import {
 import { BenchmarkRequestError } from './repository';
 
 import type { BenchmarkRepository } from './repository';
-import type { Hono } from 'hono';
+import type { Context, Hono } from 'hono';
 
-export function registerBenchmarkApi(app: Hono, repository: BenchmarkRepository): void {
+export function registerBenchmarkApi(
+  app: Hono,
+  resolve: (context: Context) => BenchmarkRepository,
+): void {
   app.use('/api/bench/v1/*', async (context, next) => {
     context.header('Cache-Control', 'no-store');
     await next();
@@ -31,19 +34,19 @@ export function registerBenchmarkApi(app: Hono, repository: BenchmarkRepository)
       throw new BenchmarkRequestError('invalid_input');
     const parsed = runSearchQuerySchema.safeParse(Object.fromEntries(parameters));
     if (!parsed.success) throw new BenchmarkRequestError('invalid_input');
-    return context.json(runSearchResponseSchema.parse(await repository.search(parsed.data)));
+    return context.json(runSearchResponseSchema.parse(await resolve(context).search(parsed.data)));
   });
 
   app.get('/api/bench/v1/filter-options', async context => {
     if (new URL(context.req.url).search) throw new BenchmarkRequestError('invalid_input');
-    return context.json(filterOptionsSchema.parse(await repository.filterOptions()));
+    return context.json(filterOptionsSchema.parse(await resolve(context).filterOptions()));
   });
 
   app.get('/api/bench/v1/runs/:publicRunId', async context => {
     if (new URL(context.req.url).search) throw new BenchmarkRequestError('invalid_input');
     const parsed = publicRunIdSchema.safeParse(context.req.param('publicRunId'));
     if (!parsed.success) throw new BenchmarkRequestError('invalid_input');
-    const detail = await repository.detail(parsed.data);
+    const detail = await resolve(context).detail(parsed.data);
     if (!detail) throw new BenchmarkRequestError('not_found');
     return context.json(publicRunDetailSchema.parse(detail));
   });
@@ -81,6 +84,6 @@ export function registerBenchmarkApi(app: Hono, repository: BenchmarkRepository)
     }
     const parsed = cohortQuerySchema.safeParse(body);
     if (!parsed.success) throw new BenchmarkRequestError('invalid_input');
-    return context.json(cohortResponseSchema.parse(await repository.cohort(parsed.data)));
+    return context.json(cohortResponseSchema.parse(await resolve(context).cohort(parsed.data)));
   });
 }

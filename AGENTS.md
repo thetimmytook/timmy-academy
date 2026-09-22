@@ -28,7 +28,8 @@ Timmy Academy is currently in the design stage. The Windows Benchmark applicatio
 
 ## Git hygiene
 
-- Do not commit unless the user asks. Do not rewrite history or discard user changes.
+- Split implementation into small, independently reviewable substeps instead of accumulating one large commit. For each substep, implement it, run relevant checks, show the user the concrete changes for a mini review, and wait for their approval before committing. Then continue with the next substep and repeat. An implementation request alone does not authorize commits. Do not rewrite history or discard user changes.
+- Keep each approved commit limited to one coherent change (for example, schema and migration, repository behavior, local seed, or deployment wiring). Inspect the staged diff and stage only files belonging to that reviewed step. Do not sweep unrelated or unfinished working-tree changes into a commit.
 - Name new branches by change type and purpose: `feat/<purpose>`, `fix/<purpose>`, `docs/<purpose>`, or `chore/<purpose>`. Do not use an agent or tool name as a branch prefix. Use `master` as the primary branch.
 - For feature and fix commits, use the Benchmark repository format: `feat|fix # UI | BE # Description`, choosing `UI`, `BE`, or `UI | BE` for the affected area. For documentation and maintenance commits, use `docs` or `chore` with the same `type # area # description` structure when appropriate.
 - Commit only with the repository user's locally configured Git identity. Never add an agent/tool name, generated-by text, or co-author trailer to commits, PRs, release notes, or repository metadata unless the user explicitly requests it.

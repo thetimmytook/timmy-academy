@@ -1,0 +1,16 @@
+meta {
+  name: 13 Deleted seed run
+  type: http
+  seq: 13
+}
+get {
+  url: {{base_url}}/api/bench/v1/runs/br_test_deleted
+  body: none
+  auth: none
+}
+tests {
+  test('deleted run is unavailable', function () {
+    expect(res.getStatus()).to.equal(404);
+    expect(res.getBody().code).to.equal('not_found');
+  });
+}

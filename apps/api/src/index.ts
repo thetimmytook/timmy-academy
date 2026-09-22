@@ -2,17 +2,25 @@ import { benchmarkErrorSchema } from '@timmy/contracts';
 import { Hono } from 'hono';
 
 import { registerBenchmarkApi } from './benchmark/benchmark.api';
-import { InMemoryBenchmarkRepository } from './benchmark/in-memory-repository';
+import { D1BenchmarkRepository } from './benchmark/d1-repository';
 import { BenchmarkRequestError, type BenchmarkRepository } from './benchmark/repository';
 
-export function createApp(repository: BenchmarkRepository = new InMemoryBenchmarkRepository()) {
+import type { D1Database } from '@cloudflare/workers-types';
+
+export function createApp(repository?: BenchmarkRepository) {
   const app = new Hono();
   app.use('*', async (context, next) => {
     await next();
     const bindings = context.env as { DISABLE_INDEXING?: string } | undefined;
     if (bindings?.DISABLE_INDEXING === 'true') context.header('X-Robots-Tag', 'noindex');
   });
-  registerBenchmarkApi(app, repository);
+  registerBenchmarkApi(
+    app,
+    repository
+      ? () => repository
+      : context =>
+          new D1BenchmarkRepository((context.env as { BENCHMARK_DB: D1Database }).BENCHMARK_DB),
+  );
 
   app.notFound(context =>
     context.json(

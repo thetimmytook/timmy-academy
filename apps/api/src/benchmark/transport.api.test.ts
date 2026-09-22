@@ -7,7 +7,9 @@ import { describe, expect, it } from 'vitest';
 
 import { createApp } from '../index';
 
-const app = createApp();
+import { InMemoryBenchmarkRepository } from './in-memory-repository';
+
+const app = createApp(new InMemoryBenchmarkRepository());
 const path = '/api/bench/v1/cohorts/query';
 const jsonType = 'application/json';
 const validBody = JSON.stringify({

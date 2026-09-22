@@ -10,7 +10,7 @@ import App from './App';
 import { rememberBrowse } from './bench/navigation';
 import { navigate } from './routing';
 
-let app = createApp();
+let app = createApp(new InMemoryBenchmarkRepository());
 const nextRuns = 'Next runs →';
 const firstRuns = 'First run page';
 const publicSettings = 'Public settings';
@@ -32,7 +32,7 @@ async function choose(label: string, value: string) {
 }
 
 beforeEach(() => {
-  app = createApp();
+  app = createApp(new InMemoryBenchmarkRepository());
   sessionStorage.clear();
   rememberBrowse('/bench/');
   request.mockReset().mockImplementation((path: string) => app.request(path));

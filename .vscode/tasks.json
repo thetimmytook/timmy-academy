@@ -16,6 +16,24 @@
       "hide": true
     },
     {
+      "label": "Academy: seed local DB",
+      "icon": { "id": "database", "color": "terminal.ansiGreen" },
+      "type": "shell",
+      "command": "npm run db:seed:local",
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "focus": false, "panel": "dedicated" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Academy: reset local DB",
+      "icon": { "id": "database", "color": "terminal.ansiYellow" },
+      "type": "shell",
+      "command": "npm run db:reset:local",
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "focus": false, "panel": "dedicated" },
+      "problemMatcher": []
+    },
+    {
       "label": "Academy: watch contracts",
       "type": "shell",
       "command": "npm run dev -w @timmy/contracts",
