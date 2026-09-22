@@ -1,9 +1,11 @@
 import { createSyntheticRuns } from './fixtures';
 import { projectDetail } from './projection';
 
+import type { StoredRun } from './stored-run';
+
 // Stable, conspicuously fictional IDs. Never rewrite an existing row, including
 // a hidden/deleted seed row: rerunning seed must not republish it.
-export function seedRows() {
+export function seedRows(): (StoredRun & { visibility: string })[] {
   const rows = createSyntheticRuns().map((run, index) => {
     const publicId = `br_test_${String(index + 1).padStart(2, '0')}`;
 
@@ -35,9 +37,9 @@ export function seedRows() {
   return rows;
 }
 
-const quote = (value: string) => `'${value.replaceAll("'", "''")}'`;
+const quote = (value: string): string => `'${value.replaceAll("'", "''")}'`;
 
-export function seedStatements() {
+export function seedStatements(): string[] {
   return seedRows().map(
     run =>
       `INSERT INTO benchmark_runs(public_id, contributor_key, published_at, visibility, detail) VALUES (${[

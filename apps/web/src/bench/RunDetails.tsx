@@ -10,8 +10,9 @@ import { PublicSettings } from './PublicSettings';
 import { grid, muted, stack } from './styles';
 
 import type { PublicRunDetail } from '@timmy/contracts';
+import type { JSX } from 'react';
 
-export function RunDetails({ run }: Readonly<{ run: PublicRunDetail }>) {
+export function RunDetails({ run }: Readonly<{ run: PublicRunDetail }>): JSX.Element {
   const [copied, setCopied] = useState('');
   const conditions = run.conditions;
   const metrics: [string, number, string][] = [

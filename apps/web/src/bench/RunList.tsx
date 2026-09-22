@@ -5,8 +5,9 @@ import { execution, resolution, number } from './format';
 import { muted } from './styles';
 
 import type { PublicRunSummary } from '@timmy/contracts';
+import type { JSX } from 'react';
 
-export function RunList({ runs }: Readonly<{ runs: PublicRunSummary[] }>) {
+export function RunList({ runs }: Readonly<{ runs: PublicRunSummary[] }>): JSX.Element {
   return (
     <ul className={css({ display: 'grid' })}>
       {runs.map(run => (

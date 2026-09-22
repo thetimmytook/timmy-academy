@@ -1,11 +1,23 @@
 import { sql } from 'drizzle-orm';
 import { check, index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
+import type { HasGenerated } from 'drizzle-orm';
+import type {
+  SQLiteIntegerBuilderInitial,
+  SQLiteTextBuilderInitial,
+} from 'drizzle-orm/sqlite-core';
+
+type GeneratedText = HasGenerated<
+  SQLiteTextBuilderInitial<string, [string, ...string[]], number | undefined>,
+  { type: 'always' }
+>;
+type GeneratedInteger = HasGenerated<SQLiteIntegerBuilderInitial<string>, { type: 'always' }>;
+
 // JSON contains only the accepted public document; private ownership stays separate.
 // Generated columns keep indexed predicates inseparable from that document.
-const jsonText = (name: string, path: string) =>
+const jsonText = (name: string, path: string): GeneratedText =>
   text(name).generatedAlwaysAs(sql.raw(`json_extract(detail, '${path}')`));
-const jsonInt = (name: string, path: string) =>
+const jsonInt = (name: string, path: string): GeneratedInteger =>
   integer(name).generatedAlwaysAs(sql.raw(`json_extract(detail, '${path}')`));
 export const runs = sqliteTable(
   'benchmark_runs',

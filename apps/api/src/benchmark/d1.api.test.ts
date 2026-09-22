@@ -23,6 +23,8 @@ import { InMemoryBenchmarkRepository } from './in-memory-repository';
 import { seedRows, seedStatements } from './seed';
 
 import type { StoredRun } from './stored-run';
+import type { GroupSearchResponse, GroupRunsResponse, CohortResponse } from '@timmy/contracts';
+import type { Hono } from 'hono';
 
 const base = '/api/bench/v1';
 const firstSeedRunPath = '/runs/br_test_01';
@@ -30,24 +32,25 @@ const filterOptionsPath = '/filter-options';
 let mf: Miniflare;
 let db: D1Database;
 let now = 1000000;
-const app = () => createApp(new D1BenchmarkRepository(db, () => now));
-const request = (path: string) => app().request(base + path);
+const app = (): Hono => createApp(new D1BenchmarkRepository(db, () => now));
+const request = (path: string): Response | Promise<Response> => app().request(base + path);
 
-const groups = async (query = '') => {
+const groups = async (query = ''): Promise<GroupSearchResponse> => {
   const response = await request('/runs' + (query ? '?' + query : ''));
   expect(response.status).toBe(200);
 
   return groupSearchResponseSchema.parse(await response.json());
 };
 
-const items = async (key: string, suffix = '') => {
+const items = async (key: string, suffix = ''): Promise<GroupRunsResponse> => {
   const response = await request(`/runs?view=items&group_key=${key}${suffix}`);
   expect(response.status).toBe(200);
 
   return groupRunsResponseSchema.parse(await response.json());
 };
 
-const seed = () => db.batch(seedStatements().map(statement => db.prepare(statement)));
+const seed = (): Promise<D1Result<unknown>[]> =>
+  db.batch(seedStatements().map(statement => db.prepare(statement)));
 const exact = {
   hardware: { cpu_name: 'Ryzen 7 7800X3D', gpu_name: 'GeForce RTX 4070 SUPER', ram_gb: 32 },
   map: 'lighthouse',
@@ -56,7 +59,7 @@ const exact = {
   game_version: '0.16.9.0',
 };
 
-const position = async (body: unknown = exact) => {
+const position = async (body: unknown = exact): Promise<CohortResponse> => {
   const response = await app().request(`${base}/cohorts/query`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -67,7 +70,7 @@ const position = async (body: unknown = exact) => {
   return cohortResponseSchema.parse(await response.json());
 };
 
-async function insert(run: StoredRun, id: string) {
+async function insert(run: StoredRun, id: string): Promise<void> {
   const detail = { ...run.detail, public_run_id: id, url: `/bench/runs/${id}` };
   await db
     .prepare(
@@ -139,7 +142,7 @@ describe('real local D1 public HTTP integration', { timeout: 30000 }, () => {
       const query = runSearchQuerySchema.parse(raw);
       const expected = groupSearchResponseSchema.parse(await memory.search(query));
       const actual = await groups(new URLSearchParams(raw).toString());
-      const scrub = (value: typeof actual) => ({
+      const scrub = (value: typeof actual): GroupSearchResponse => ({
         ...value,
         groups: value.groups.map(group => ({ ...group, group_key: 'opaque' })),
       });

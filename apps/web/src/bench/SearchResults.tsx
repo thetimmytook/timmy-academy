@@ -12,7 +12,9 @@ import { useResource } from './resource';
 import { RunPagination } from './RunPagination';
 import { muted, stack } from './styles';
 
-export function SearchResults({ params }: Readonly<{ params: URLSearchParams }>) {
+import type { JSX } from 'react';
+
+export function SearchResults({ params }: Readonly<{ params: URLSearchParams }>): JSX.Element {
   const query = searchParameters(params);
   const { data, error, retry } = useResource(
     `/api/bench/v1/runs?${query}`,

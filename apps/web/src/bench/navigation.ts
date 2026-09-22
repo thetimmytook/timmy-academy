@@ -2,7 +2,7 @@ const browsePath = '/bench/';
 const storageKey = 'bench:last-browse';
 let inMemoryBrowse: string | undefined;
 
-export function rememberBrowse(url: string) {
+export function rememberBrowse(url: string): void {
   inMemoryBrowse = url;
 
   try {
@@ -12,7 +12,7 @@ export function rememberBrowse(url: string) {
   }
 }
 
-export function lastBrowse() {
+export function lastBrowse(): string {
   if (inMemoryBrowse) {
     return inMemoryBrowse;
   }
@@ -30,13 +30,13 @@ export function lastBrowse() {
   return browsePath;
 }
 
-export function browseUrl(params: URLSearchParams) {
+export function browseUrl(params: URLSearchParams): string {
   const query = params.toString();
 
   return browsePath + (query ? `?${query}` : '');
 }
 
-export function resetPage(params: URLSearchParams) {
+export function resetPage(params: URLSearchParams): URLSearchParams {
   const next = new URLSearchParams(params);
 
   for (const key of ['cursor', 'expanded', 'item_cursor']) {
@@ -46,7 +46,7 @@ export function resetPage(params: URLSearchParams) {
   return next;
 }
 
-export function searchParameters(params: URLSearchParams) {
+export function searchParameters(params: URLSearchParams): URLSearchParams {
   const next = new URLSearchParams(params);
   next.delete('expanded');
   next.delete('item_cursor');

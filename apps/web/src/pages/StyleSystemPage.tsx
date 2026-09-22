@@ -11,7 +11,7 @@ import { Field } from '../elements/Field';
 import { Input } from '../elements/Input';
 import { Message } from '../elements/Message';
 
-import type { ReactNode } from 'react';
+import type { JSX, ReactNode } from 'react';
 
 const row = css({ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '3' });
 const stack = css({ display: 'grid', gap: '4' });
@@ -36,7 +36,7 @@ function Section({
   readonly title: string;
   readonly description: string;
   readonly children: ReactNode;
-}) {
+}): JSX.Element {
   return (
     <section
       id={id}
@@ -59,7 +59,7 @@ function Section({
   );
 }
 
-function Actions() {
+function Actions(): JSX.Element {
   const [message, setMessage] = useState('Try an action. Feedback appears here.');
 
   return (
@@ -112,7 +112,7 @@ function Actions() {
   );
 }
 
-function Forms() {
+function Forms(): JSX.Element {
   const [saved, setSaved] = useState(false);
   const [name, setName] = useState('Streets · evening run');
   const [submitted, setSubmitted] = useState(false);
@@ -204,7 +204,7 @@ function Forms() {
   );
 }
 
-function Surfaces() {
+function Surfaces(): JSX.Element {
   const [selected, setSelected] = useState(true);
 
   return (
@@ -285,7 +285,7 @@ function Surfaces() {
   );
 }
 
-function Diagnostics() {
+function Diagnostics(): JSX.Element {
   const [active, setActive] = useState('Overview');
   const options = ['Overview', 'Run details'];
 
@@ -461,7 +461,7 @@ function Diagnostics() {
   );
 }
 
-export default function StyleSystemPage() {
+export default function StyleSystemPage(): JSX.Element {
   return (
     <>
       <title>Style System · Timmy Academy</title>

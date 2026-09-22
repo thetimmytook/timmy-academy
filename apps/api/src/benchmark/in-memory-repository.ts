@@ -5,6 +5,9 @@ import {
   type CohortResponse,
   type RunSearchQuery,
   type RunSearchResponse,
+  type PublicRunDetail,
+  type FilterOptions,
+  type GroupRunsResponse,
 } from '@timmy/contracts';
 
 import { publicFilterOptions } from './filter-options';
@@ -47,14 +50,14 @@ function compareRuns(left: StoredRun, right: StoredRun): number {
   );
 }
 
-function counts(runs: readonly StoredRun[]) {
+function counts(runs: readonly StoredRun[]): { run_count: number; contributor_count: number } {
   return {
     run_count: runs.length,
     contributor_count: new Set(runs.map(run => run.contributor)).size,
   };
 }
 
-function groupFacts(runs: readonly StoredRun[]) {
+function groupFacts(runs: readonly StoredRun[]): GroupRunsResponse['group'] {
   const first = runs[0];
 
   if (!first) {
@@ -87,13 +90,13 @@ export class InMemoryBenchmarkRepository implements BenchmarkRepository {
     this.runs = structuredClone(runs);
   }
 
-  detail(id: string) {
+  detail(id: string): Promise<PublicRunDetail | undefined> {
     const run = this.runs.find(candidate => candidate.detail.public_run_id === id);
 
     return Promise.resolve(run === undefined ? undefined : projectDetail(run));
   }
 
-  filterOptions() {
+  filterOptions(): Promise<FilterOptions> {
     return Promise.resolve(publicFilterOptions(this.runs.map(projectDetail)));
   }
 
@@ -192,7 +195,7 @@ export class InMemoryBenchmarkRepository implements BenchmarkRepository {
     };
   }
 
-  private checkCursor(cursor: string | undefined, snapshot: string, binding: string) {
+  private checkCursor(cursor: string | undefined, snapshot: string, binding: string): void {
     if (cursor === undefined) {
       return;
     }
@@ -215,7 +218,7 @@ export class InMemoryBenchmarkRepository implements BenchmarkRepository {
     }
   }
 
-  private checkGroupKey(key: string, snapshot: string, binding: string) {
+  private checkGroupKey(key: string, snapshot: string, binding: string): void {
     if (!/^hg_[a-f0-9]{64}_[a-f0-9]{64}_[a-f0-9]{64}$/.test(key)) {
       throw new BenchmarkRequestError('not_found');
     }
@@ -232,8 +235,9 @@ export class InMemoryBenchmarkRepository implements BenchmarkRepository {
     query: RunSearchQuery,
     snapshot: string,
     binding: string,
-  ) {
-    const token = async (offset: number) => `cur_${snapshot}_${binding}_${await digest(offset)}`;
+  ): Promise<{ items: T[]; next: string | null }> {
+    const token = async (offset: number): Promise<string> =>
+      `cur_${snapshot}_${binding}_${await digest(offset)}`;
     let start = 0;
 
     if (query.cursor !== undefined) {

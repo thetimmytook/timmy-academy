@@ -7,7 +7,7 @@ import { BenchmarkRequestError, type BenchmarkRepository } from './benchmark/rep
 
 import type { D1Database } from '@cloudflare/workers-types';
 
-export function createApp(repository?: BenchmarkRepository) {
+export function createApp(repository?: BenchmarkRepository): Hono {
   const app = new Hono();
   app.use('*', async (context, next) => {
     await next();
@@ -20,8 +20,8 @@ export function createApp(repository?: BenchmarkRepository) {
   registerBenchmarkApi(
     app,
     repository
-      ? () => repository
-      : context =>
+      ? (): BenchmarkRepository => repository
+      : (context): BenchmarkRepository =>
           new D1BenchmarkRepository((context.env as { BENCHMARK_DB: D1Database }).BENCHMARK_DB),
   );
 

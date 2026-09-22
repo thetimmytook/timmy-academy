@@ -1,10 +1,10 @@
 import { css } from '../../styled-system/css';
 
-import type { ReactNode } from 'react';
+import type { JSX, ReactNode } from 'react';
 
 export function DefinitionList({
   values,
-}: Readonly<{ values: ReadonlyArray<readonly [string, ReactNode]> }>) {
+}: Readonly<{ values: ReadonlyArray<readonly [string, ReactNode]> }>): JSX.Element {
   return (
     <dl className={css({ display: 'grid', gap: '3' })}>
       {values.map(([label, value]) => (

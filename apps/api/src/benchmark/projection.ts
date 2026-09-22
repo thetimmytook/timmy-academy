@@ -6,6 +6,7 @@ import {
   type PublicRunDetail,
   type PublicRunSummary,
   type PublicSettings,
+  type Hardware,
 } from '@timmy/contracts';
 
 import type { StoredRun } from './stored-run';
@@ -65,7 +66,7 @@ export function projectPublicSettings(settings: PublicSettings | null): PublicSe
   return Object.keys(projection).length === 0 ? null : publicSettingsSchema.parse(projection);
 }
 
-export function projectHardware(run: StoredRun) {
+export function projectHardware(run: StoredRun): Hardware {
   const { cpu, gpu, ram_gb } = run.detail.hardware;
 
   return hardwareSchema.parse({

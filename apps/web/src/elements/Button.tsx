@@ -4,7 +4,7 @@ import { button } from '../../styled-system/recipes';
 import { Link } from './Link';
 
 import type { ButtonVariantProps } from '../../styled-system/recipes';
-import type { ComponentPropsWithRef } from 'react';
+import type { JSX, ComponentPropsWithRef } from 'react';
 
 type ButtonProps = ButtonVariantProps &
   (
@@ -12,7 +12,7 @@ type ButtonProps = ButtonVariantProps &
     | (ComponentPropsWithRef<'a'> & { href: string })
   );
 
-export function Button(props: Readonly<ButtonProps>) {
+export function Button(props: Readonly<ButtonProps>): JSX.Element {
   if (props.href !== undefined) {
     const { variant, size, className, ...attributes } = props;
 

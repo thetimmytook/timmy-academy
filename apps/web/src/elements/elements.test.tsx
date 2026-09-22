@@ -66,7 +66,7 @@ describe('shared elements', () => {
     // Observe whether React prevented the event, then suppress jsdom's navigation.
     const prevented: boolean[] = [];
 
-    const intercept = (event: MouseEvent) => {
+    const intercept = (event: MouseEvent): void => {
       prevented.push(event.defaultPrevented);
       event.preventDefault();
     };

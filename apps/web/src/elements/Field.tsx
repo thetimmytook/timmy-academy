@@ -1,10 +1,10 @@
 import { css, cx } from '../../styled-system/css';
 
-import type { ComponentPropsWithRef, ReactNode } from 'react';
+import type { JSX, ComponentPropsWithRef, ReactNode } from 'react';
 
 type FieldProps = ComponentPropsWithRef<'label'> & { label: ReactNode };
 
-export function Field({ label, children, className, ...props }: Readonly<FieldProps>) {
+export function Field({ label, children, className, ...props }: Readonly<FieldProps>): JSX.Element {
   return (
     <label
       {...props}

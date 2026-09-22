@@ -16,7 +16,7 @@ type DatabaseConfig = EnvironmentConfig & {
 export function checkDatabaseTarget(environment: string): void {
   const parsed: unknown = parse(readFileSync('infrastructure/wrangler.jsonc', 'utf8'));
   const config = parsed as DatabaseConfig;
-  const binding = (list: DatabaseBinding[] | undefined) =>
+  const binding = (list: DatabaseBinding[] | undefined): DatabaseBinding | undefined =>
     list?.find(value => value.binding === 'BENCHMARK_DB');
   const local = binding(config.d1_databases);
 

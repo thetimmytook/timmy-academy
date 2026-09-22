@@ -10,7 +10,7 @@ export function runWrangler(args: string[]): void {
     env: { ...process.env, CI: 'true' },
   });
 
-  const redact = (text: string | null) =>
+  const redact = (text: string | null): string =>
     (text ?? '')
       .replace(/\b[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}\b/gi, '[database-id]')
       .replaceAll(process.env.CLOUDFLARE_ACCOUNT_ID || '___NO_ACCOUNT_ID___', '[account-id]');

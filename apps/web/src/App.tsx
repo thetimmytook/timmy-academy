@@ -9,7 +9,9 @@ import NotFoundPage from './pages/NotFoundPage';
 import RunPage from './pages/RunPage';
 import { navigate, useUrl } from './routing';
 
-export default function App() {
+import type { JSX } from 'react';
+
+export default function App(): JSX.Element | null {
   const url = useUrl();
   const path = url.split('?')[0] ?? '/';
   const browse = path === '/bench/' || path === '/bench';
