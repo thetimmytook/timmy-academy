@@ -25,6 +25,8 @@ import { seedRows, seedStatements } from './seed';
 import type { StoredRun } from './stored-run';
 
 const base = '/api/bench/v1';
+const firstSeedRunPath = '/runs/br_test_01';
+const filterOptionsPath = '/filter-options';
 let mf: Miniflare;
 let db: D1Database;
 let now = 1000000;
@@ -87,9 +89,15 @@ beforeAll(async () => {
   db = await mf.getD1Database('BENCHMARK_DB');
   const folder = new URL('../../../../infrastructure/migrations/', import.meta.url);
 
-  for (const name of (await readdir(folder))
+  // The directory is fixed inside this repository; its SQL files are test inputs.
+  // eslint-disable-next-line security/detect-non-literal-fs-filename
+  const migrationNames = (await readdir(folder))
     .filter(name => name.endsWith('.sql'))
-    .sort((a, b) => a.localeCompare(b))) {
+    .sort((a, b) => a.localeCompare(b));
+
+  for (const name of migrationNames) {
+    // Names come from the fixed directory listing above.
+    // eslint-disable-next-line security/detect-non-literal-fs-filename
     const sql = await readFile(new URL(name, folder), 'utf8');
     await db.batch(
       sql
@@ -233,13 +241,13 @@ describe('real local D1 public HTTP integration', { timeout: 30000 }, () => {
         expect((await request(path)).status).toBe(409);
       }
 
-      expect((await request('/runs/br_test_01')).status).toBe(404);
+      expect((await request(firstSeedRunPath)).status).toBe(404);
       expect((await groups()).summary.run_count).toBe(23);
       expect((await position()).runs.map(run => run.public_run_id)).toEqual(['br_test_05']);
       await db
         .prepare("UPDATE benchmark_runs SET visibility = 'hidden' WHERE cpu = 'core-i5-12400f'")
         .run();
-      const options = filterOptionsSchema.parse(await (await request('/filter-options')).json());
+      const options = filterOptionsSchema.parse(await (await request(filterOptionsPath)).json());
       expect(options.cpus.map(cpu => cpu.id)).not.toContain('core-i5-12400f');
       expect(options.ram_gb).toEqual([32, 64]);
     },
@@ -297,7 +305,7 @@ describe('real local D1 public HTTP integration', { timeout: 30000 }, () => {
     await seed();
     expect((await groups()).summary.run_count).toBe(24);
     expect((await request('/runs/br_unrelated')).status).toBe(200);
-    expect((await request('/runs/br_test_01')).status).toBe(404);
+    expect((await request(firstSeedRunPath)).status).toBe(404);
     await groups(`limit=1&cursor=${first.next_cursor}`);
   });
   it('uses explicit projections even when stored documents contain future private fields', async () => {
@@ -312,8 +320,8 @@ describe('real local D1 public HTTP integration', { timeout: 30000 }, () => {
     for (const response of [
       await groups(),
       await position(),
-      await (await request('/runs/br_test_01')).json(),
-      await (await request('/filter-options')).json(),
+      await (await request(firstSeedRunPath)).json(),
+      await (await request(filterOptionsPath)).json(),
     ]) {
       const json = JSON.stringify(response);
       expect(json).not.toMatch(
@@ -410,7 +418,7 @@ describe('real local D1 public HTTP integration', { timeout: 30000 }, () => {
     expect(groupSearchResponseSchema.parse(await response.json()).summary.run_count).toBe(0);
     expect((await groups('map=woods')).groups).toEqual([]);
     expect((await position()).status).toBe('no_data');
-    expect(filterOptionsSchema.parse(await (await request('/filter-options')).json()).cpus).toEqual(
+    expect(filterOptionsSchema.parse(await (await request(filterOptionsPath)).json()).cpus).toEqual(
       [],
     );
     expect((await live.request(`${base}/runs`)).status).toBe(500);

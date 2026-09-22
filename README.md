@@ -149,5 +149,5 @@ Infrastructure scripts, the Drizzle configuration and the ESLint configuration u
 Node.js 24 runs the standalone database commands directly; the seed command uses `tsx` because
 it imports application modules. ESLint loads its TypeScript configuration through `jiti`.
 
-The remaining lint warnings still need review. Keep local, pre-commit and CI checks aligned,
-and retain useful type-aware rules instead of broadly disabling them.
+ESLint enforces braces and spacing around statements and comments across the workspace. Local,
+pre-commit and CI checks use the same configuration, including type-aware rules.
