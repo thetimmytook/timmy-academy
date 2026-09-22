@@ -1,4 +1,4 @@
-# Auth provider proof: adapter and local Worker
+# Auth provider proof: adapter, local Worker and browser harness
 
 Review checkpoint, 2026-09-22. Clerk remains a candidate, not a selected provider.
 This directory is not imported by the product Worker, web app or Windows apps.
@@ -74,7 +74,7 @@ local server after testing. No dashboard action is needed for the stubbed tests.
 
 | Required gate                                           | Status       | Evidence / remaining work                                                                                                                                                |
 | ------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1. Email code in system browser, no Microsoft account   | Blocked      | Clerk documents email codes; browser and Windows harness not yet built; no test instance configured.                                                                     |
+| 1. Email code in system browser, no Microsoft account   | Blocked      | Isolated browser entry built; Windows harness pending; no live test instance configured.                                                                                 |
 | 2. Existing Academy browser session avoids another code | Blocked      | Must exercise custom consent page on the same web origin and same browser profile.                                                                                       |
 | 3. One-time verifier-bound desktop return               | Blocked      | Public client + required S256 PKCE documented; live wrong-verifier, replay, state and loopback tests pending.                                                            |
 | 4. Worker token and verified-email validation           | Blocked      | Actual local workerd passes with stubbed Clerk responses; live Clerk token/email verification remains pending.                                                           |
@@ -116,10 +116,45 @@ These are identity list prices excluding taxes, Worker/database use and operatio
 costs. Stytch's old $0.20 figure has not yet been reverified and is not accepted as
 current evidence. Final cost and provider recommendation follow the live gates.
 
+## Isolated browser harness
+
+The separate Vite root is `apps/web/auth-poc`; its configuration lives in
+`infrastructure/auth-poc/web.config.ts`. Normal Academy entry points do not import it.
+`@clerk/react` is a direct web dependency, used only by the browser auth adapter.
+The API adapter still uses REST. No provider types enter product code.
+
+Run from `apps/web`:
+
+```sh
+npx panda codegen
+npx vite --config ../../infrastructure/auth-poc/web.config.ts
+```
+
+Open `http://127.0.0.1:5190/`. Without a configured development publishable key, the
+page displays a setup message and does not initialize Clerk. When the full local
+harness is ready, copy `infrastructure/auth-poc/.env.example` to `.env.local` in that
+same directory and set the development publishable key locally. Never place the
+Worker secret key in a `VITE_*` variable. Restart Vite after changing the environment.
+
+Routes: `/` shows browser session status, `/sign-in` and `/sign-up` host Clerk widgets,
+and `/oauth/consent` hosts the unmodified prebuilt consent component. The consent
+route has no home/logout controls and preserves the original authorization parameters.
+The HTML sets the referrer policy required by Clerk's cross-origin consent form.
+Browser logout targets the current browser session only. Its actual interaction with
+desktop OAuth grants still needs a live check; SDK call arguments do not prove that.
+Email-code-only authentication must be configured in the test dashboard; a sign-in
+widget alone does not enforce that setting.
+
+Twelve additional browser tests use stubbed Clerk components. They cover setup guards,
+loading, provider subroutes, protected consent, preservation of consent parameters,
+current-session logout and sanitized logout errors. They do not test real Clerk UI,
+email delivery, consent submission, SSO or token issuance. The standalone build and
+local HTTP entry/module smoke check pass; the normal web build contains no Clerk JS.
+
 ## Next reviewable step
 
-Add minimal English React auth/consent UI and a standalone .NET Windows harness.
-Connect them to this local Worker. Use the system browser, state, S256 PKCE, a one-shot
+Add a standalone .NET Windows harness and connect it to this local Worker and browser
+entry. Use the system browser, state, S256 PKCE, a one-shot
 loopback listener, secure credential storage, explicit refresh and remote revoke.
 Do not integrate the Benchmark product or touch its run state. Exercise the Worker
 locally and prepare exact development-dashboard steps only once these tools are ready.
