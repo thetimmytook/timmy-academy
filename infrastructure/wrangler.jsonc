@@ -12,6 +12,7 @@
   "env": {
     "staging": {
       "name": "timmy-academy-staging",
+      "vars": { "DISABLE_INDEXING": "true" },
       "routes": [{ "pattern": "staging.timmy.academy", "custom_domain": true }],
     },
     "production": {

@@ -7,6 +7,7 @@ import {
   type RunSearchResponse,
 } from '@timmy/contracts';
 
+import { publicFilterOptions } from './filter-options';
 import { createSyntheticRuns, syntheticHardware, syntheticMaps, type StoredRun } from './fixtures';
 import { projectDetail, projectHardware, projectSummary } from './projection';
 import { BenchmarkRequestError, type BenchmarkRepository } from './repository';
@@ -86,6 +87,10 @@ export class InMemoryBenchmarkRepository implements BenchmarkRepository {
   detail(id: string) {
     const run = this.runs.find(candidate => candidate.detail.public_run_id === id);
     return Promise.resolve(run === undefined ? undefined : projectDetail(run));
+  }
+
+  filterOptions() {
+    return Promise.resolve(publicFilterOptions(this.runs.map(projectDetail)));
   }
 
   async search(query: RunSearchQuery): Promise<RunSearchResponse> {

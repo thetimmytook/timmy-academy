@@ -11,6 +11,6 @@ export default defineConfig({
   theme,
   globalCss,
   globalFontface,
-  // These examples choose their tone from data, outside static JSX extraction.
-  staticCss: { recipes: { badge: ['*'], callout: ['*'] } },
+  // Shared elements receive recipe variants through props, outside static extraction.
+  staticCss: { recipes: { badge: ['*'], callout: ['*'], button: ['*'] } },
 });

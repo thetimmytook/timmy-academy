@@ -16,6 +16,16 @@ Timmy Academy is currently in the design stage. The Windows Benchmark applicatio
 - Keep `apps/api/src/index.ts` for app assembly and shared middleware/error handling. Keep repository/query logic, fixtures and public projections outside `.api.ts` files; shared runtime contracts belong in `packages/contracts`.
 - Name HTTP tests `*.api.test.ts` when adding a dedicated route-module test file. Existing broader integration tests may retain their names.
 
+## Web UI conventions
+
+- Keep reusable, domain-independent UI components in `apps/web/src/elements`. Start with a flat library; introduce atom/molecule/organism folders only when its size makes that useful.
+- Put route-level components in `apps/web/src/pages`. Both the component and its file name must end in `Page` (for example, `BenchPage.tsx`, `RunPage.tsx`, `StyleSystemPage.tsx`). Keep `App.tsx` for app assembly and route selection.
+- Keep Benchmark-specific components, API access and search state in `apps/web/src/bench`. Elements must not import Benchmark contracts or fetch feature data. Split components by responsibility, without speculative abstractions or a separate package before it has a real consumer.
+- Use PascalCase component files and simple names such as `Button`, `Dropdown`, `Input`, `Field`, and `Message`. Avoid redundant `Control` suffixes. A native select is exposed as `Dropdown`; this naming does not require a third-party UI library.
+- Use the shared elements in product pages and the style-system page. Keep visual tokens and recipes in `theme.ts` and Panda; do not duplicate control styling in pages. Generate all supported recipe variants when wrapper props prevent static extraction.
+- Preserve native HTML semantics, keyboard behavior, accessible labels, refs and native attributes. `Button` renders a button for actions (default `type="button"`, explicit `type="submit"` for submission) and an anchor when given `href`. Modified clicks and external links retain normal browser behavior.
+- Format UI files with the repository's shared Prettier configuration, including `.tsx`. Do not add UI-only ESLint whitespace or blank-line rules to imitate formatting. Use meaningful blank lines and small components to keep code readable.
+
 ## Git hygiene
 
 - Do not commit unless the user asks. Do not rewrite history or discard user changes.
