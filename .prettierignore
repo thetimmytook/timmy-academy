@@ -7,3 +7,5 @@ design
 *.drawio
 *.svg
 apps/web/styled-system
+tools/auth-poc-desktop/**/bin
+tools/auth-poc-desktop/**/obj
