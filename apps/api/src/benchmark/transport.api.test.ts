@@ -53,8 +53,10 @@ describe('Position transport policy', () => {
         body: validBody.padEnd(COHORT_QUERY_MAX_BODY_BYTES + extra),
       });
       expect(response.status).toBe(extra === 0 ? 200 : 413);
-      if (extra !== 0)
+
+      if (extra !== 0) {
         expect(benchmarkErrorSchema.parse(await response.json()).code).toBe('payload_too_large');
+      }
     }
   });
   it('counts UTF-8 bytes rather than characters', async () => {

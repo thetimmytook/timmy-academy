@@ -18,6 +18,12 @@ export function runWrangler(args) {
       .replaceAll(process.env.CLOUDFLARE_ACCOUNT_ID || '___NO_ACCOUNT_ID___', '[account-id]');
   process.stdout.write(redact(result.stdout));
   process.stderr.write(redact(result.stderr));
-  if (result.error) throw new Error('Could not start Wrangler.');
-  if (result.status !== 0) throw new Error('Wrangler failed; see the redacted output above.');
+
+  if (result.error) {
+    throw new Error('Could not start Wrangler.');
+  }
+
+  if (result.status !== 0) {
+    throw new Error('Wrangler failed; see the redacted output above.');
+  }
 }

@@ -13,7 +13,9 @@ export function execution(value: string) {
 export function number(value: number) {
   return new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(value);
 }
+
 export function words(value: string) {
   const text = value.replaceAll('_', ' ');
+
   return text.charAt(0).toUpperCase() + text.slice(1);
 }

@@ -15,9 +15,12 @@ type ButtonProps = ButtonVariantProps &
 export function Button(props: Readonly<ButtonProps>) {
   if (props.href !== undefined) {
     const { variant, size, className, ...attributes } = props;
+
     return <Link {...attributes} className={cx(button({ variant, size }), className)} />;
   }
+
   const { variant, size, className, type = 'button', ...attributes } = props;
+
   return (
     <button {...attributes} type={type} className={cx(button({ variant, size }), className)} />
   );

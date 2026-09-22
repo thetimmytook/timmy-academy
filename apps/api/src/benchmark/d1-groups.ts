@@ -90,6 +90,7 @@ export async function groupPage(
     .orderBy(...runOrder(ascending, maps))
     .limit(3)
     .as('preview');
+
   // The ordered/limited correlated subquery must be aggregated as a whole, not
   // before LIMIT. This small SQLite JSON aggregate is expressed with Drizzle sql.
   const previews = sql<string>`(select json_group_array(json(${preview.detail})) from ${preview})`;
@@ -117,7 +118,9 @@ export async function groupPage(
     const documents = JSON.parse(row.previews) as PublicRunDetail[];
     const key = keys.at(index);
 
-    if (!key) throw new Error('Missing navigation token.');
+    if (!key) {
+      throw new Error('Missing navigation token.');
+    }
 
     return {
       hardware: projectHardware(stored(row)),

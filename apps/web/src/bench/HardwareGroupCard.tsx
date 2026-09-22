@@ -25,13 +25,16 @@ function ExpandedRuns({
   query.set('group_key', group.group_key);
   query.set('limit', '5');
   const cursor = params.get('item_cursor');
+
   if (cursor) {
     query.set('cursor', cursor);
   }
+
   const { data, error, retry } = useResource(
     `/api/bench/v1/runs?${query}`,
     groupRunsResponseSchema,
   );
+
   if (error) {
     return (
       <>
@@ -42,9 +45,11 @@ function ExpandedRuns({
       </>
     );
   }
+
   if (!data) {
     return <p role="status">Loading runs…</p>;
   }
+
   return (
     <>
       <RunList runs={data.items} />
@@ -59,6 +64,7 @@ export function HardwareGroupCard({
 }: Readonly<{ group: HardwareGroup; params: URLSearchParams }>) {
   const expanded = params.get('expanded') === group.group_key;
   const regionId = `runs-${group.group_key}`;
+
   return (
     <article className={`${panel()} ${stack}`}>
       <div>
@@ -84,11 +90,13 @@ export function HardwareGroupCard({
         onClick={() => {
           const next = new URLSearchParams(params);
           next.delete('item_cursor');
+
           if (expanded) {
             next.delete('expanded');
           } else {
             next.set('expanded', group.group_key);
           }
+
           navigate(browseUrl(next));
         }}
       >

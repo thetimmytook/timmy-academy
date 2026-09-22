@@ -13,6 +13,7 @@ export default defineConfig({
         this.emitFile({
           type: 'asset',
           fileName: '_headers',
+
           // Fixed repository path; no request or environment input reaches this filename.
           // eslint-disable-next-line security/detect-non-literal-fs-filename
           source: readFileSync(

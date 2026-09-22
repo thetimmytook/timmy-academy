@@ -36,6 +36,7 @@ export function runFields<T extends Record<keyof typeof runColumns, AnySQLiteCol
     ram: source.ram,
   };
 }
+
 export type Anchor = [string, string, string];
 export type Tuple = [string, string, number];
 type OrderFields = Record<'day' | 'publishedAt' | 'publicId', SQLWrapper>;
@@ -45,8 +46,11 @@ export function runOrder(ascending: boolean, source: OrderFields = runs) {
 
   return [direction(source.day), direction(source.publishedAt), direction(source.publicId)];
 }
+
 export function pagePredicate(ascending: boolean, after?: Anchor, source: OrderFields = runs) {
-  if (!after) return undefined;
+  if (!after) {
+    return undefined;
+  }
 
   const compare = ascending ? gt : lt;
 
@@ -55,17 +59,23 @@ export function pagePredicate(ascending: boolean, after?: Anchor, source: OrderF
     sql`(${after[0]}, ${after[1]}, ${after[2]})`,
   );
 }
+
 export function anchor(row: RunRow): Anchor {
-  if (row.day === null) throw new Error('A public run must have a capture day.');
+  if (row.day === null) {
+    throw new Error('A public run must have a capture day.');
+  }
 
   return [row.day, row.publishedAt, row.publicId];
 }
+
 export function tuple(row: RunRow): Tuple {
-  if (row.cpu === null || row.gpu === null || row.ram === null)
+  if (row.cpu === null || row.gpu === null || row.ram === null) {
     throw new Error('A public run must have a hardware tuple.');
+  }
 
   return [row.cpu, row.gpu, row.ram];
 }
+
 export function stored(row: Pick<RunRow, 'detail' | 'contributor' | 'publishedAt'>): StoredRun {
   return {
     detail: JSON.parse(row.detail) as PublicRunDetail,
@@ -73,9 +83,11 @@ export function stored(row: Pick<RunRow, 'detail' | 'contributor' | 'publishedAt
     publishedAt: row.publishedAt,
   };
 }
+
 export function detail(row: RunRow) {
   return projectDetail(stored(row));
 }
+
 export function predicate(filters: BenchmarkFilters, watermark: number, hardware?: Tuple) {
   return and(
     eq(runs.visibility, 'published'),
@@ -93,6 +105,7 @@ export function predicate(filters: BenchmarkFilters, watermark: number, hardware
       : undefined,
   );
 }
+
 export const countFields = {
   run_count: count(),
   contributor_count: countDistinct(runs.contributor),

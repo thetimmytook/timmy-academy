@@ -131,6 +131,7 @@ export const theme = {
         bg: { value: '{colors.green.900}' },
         border: { value: '{colors.green.700}' },
       },
+
       // Darker status backgrounds keep the draft's foreground accents readable.
       warning: {
         fg: { value: '{colors.amber.400}' },

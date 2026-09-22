@@ -61,6 +61,7 @@ function Section({
 
 function Actions() {
   const [message, setMessage] = useState('Try an action. Feedback appears here.');
+
   return (
     <div className={panel()}>
       <div className={row}>
@@ -116,6 +117,7 @@ function Forms() {
   const [name, setName] = useState('Streets · evening run');
   const [submitted, setSubmitted] = useState(false);
   const invalid = submitted && !name.trim();
+
   return (
     <form
       className={panel()}
@@ -204,6 +206,7 @@ function Forms() {
 
 function Surfaces() {
   const [selected, setSelected] = useState(true);
+
   return (
     <div className={stack}>
       <div className={grid}>
@@ -285,6 +288,7 @@ function Surfaces() {
 function Diagnostics() {
   const [active, setActive] = useState('Overview');
   const options = ['Overview', 'Run details'];
+
   return (
     <div className={panel()}>
       <div role="tablist" aria-label="Sample result" className={tabs()}>
@@ -302,8 +306,10 @@ function Diagnostics() {
               if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
                 return;
               }
+
               event.preventDefault();
               let nextIndex;
+
               if (event.key === 'Home') {
                 nextIndex = 0;
               } else if (event.key === 'End') {
@@ -312,7 +318,9 @@ function Diagnostics() {
                 const direction = event.key === 'ArrowRight' ? 1 : -1;
                 nextIndex = (index + direction + options.length) % options.length;
               }
+
               const next = options.at(nextIndex);
+
               if (next) {
                 setActive(next);
                 document.getElementById(`sample-tab-${nextIndex}`)?.focus();

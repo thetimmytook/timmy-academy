@@ -19,11 +19,13 @@ export function Filters({ params }: Readonly<{ params: URLSearchParams }>) {
 
   function change(key: string, value: string) {
     const next = resetPage(params);
+
     if (value) {
       next.set(key, value);
     } else {
       next.delete(key);
     }
+
     navigate(browseUrl(next));
   }
 
@@ -42,6 +44,7 @@ export function Filters({ params }: Readonly<{ params: URLSearchParams }>) {
     params.has('game_width') || params.has('game_height')
       ? `${params.get('game_width') ?? ''}x${params.get('game_height') ?? ''}`
       : '';
+
   return (
     <section aria-label="Search filters" className={`${panel()} ${stack}`}>
       <div>
@@ -103,10 +106,12 @@ export function Filters({ params }: Readonly<{ params: URLSearchParams }>) {
               const [width, height] = value.split('x');
               next.delete('game_width');
               next.delete('game_height');
+
               if (width && height) {
                 next.set('game_width', width);
                 next.set('game_height', height);
               }
+
               navigate(browseUrl(next));
             }}
           />

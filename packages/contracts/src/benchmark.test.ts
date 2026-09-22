@@ -77,6 +77,7 @@ describe('public benchmark runtime contracts', () => {
       game_version: null,
     };
     expect(cohortQuerySchema.safeParse(query).success).toBe(true);
+
     for (const extra of [
       { average_fps: 100 },
       { raw_capture: [] },

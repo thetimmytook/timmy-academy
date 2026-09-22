@@ -19,6 +19,7 @@ import { BenchmarkRequestError } from './repository';
 import type { FilterOptions, CohortQuery, CohortResponse } from '@timmy/contracts';
 
 const normalize = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
+
 export async function queryCohort(
   db: BenchmarkDatabase,
   query: CohortQuery,
@@ -31,7 +32,11 @@ export async function queryCohort(
     .map(item => item.gpu)
     .find(item => normalize(item.name) === normalize(query.hardware.gpu_name));
   const map = mapCatalog.find(item => item.id === query.map);
-  if (!cpu || !gpu || !map) throw new BenchmarkRequestError('invalid_input');
+
+  if (!cpu || !gpu || !map) {
+    throw new BenchmarkRequestError('invalid_input');
+  }
+
   const criteria = {
     hardware: { cpu, gpu, ram_gb: query.hardware.ram_gb },
     map,
@@ -39,10 +44,18 @@ export async function queryCohort(
     game_resolution: query.game_resolution,
     game_version: query.game_version,
   };
+
   if (query.game_resolution === null || query.game_version === null) {
     const reason_codes: ('unknown_game_resolution' | 'game_version_missing')[] = [];
-    if (query.game_resolution === null) reason_codes.push('unknown_game_resolution');
-    if (query.game_version === null) reason_codes.push('game_version_missing');
+
+    if (query.game_resolution === null) {
+      reason_codes.push('unknown_game_resolution');
+    }
+
+    if (query.game_version === null) {
+      reason_codes.push('game_version_missing');
+    }
+
     return {
       status: 'missing_conditions',
       criteria,
@@ -52,6 +65,7 @@ export async function queryCohort(
       reason_codes,
     };
   }
+
   const exact = {
     ...criteria,
     game_resolution: query.game_resolution,
@@ -71,7 +85,8 @@ export async function queryCohort(
     watermark,
   );
   const counts = await db.select(countFields).from(runs).where(where).get();
-  if (!counts?.run_count)
+
+  if (!counts?.run_count) {
     return {
       status: 'no_data',
       criteria: exact,
@@ -80,6 +95,8 @@ export async function queryCohort(
       truncated: false,
       reason_codes: ['no_exact_matches'],
     };
+  }
+
   const rows = await db
     .select(runColumns)
     .from(runs)
@@ -87,6 +104,7 @@ export async function queryCohort(
     .orderBy(...runOrder(false))
     .limit(20)
     .all();
+
   return {
     status: 'matches',
     criteria: exact,
@@ -99,6 +117,7 @@ export async function queryCohort(
 
 export async function queryFilterOptions(db: BenchmarkDatabase): Promise<FilterOptions> {
   const visible = eq(runs.visibility, 'published');
+
   const named = async (
     id: typeof runs.cpu | typeof runs.gpu | typeof runs.map,
     namePath: '$.hardware.cpu.name' | '$.hardware.gpu.name' | '$.conditions.map.name',
@@ -114,6 +133,7 @@ export async function queryFilterOptions(db: BenchmarkDatabase): Promise<FilterO
 
     return namedOptions(namedModelSchema.array().parse(rows));
   };
+
   const cpus = await named(runs.cpu, '$.hardware.cpu.name');
   const gpus = await named(runs.gpu, '$.hardware.gpu.name');
   const maps = await named(runs.map, '$.conditions.map.name');

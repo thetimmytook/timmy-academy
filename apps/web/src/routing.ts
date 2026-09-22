@@ -6,6 +6,7 @@ function currentUrl() {
 
 function subscribe(callback: () => void) {
   window.addEventListener('popstate', callback);
+
   return () => window.removeEventListener('popstate', callback);
 }
 
@@ -19,5 +20,6 @@ export function navigate(url: string, { replace = false }: { replace?: boolean }
   } else {
     window.history.pushState(null, '', url);
   }
+
   window.dispatchEvent(new PopStateEvent('popstate'));
 }

@@ -5,14 +5,18 @@ import { browseUrl } from './navigation';
 
 function pageUrl(params: URLSearchParams, cursor: string | null, key = 'cursor') {
   const next = new URLSearchParams(params);
+
   if (key === 'cursor') {
     next.delete('expanded');
     next.delete('item_cursor');
   }
+
   next.delete(key);
+
   if (cursor) {
     next.set(key, cursor);
   }
+
   return browseUrl(next);
 }
 
@@ -26,6 +30,7 @@ export function RunPagination({
   item?: boolean;
 }>) {
   const key = item ? 'item_cursor' : 'cursor';
+
   return (
     <nav
       aria-label={item ? 'Run pages' : 'Hardware pages'}

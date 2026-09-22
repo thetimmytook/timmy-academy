@@ -11,6 +11,7 @@ export default function RunPage({ id, back }: Readonly<{ id: string; back: strin
     `/api/bench/v1/runs/${encodeURIComponent(id)}`,
     publicRunDetailSchema,
   );
+
   return (
     <div className={stack}>
       <Button variant="link" href={back}>
