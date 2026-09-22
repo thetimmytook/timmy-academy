@@ -1,8 +1,9 @@
-# Auth provider proof: step 1
+# Auth provider proof: adapter and local Worker
 
 Review checkpoint, 2026-09-22. Clerk remains a candidate, not a selected provider.
 This directory is not imported by the product Worker, web app or Windows apps.
-It has no deployment configuration, account provisioning or run publication.
+It has a separate local Worker configuration, but no deployment environments,
+account provisioning or run publication.
 The API declares Zod directly for the small provider-response schemas.
 
 ## What this step proves
@@ -24,19 +25,50 @@ API requests. Rate limits, latency and availability need live measurement.
 Run from the repository root:
 
 ```sh
-npx vitest run apps/api/src/auth-poc/auth-poc.api.test.ts
+npx vitest run apps/api/src/auth-poc
 npm run typecheck -w @timmy/api
 npx eslint apps/api/src/auth-poc
 npx prettier --check apps/api/src/auth-poc
 ```
 
-Tests use synthetic responses and identities. They establish our denial rules and
-response boundary, not Clerk service behavior or Cloudflare runtime compatibility.
+Tests use synthetic responses and identities. The runtime tests bundle the actual
+Worker with Wrangler's `deploy --dry-run` (no upload), then run it in local workerd
+through Miniflare. All outbound fetches are intercepted by an in-process Clerk stub;
+the tests never call the live provider. Build output stays in ignored `.wrangler/`.
 
-Local verification on 2026-09-22: **78/78 PoC tests passed**, including malformed
+Local verification on 2026-09-22: **90/90 PoC tests passed**, including malformed
 provider responses, missing/null primary-email IDs and overflow when converting expiry
 to milliseconds. API TypeScript, targeted ESLint and Prettier checks passed.
-The earlier full API baseline passed 132 tests before these additional PoC cases.
+Eight of these cases run the actual Worker bundle. This exposed a runtime restriction:
+workerd rejects `redirect: 'error'`. The adapter now uses `manual` and rejects non-2xx
+responses. A runtime test verifies that a provider redirect is denied without forwarding
+the secret key to its target. The earlier full API baseline passed 132 tests before
+these additional PoC cases.
+
+## Local Worker
+
+The dedicated configuration is `infrastructure/auth-poc/wrangler.jsonc`. It has no
+product assets, database bindings, routes or production environment. It binds to
+`127.0.0.1:8790`, disables observability, workers.dev and preview URLs. Nothing here
+authorizes deployment. The Worker additionally requires `AUTH_POC_MODE=local` and
+a loopback request hostname. These are local-harness guards, not a production access policy.
+
+Once the browser/desktop harness is ready, copy `.dev.vars.example` to `.dev.vars`
+in that directory and fill the development-instance settings locally. `.dev.vars`
+is ignored by Git. `CLERK_TEST_SUBJECT` and `AUTH_POC_ACCOUNT_ID` provision one private
+mapping; preserve the internal account ID between runs. This is neither account
+registration nor a provider-migration implementation. Keys and client IDs must belong
+to the configured issuer; the live check of that association is still outstanding.
+
+```sh
+npx wrangler dev --config infrastructure/auth-poc/wrangler.jsonc --local --log-level error
+```
+
+Only `GET /api/auth/v1/poc/check` is registered. The desktop will send its opaque
+credential in the Authorization header. Do not paste credentials into URLs, shell
+commands or task messages. Success is `{ "status": "verified" }`; missing/invalid
+credentials get 401, URL parameters get 400, incomplete configuration gets a sanitized 503. No account IDs, provider identifiers or email addresses are returned. Stop the
+local server after testing. No dashboard action is needed for the stubbed tests.
 
 ## Evidence ledger
 
@@ -45,7 +77,7 @@ The earlier full API baseline passed 132 tests before these additional PoC cases
 | 1. Email code in system browser, no Microsoft account   | Blocked      | Clerk documents email codes; browser and Windows harness not yet built; no test instance configured.                                                                     |
 | 2. Existing Academy browser session avoids another code | Blocked      | Must exercise custom consent page on the same web origin and same browser profile.                                                                                       |
 | 3. One-time verifier-bound desktop return               | Blocked      | Public client + required S256 PKCE documented; live wrong-verifier, replay, state and loopback tests pending.                                                            |
-| 4. Worker token and verified-email validation           | Blocked      | Adapter denial/privacy tests use mock HTTP. Actual Worker runtime and live Clerk verification pending.                                                                   |
+| 4. Worker token and verified-email validation           | Blocked      | Actual local workerd passes with stubbed Clerk responses; live Clerk token/email verification remains pending.                                                           |
 | 5. Expiry, refresh, revoke, independent logout          | Blocked      | Local expiry/revocation checks covered; provider lifecycle and session independence untested.                                                                            |
 | 6. Stable account ID and provider migration             | Blocked      | Email-independent directory boundary tested. Durable mapping and proof of both identities for migration pending.                                                         |
 | 7. Anonymous public search                              | Pass (local) | Product `GET /api/bench/v1/runs` without Authorization returns 200; PoC route returns 404 in product app. Existing benchmark suite supplies broader regression coverage. |
@@ -86,8 +118,8 @@ current evidence. Final cost and provider recommendation follow the live gates.
 
 ## Next reviewable step
 
-Add a separately started local Worker, minimal English React auth/consent UI and a
-standalone .NET Windows harness. Use the system browser, state, S256 PKCE, a one-shot
+Add minimal English React auth/consent UI and a standalone .NET Windows harness.
+Connect them to this local Worker. Use the system browser, state, S256 PKCE, a one-shot
 loopback listener, secure credential storage, explicit refresh and remote revoke.
 Do not integrate the Benchmark product or touch its run state. Exercise the Worker
 locally and prepare exact development-dashboard steps only once these tools are ready.

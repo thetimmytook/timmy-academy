@@ -58,7 +58,9 @@ export function createClerkTestAdapter(
   async function backend(path: string, init: RequestInit = {}): Promise<unknown> {
     const response = await transport(`https://api.clerk.com/v1/${path}`, {
       ...init,
-      redirect: 'error',
+
+      // Workers supports manual/follow only. The non-2xx check below rejects redirects.
+      redirect: 'manual',
       signal: AbortSignal.timeout(5000),
       headers: {
         Authorization: `Bearer ${config.secretKey}`,

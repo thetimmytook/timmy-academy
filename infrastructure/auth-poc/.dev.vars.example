@@ -1,0 +1,7 @@
+# Copy to .dev.vars in this directory. Use a Clerk development instance only.
+# Fill locally; never paste credentials into task messages or commit .dev.vars.
+CLERK_ISSUER=https://REPLACE.clerk.accounts.dev
+CLERK_CLIENT_ID=REPLACE
+CLERK_SECRET_KEY=sk_test_REPLACE
+CLERK_TEST_SUBJECT=REPLACE
+AUTH_POC_ACCOUNT_ID=acc_poc_REPLACE

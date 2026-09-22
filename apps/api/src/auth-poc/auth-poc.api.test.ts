@@ -78,7 +78,7 @@ describe('isolated Clerk adapter (mock provider, not live authentication)', () =
       'https://api.clerk.com/v1/oauth_applications/access_tokens/verify',
       expect.objectContaining({
         method: 'POST',
-        redirect: 'error',
+        redirect: 'manual',
         body: JSON.stringify({ access_token: 'fixture-opaque-credential' }),
       }),
     );
@@ -290,7 +290,7 @@ describe('isolated Clerk adapter (mock provider, not live authentication)', () =
     },
   );
 
-  it.each([401, 404, 429, 500])('sanitizes upstream HTTP %i', async status => {
+  it.each([301, 302, 307, 308, 401, 404, 429, 500])('sanitizes upstream HTTP %i', async status => {
     const { adapter, transport } = fixture();
     transport.mockReset().mockResolvedValue(new Response('secret provider details', { status }));
     await expect(adapter.authenticate(authorization)).rejects.toThrow(deniedMessage);
