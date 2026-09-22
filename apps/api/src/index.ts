@@ -7,6 +7,11 @@ import { BenchmarkRequestError, type BenchmarkRepository } from './benchmark/rep
 
 export function createApp(repository: BenchmarkRepository = new InMemoryBenchmarkRepository()) {
   const app = new Hono();
+  app.use('*', async (context, next) => {
+    await next();
+    const bindings = context.env as { DISABLE_INDEXING?: string } | undefined;
+    if (bindings?.DISABLE_INDEXING === 'true') context.header('X-Robots-Tag', 'noindex');
+  });
   registerBenchmarkApi(app, repository);
 
   app.notFound(context =>

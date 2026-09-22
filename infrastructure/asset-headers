@@ -1,0 +1,3 @@
+# Host-scoped: the same build can be deployed to production without noindex.
+https://staging.timmy.academy/*
+  X-Robots-Tag: noindex

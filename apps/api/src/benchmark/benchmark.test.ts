@@ -409,6 +409,9 @@ describe('public allowlist and error privacy', () => {
   });
   it('masks internal exceptions', async () => {
     const failingRepository: BenchmarkRepository = {
+      filterOptions() {
+        throw new Error('secret');
+      },
       search() {
         throw new Error('secret SQL path stack account_id');
       },

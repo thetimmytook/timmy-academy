@@ -2,18 +2,14 @@
 /* eslint-disable sonarjs/no-duplicate-string */
 import { useState } from 'react';
 
-import { css } from '../styled-system/css';
-import {
-  badge,
-  button,
-  callout,
-  input,
-  panel,
-  tab,
-  tabs,
-  tableRow,
-} from '../styled-system/recipes';
-import { token } from '../styled-system/tokens';
+import { css } from '../../styled-system/css';
+import { badge, panel, tab, tabs, tableRow } from '../../styled-system/recipes';
+import { token } from '../../styled-system/tokens';
+import { Button } from '../elements/Button';
+import { Dropdown } from '../elements/Dropdown';
+import { Field } from '../elements/Field';
+import { Input } from '../elements/Input';
+import { Message } from '../elements/Message';
 
 import type { ReactNode } from 'react';
 
@@ -68,36 +64,28 @@ function Actions() {
   return (
     <div className={panel()}>
       <div className={row}>
-        <button
-          className={button({ variant: 'primary' })}
+        <Button
+          variant="primary"
           onClick={() => setMessage('Practice started. This is a preview interaction.')}
         >
           Start Practice <span aria-hidden="true">↗</span>
-        </button>
-        <button
-          className={button()}
-          onClick={() => setMessage('Comparison added to your preview.')}
-        >
+        </Button>
+        <Button onClick={() => setMessage('Comparison added to your preview.')}>
           Compare Results
-        </button>
-        <button
-          className={button({ variant: 'ghost' })}
-          onClick={() => setMessage('Preview dismissed.')}
-        >
+        </Button>
+        <Button variant="ghost" onClick={() => setMessage('Preview dismissed.')}>
           Dismiss
-        </button>
-        <button
-          className={button({ variant: 'danger' })}
+        </Button>
+        <Button
+          variant="danger"
           onClick={() => setMessage('Demo selection cleared. No saved data was changed.')}
         >
           Clear Demo
-        </button>
-        <button className={button()} disabled>
-          Locked
-        </button>
-        <a className={button({ variant: 'link' })} href="#forms">
+        </Button>
+        <Button disabled>Locked</Button>
+        <Button variant="link" href="#forms">
           Explore fields <span aria-hidden="true">→</span>
-        </a>
+        </Button>
       </div>
       <p
         role="status"
@@ -112,19 +100,11 @@ function Actions() {
           State reference · secondary button
         </p>
         <div className={row}>
-          <button className={button()}>Default</button>
-          <button className={button()} data-hover>
-            Hover
-          </button>
-          <button className={button()} data-focus-visible>
-            Keyboard focus
-          </button>
-          <button className={button()} data-active>
-            Pressed
-          </button>
-          <button className={button()} disabled>
-            Disabled
-          </button>
+          <Button>Default</Button>
+          <Button data-hover>Hover</Button>
+          <Button data-focus-visible>Keyboard focus</Button>
+          <Button data-active>Pressed</Button>
+          <Button disabled>Disabled</Button>
         </div>
       </div>
     </div>
@@ -148,10 +128,8 @@ function Forms() {
     >
       <div className={grid}>
         <div className={stack}>
-          <label className={css({ display: 'grid', gap: 'field' })}>
-            <span className={css({ textStyle: 'label' })}>Run label</span>
-            <input
-              className={input()}
+          <Field label="Run label">
+            <Input
               value={name}
               required
               aria-invalid={invalid}
@@ -161,44 +139,24 @@ function Forms() {
                 setSaved(false);
               }}
             />
-          </label>
+          </Field>
           <p
             id="run-label-help"
             className={css({ textStyle: 'caption', color: invalid ? 'danger.fg' : 'fg.muted' })}
           >
             {invalid ? 'Enter a label before saving.' : 'A short name to help you find this run.'}
           </p>
-          <label className={css({ display: 'grid', gap: 'field' })}>
-            <span className={css({ textStyle: 'label' })}>Map</span>
-            <span className={css({ position: 'relative', display: 'block' })}>
-              <select className={input({ kind: 'select' })} defaultValue="streets">
-                <option value="streets">Streets of Tarkov</option>
-                <option value="woods">Woods</option>
-                <option value="customs">Customs</option>
-              </select>
-              <span
-                aria-hidden="true"
-                className={css({
-                  position: 'absolute',
-                  right: '4',
-                  top: '50%',
-                  width: '0.5rem',
-                  height: '0.5rem',
-                  borderRight: '2px solid currentColor',
-                  borderBottom: '2px solid currentColor',
-                  color: 'fg.muted',
-                  transform: 'translateY(-75%) rotate(45deg)',
-                  pointerEvents: 'none',
-                })}
-              />
-            </span>
-          </label>
+          <Field label="Map">
+            <Dropdown defaultValue="streets">
+              <option value="streets">Streets of Tarkov</option>
+              <option value="woods">Woods</option>
+              <option value="customs">Customs</option>
+            </Dropdown>
+          </Field>
         </div>
         <div className={stack}>
-          <label className={css({ display: 'grid', gap: 'field' })}>
-            <span className={css({ textStyle: 'label' })}>Invalid field example</span>
-            <input
-              className={input()}
+          <Field label="Invalid field example">
+            <Input
               defaultValue="not-a-number"
               aria-invalid="true"
               aria-describedby="resolution-error"
@@ -209,11 +167,10 @@ function Forms() {
             >
               Error: enter a numeric resolution width.
             </span>
-          </label>
-          <label className={css({ display: 'grid', gap: 'field' })}>
-            <span className={css({ textStyle: 'label' })}>Unavailable setting</span>
-            <input className={input()} value="Available after your first run" disabled readOnly />
-          </label>
+          </Field>
+          <Field label="Unavailable setting">
+            <Input value="Available after your first run" disabled readOnly />
+          </Field>
         </div>
       </div>
       <label
@@ -234,9 +191,7 @@ function Forms() {
         Include this run in my comparison
       </label>
       <div className={row}>
-        <button className={button()} type="submit">
-          Save Preview
-        </button>
+        <Button type="submit">Save Preview</Button>
         <p role="status" className={muted}>
           {saved
             ? 'Preview saved for this session. Nothing is published.'
@@ -317,10 +272,10 @@ function Surfaces() {
             },
           ] as const
         ).map(item => (
-          <div key={item.tone} className={callout({ tone: item.tone })}>
+          <Message key={item.tone} tone={item.tone}>
             <h3 className={css({ fontWeight: 600, mb: '1' })}>{item.title}</h3>
             <p>{item.text}</p>
-          </div>
+          </Message>
         ))}
       </div>
     </div>
@@ -344,7 +299,9 @@ function Diagnostics() {
             className={tab()}
             onClick={() => setActive(option)}
             onKeyDown={event => {
-              if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+              if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
+                return;
+              }
               event.preventDefault();
               let nextIndex;
               if (event.key === 'Home') {
@@ -496,7 +453,7 @@ function Diagnostics() {
   );
 }
 
-export default function StyleSystem() {
+export default function StyleSystemPage() {
   return (
     <>
       <title>Style System · Timmy Academy</title>
@@ -587,11 +544,7 @@ export default function StyleSystem() {
           })}
         >
           {sections.map((section, i) => (
-            <a
-              key={section}
-              href={`#${section.toLowerCase()}`}
-              className={button({ variant: 'ghost', size: 'sm' })}
-            >
+            <Button key={section} href={`#${section.toLowerCase()}`} variant="ghost" size="sm">
               <span
                 className={css({
                   color: 'brand.default',
@@ -602,7 +555,7 @@ export default function StyleSystem() {
                 0{i + 1}
               </span>
               {section}
-            </a>
+            </Button>
           ))}
         </nav>
         <div className={css({ display: 'grid', gap: 'section' })}>
@@ -754,10 +707,10 @@ export default function StyleSystem() {
                   <br />
                   00:10:32
                 </p>
-                <div className={callout({ tone: 'info' })}>
+                <Message tone="info">
                   <h3 className={css({ fontWeight: 600, mb: '1' })}>Field note</h3>
                   <p>Use mono for measurements, timestamps, and IDs. Keep explanations in Sans.</p>
-                </div>
+                </Message>
                 <p className={css({ textStyle: 'eyebrow', mt: '6', mb: '2' })}>Signature labels</p>
                 <p className={eyebrow}>Lesson 04 · Practice · Skill check</p>
               </div>

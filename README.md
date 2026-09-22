@@ -1,6 +1,6 @@
 # Timmy Academy
 
-Timmy Academy workspace with a public Benchmark API slice backed by synthetic in-memory data.
+Timmy Academy workspace with a public Benchmark web UI and API backed by synthetic in-memory data.
 
 ## Local development
 
@@ -24,6 +24,7 @@ The [v1 contract](design/benchmark-backend-draft.md) is implemented by these ano
 
 - `GET /api/bench/v1/runs`: grouped search; `view=items&group_key=...` expands one group.
 - `GET /api/bench/v1/runs/{publicRunId}`: one run's public details and reviewed settings.
+- `GET /api/bench/v1/filter-options`: distinct CPU/GPU, RAM, map, resolution and game-version values observed in public runs.
 - `POST /api/bench/v1/cohorts/query`: exact Position comparison, without publication.
 
 Try `http://127.0.0.1:8787/api/bench/v1/runs?ram_gb=32&map=lighthouse` after `npm run dev:api`.
@@ -71,6 +72,32 @@ codes and abuse limits remain future work. Publishing must add validation/metric
 idempotency, moderation, deletion and retention. Authentication/provider selection and ownership
 remain separate work; this slice implements no writes, owner endpoints or persistent storage.
 
+## Public Benchmark UI
+
+Open `/bench/` for immediate grouped results and `/bench/runs/{publicRunId}` for one capture.
+CPU, GPU, RAM and map are the main filters; More conditions exposes execution, selected game
+resolution and exact game version. Options come from the read-only API, never a bundled catalog.
+They describe the current public dataset, not all supported hardware. Unknown URL selections
+remain visible and return exact matches or an empty result; filters never widen automatically.
+
+Filters, capture-date sort, page size, hardware cursor, expanded group and run cursor live in the
+URL. Changing filters or sort clears both cursors and expansion. Expansion replaces the preview
+with paginated individual runs (five per page), without duplicating or averaging preview values.
+Pagination offers the next and first pages; browser Back revisits previous pages. BENCH and Back
+to search results restore the last browse URL in this tab, saved in session storage when available.
+A direct detail visit with no saved browse URL falls back to `/bench/`. Vite and the existing
+Cloudflare SPA asset fallback both serve direct detail URLs on refresh.
+
+The UI has loading, empty, invalid-link, unavailable-run and retry states. Missing settings are
+not inferred; recorded quality codes and mode tokens retain their saved values. The profile
+icon is a noninteractive placeholder. No auth, owner actions, Position or Academy pages are added.
+
+UI integration tests use the real Hono read routes with synthetic test data to cover navigation,
+filtering, both cursors, null settings, errors and out-of-order requests. The current options
+endpoint returns all distinct observed values in one response; a large production dataset will
+need a searchable/paginated options contract. Durable storage and real publication data remain
+backend work.
+
 ## Style system
 
 The permanent `/style-system` page shows the Academy palette, typography, shared component
@@ -81,6 +108,11 @@ data only. Open it locally at `http://127.0.0.1:5173/style-system`.
 declarations. `apps/web/panda.config.ts` connects it to Panda; `src/style.css` contains only the
 CSS layer entry point. Component and page layouts use Panda's generated helpers. Generated
 `apps/web/styled-system/` files are ignored by Git and recreated by the web scripts.
+
+Reusable UI components live in `apps/web/src/elements` and are shared by Benchmark and the
+style-system page. Route components live in `apps/web/src/pages`, with `Page` in both their
+component and file names. Benchmark-specific components and data access stay in `src/bench`.
+See `AGENTS.md` for naming, accessibility and formatting conventions.
 
 Typography, spacing, radii, controls and page widths use `rem`, converted from the draft's
 16px reference root. The root stays at `100%` to respect the browser's default font size.

@@ -3,6 +3,7 @@ import {
   cohortQuerySchema,
   cohortResponseSchema,
   healthResponseSchema,
+  filterOptionsSchema,
   publicRunIdSchema,
   publicRunDetailSchema,
   runSearchQuerySchema,
@@ -31,6 +32,11 @@ export function registerBenchmarkApi(app: Hono, repository: BenchmarkRepository)
     const parsed = runSearchQuerySchema.safeParse(Object.fromEntries(parameters));
     if (!parsed.success) throw new BenchmarkRequestError('invalid_input');
     return context.json(runSearchResponseSchema.parse(await repository.search(parsed.data)));
+  });
+
+  app.get('/api/bench/v1/filter-options', async context => {
+    if (new URL(context.req.url).search) throw new BenchmarkRequestError('invalid_input');
+    return context.json(filterOptionsSchema.parse(await repository.filterOptions()));
   });
 
   app.get('/api/bench/v1/runs/:publicRunId', async context => {

@@ -1,48 +1,114 @@
-import { healthResponseSchema } from '@timmy/contracts';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 
 import { css } from '../styled-system/css';
-import { button } from '../styled-system/recipes';
+
+import { lastBrowse } from './bench/navigation';
+import { Button } from './elements/Button';
+import BenchPage from './pages/BenchPage';
+import NotFoundPage from './pages/NotFoundPage';
+import RunPage from './pages/RunPage';
+import { navigate, useUrl } from './routing';
 
 export default function App() {
-  const [apiStatus, setApiStatus] = useState('Checking API…');
+  const url = useUrl();
+  const path = url.split('?')[0] ?? '/';
+  const browse = path === '/bench/' || path === '/bench';
+  const search = new URL(url, window.location.origin).search;
+  const back = browse ? '/bench/' + search : lastBrowse();
+  const detail = /^\/bench\/runs\/(br_[A-Za-z0-9_-]+)\/?$/.exec(path);
+  let content = <NotFoundPage back={back} />;
+  let title = 'Page not found · Timmy Academy';
+  if (browse) {
+    content = <BenchPage url={back} />;
+    title = 'Benchmark · Timmy Academy';
+  } else if (detail?.[1]) {
+    content = <RunPage id={detail[1]} back={back} />;
+    title = 'Public run · Timmy Academy';
+  }
 
   useEffect(() => {
-    const controller = new AbortController();
-
-    async function checkHealth() {
-      try {
-        const response = await fetch('/api/bench/v1/health', { signal: controller.signal });
-        if (!response.ok) throw new Error('API unavailable');
-        const payload: unknown = await response.json();
-        healthResponseSchema.parse(payload);
-        setApiStatus('API connected');
-      } catch {
-        if (!controller.signal.aborted) setApiStatus('API unavailable');
-      }
+    if (path === '/') {
+      navigate('/bench/' + search, { replace: true });
     }
+  }, [path, search]);
+  useEffect(() => {
+    if (path !== '/') {
+      document.title = title;
+    }
+  }, [path, title]);
+  useEffect(() => {
+    document.getElementById('main')?.focus();
+  }, [path]);
 
-    void checkHealth();
-    return () => controller.abort();
-  }, []);
-
+  if (path === '/') {
+    return null;
+  }
   return (
-    <main
-      className={css({
-        maxWidth: '40rem',
-        mx: 'auto',
-        py: '20',
-        px: '6',
-        display: 'grid',
-        gap: '4',
-      })}
-    >
-      <h1 className={css({ textStyle: 'h1' })}>Hello, Timmy Academy</h1>
-      <p>Project skeleton is ready.</p>
-      <p role="status">{apiStatus}</p>
-      <a href="/style-system" className={button({ variant: 'primary' })}>
-        Explore the Style System
+    <>
+      <a
+        href="#main"
+        className={css({
+          position: 'absolute',
+          left: '4',
+          top: '-20',
+          _focus: { top: '4', zIndex: 2, bg: 'bg.elevated', p: '4' },
+        })}
+      >
+        Skip to content
       </a>
-    </main>
+      <header
+        className={css({
+          borderBottom: '1px solid',
+          borderColor: 'border.default',
+          bg: 'bg.surface',
+        })}
+      >
+        <div
+          className={css({
+            maxWidth: '80rem',
+            mx: 'auto',
+            px: { base: '4', tablet: '8' },
+            py: '4',
+            display: 'flex',
+            gap: '4',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+          })}
+        >
+          <span className={css({ textStyle: 'eyebrow' })}>Timmy Academy</span>
+          <nav aria-label="Main">
+            <Button
+              variant="ghost"
+              className={css({ color: 'brand.default', bg: 'brand.subtle' })}
+              href={back}
+            >
+              BENCH
+            </Button>
+          </nav>
+          <span
+            aria-label="Profile unavailable"
+            title="Profiles are not available yet"
+            className={css({ ml: 'auto', color: 'fg.muted' })}
+          >
+            <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="12" cy="7" r="4" />
+              <path d="M4 22v-4a8 8 0 0 1 16 0v4z" />
+            </svg>
+          </span>
+        </div>
+      </header>
+      <main
+        id="main"
+        tabIndex={-1}
+        className={css({
+          maxWidth: '80rem',
+          mx: 'auto',
+          px: { base: '4', tablet: '8' },
+          py: { base: '6', tablet: '10' },
+        })}
+      >
+        {content}
+      </main>
+    </>
   );
 }

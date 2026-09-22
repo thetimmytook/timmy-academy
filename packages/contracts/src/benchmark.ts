@@ -24,6 +24,16 @@ export const hardwareSchema = z.strictObject({
   gpu: namedModelSchema,
   ram_gb: positiveInteger,
 });
+// Observed values in the public dataset, not a universal hardware catalog.
+export const filterOptionsSchema = z.strictObject({
+  cpus: z.array(namedModelSchema),
+  gpus: z.array(namedModelSchema),
+  ram_gb: z.array(positiveInteger),
+  maps: z.array(namedModelSchema),
+  game_resolutions: z.array(resolutionSchema),
+  game_versions: z.array(label),
+});
+export type FilterOptions = z.infer<typeof filterOptionsSchema>;
 export const benchmarkFiltersSchema = z.strictObject({
   cpu: modelId.nullable(),
   gpu: modelId.nullable(),

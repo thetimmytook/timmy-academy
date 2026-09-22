@@ -1,4 +1,5 @@
 import type {
+  FilterOptions,
   CohortQuery,
   CohortResponse,
   PublicRunDetail,
@@ -7,6 +8,7 @@ import type {
 } from '@timmy/contracts';
 
 export interface BenchmarkRepository {
+  filterOptions(): Promise<FilterOptions>;
   search(query: RunSearchQuery): Promise<RunSearchResponse>;
   detail(id: string): Promise<PublicRunDetail | undefined>;
   cohort(query: CohortQuery): Promise<CohortResponse>;
