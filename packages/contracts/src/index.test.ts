@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { healthResponseSchema } from './index';
 
 describe('health response contract', () => {

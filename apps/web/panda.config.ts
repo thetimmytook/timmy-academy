@@ -1,4 +1,5 @@
 import { defineConfig } from '@pandacss/dev';
+
 import { globalCss, globalFontface, theme } from './src/theme';
 
 export default defineConfig({
