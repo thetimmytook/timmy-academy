@@ -76,12 +76,12 @@ describe('Position transport policy', () => {
       let canceled = false;
       let chunk = 0;
       const body = new ReadableStream<Uint8Array>({
-        pull(controller) {
+        pull(controller): void {
           controller.enqueue(
             new Uint8Array(chunk++ === 0 ? COHORT_QUERY_MAX_BODY_BYTES : 1).fill(32),
           );
         },
-        cancel() {
+        cancel(): void {
           canceled = true;
         },
       });

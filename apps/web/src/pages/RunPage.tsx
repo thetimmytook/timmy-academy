@@ -6,7 +6,9 @@ import { stack } from '../bench/styles';
 import { Button } from '../elements/Button';
 import { ErrorMessage } from '../elements/ErrorMessage';
 
-export default function RunPage({ id, back }: Readonly<{ id: string; back: string }>) {
+import type { JSX } from 'react';
+
+export default function RunPage({ id, back }: Readonly<{ id: string; back: string }>): JSX.Element {
   const { data, error, retry } = useResource(
     `/api/bench/v1/runs/${encodeURIComponent(id)}`,
     publicRunDetailSchema,

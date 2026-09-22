@@ -1,8 +1,12 @@
 import { navigate } from '../routing';
 
-import type { ComponentPropsWithRef } from 'react';
+import type { JSX, ComponentPropsWithRef } from 'react';
 
-export function Link({ href, onClick, ...props }: Readonly<ComponentPropsWithRef<'a'>>) {
+export function Link({
+  href,
+  onClick,
+  ...props
+}: Readonly<ComponentPropsWithRef<'a'>>): JSX.Element {
   return (
     <a
       {...props}

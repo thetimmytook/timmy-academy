@@ -1,9 +1,12 @@
 import { css, cx } from '../../styled-system/css';
 import { input } from '../../styled-system/recipes';
 
-import type { ComponentPropsWithRef } from 'react';
+import type { JSX, ComponentPropsWithRef } from 'react';
 
-export function Dropdown({ className, ...props }: Readonly<ComponentPropsWithRef<'select'>>) {
+export function Dropdown({
+  className,
+  ...props
+}: Readonly<ComponentPropsWithRef<'select'>>): JSX.Element {
   return (
     <span className={css({ position: 'relative', display: 'block', minWidth: 0 })}>
       <select {...props} className={cx(input({ kind: 'select' }), className)} />

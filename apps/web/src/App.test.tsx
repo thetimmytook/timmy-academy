@@ -10,23 +10,25 @@ import App from './App';
 import { rememberBrowse } from './bench/navigation';
 import { navigate } from './routing';
 
+import type { RenderResult } from '@testing-library/react';
+
 let app = createApp(new InMemoryBenchmarkRepository());
 const nextRuns = 'Next runs →';
 const firstRuns = 'First run page';
 const publicSettings = 'Public settings';
 const request = vi.fn((path: string) => app.request(path));
 
-function start(url = '/bench/') {
+function start(url = '/bench/'): RenderResult {
   window.history.replaceState(null, '', url);
 
   return render(<App />);
 }
 
-async function results() {
+async function results(): Promise<HTMLElement> {
   return screen.findByRole('region', { name: 'Search results' });
 }
 
-async function choose(label: string, value: string) {
+async function choose(label: string, value: string): Promise<HTMLElement> {
   await waitFor(() => expect(screen.getByLabelText<HTMLSelectElement>(label).disabled).toBe(false));
   fireEvent.change(screen.getByLabelText<HTMLSelectElement>(label), { target: { value } });
 

@@ -1,6 +1,8 @@
 import { Link } from '../elements/Link';
 
-export default function NotFoundPage({ back }: Readonly<{ back: string }>) {
+import type { JSX } from 'react';
+
+export default function NotFoundPage({ back }: Readonly<{ back: string }>): JSX.Element {
   return (
     <>
       <h1>Page not found</h1>

@@ -13,7 +13,7 @@ const errorMessages = new Map([
   ['rate_limited', 'Too many requests. Please wait a moment and retry.'],
 ]);
 
-async function read<T>(url: string, schema: Parser<T>, signal: AbortSignal) {
+async function read<T>(url: string, schema: Parser<T>, signal: AbortSignal): Promise<T> {
   const response = await fetch(url, { signal });
   const body: unknown = await response.json();
 
@@ -27,7 +27,10 @@ async function read<T>(url: string, schema: Parser<T>, signal: AbortSignal) {
   return schema.parse(body);
 }
 
-export function useResource<T>(url: string, schema: Parser<T>) {
+export function useResource<T>(
+  url: string,
+  schema: Parser<T>,
+): { data: T | undefined; error: string | undefined; retry: () => void } {
   const [result, setResult] = useState<Result<T>>();
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
@@ -50,20 +53,20 @@ export function useResource<T>(url: string, schema: Parser<T>) {
         }
       });
 
-    return () => controller.abort();
+    return (): void => controller.abort();
   }, [url, schema, attempt]);
   const current = result?.url === url ? result : undefined;
 
   return {
     data: current?.data,
     error: current?.error,
-    retry: () => {
+    retry: (): void => {
       setResult(undefined);
       setAttempt(value => value + 1);
     },
   };
 }
 
-function errorMessagesHas(message: string) {
+function errorMessagesHas(message: string): boolean {
   return [...errorMessages.values()].includes(message);
 }

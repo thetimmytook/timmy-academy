@@ -75,7 +75,10 @@ export class D1Navigation {
     return JSON.parse(row.payload) as Snapshot;
   }
 
-  async assertFresh(snapshot: Snapshot, code: 'cursor_stale' | 'group_key_stale' = 'cursor_stale') {
+  async assertFresh(
+    snapshot: Snapshot,
+    code: 'cursor_stale' | 'group_key_stale' = 'cursor_stale',
+  ): Promise<void> {
     const current = await this.snapshot();
 
     if (current.revision !== snapshot.revision || this.now() >= snapshot.expires) {
@@ -112,7 +115,7 @@ export class D1Navigation {
     return navigation;
   }
 
-  async save(kind: 'cur' | 'hg', navigation: Navigation) {
+  async save(kind: 'cur' | 'hg', navigation: Navigation): Promise<string> {
     const token = `${kind}_${crypto.randomUUID().replaceAll('-', '')}`;
 
     await this.db
@@ -127,7 +130,7 @@ export class D1Navigation {
     return token;
   }
 
-  async saveGroups(navigations: Navigation[]) {
+  async saveGroups(navigations: Navigation[]): Promise<string[]> {
     const keys = await Promise.all(
       navigations.map(async navigation => {
         const digest = await crypto.subtle.digest(
@@ -156,7 +159,7 @@ export class D1Navigation {
     return keys;
   }
 
-  async cleanExpired() {
+  async cleanExpired(): Promise<void> {
     const expired = this.db
       .select({ token: tokens.token })
       .from(tokens)
@@ -167,10 +170,10 @@ export class D1Navigation {
   }
 }
 
-export function groupBinding(query: RunSearchQuery) {
+export function groupBinding(query: RunSearchQuery): string {
   return JSON.stringify([searchFilters(query), query.sort]);
 }
 
-export function cursorBinding(query: RunSearchQuery) {
+export function cursorBinding(query: RunSearchQuery): string {
   return JSON.stringify([groupBinding(query), query.view, query.group_key ?? null, query.limit]);
 }

@@ -15,7 +15,7 @@ import {
 import { projectHardware, projectSummary } from './projection';
 import { searchFilters } from './search-filters';
 
-import type { Anchor, BenchmarkDatabase } from './d1-query';
+import type { Anchor, BenchmarkDatabase, RunRow } from './d1-query';
 import type { GroupSearchResponse, PublicRunDetail, RunSearchQuery } from '@timmy/contracts';
 
 // A single SQLite statement: filtered rows, windows, counts and <= 3 preview
@@ -26,7 +26,15 @@ export async function groupPage(
   query: RunSearchQuery,
   snapshot: Snapshot,
   after?: Anchor,
-) {
+): Promise<{
+  rows: (RunRow & {
+    run_count: number;
+    contributor_count: number;
+    map_count: number;
+    previews: string;
+  })[];
+  groups: GroupSearchResponse['groups'];
+}> {
   const ascending = query.sort === 'captured_asc';
   const filtered = db.$with('filtered').as(
     db

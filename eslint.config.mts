@@ -46,6 +46,14 @@ export default defineConfig([
       parserOptions: { projectService: true },
     },
     rules: {
+      '@typescript-eslint/explicit-function-return-type': [
+        'error',
+        {
+          allowTypedFunctionExpressions: true,
+          allowHigherOrderFunctions: false,
+          allowDirectConstAssertionInArrowFunctions: false,
+        },
+      ],
       '@typescript-eslint/no-floating-promises': 'error',
       '@typescript-eslint/no-misused-promises': 'error',
       '@typescript-eslint/no-unsafe-argument': 'error',

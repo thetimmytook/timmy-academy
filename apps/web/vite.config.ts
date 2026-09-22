@@ -9,7 +9,7 @@ export default defineConfig({
     {
       name: 'cloudflare-asset-headers',
       apply: 'build',
-      generateBundle() {
+      generateBundle(): void {
         this.emitFile({
           type: 'asset',
           fileName: '_headers',

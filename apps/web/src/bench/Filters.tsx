@@ -13,11 +13,12 @@ import { useResource } from './resource';
 import { grid, muted, stack } from './styles';
 
 import type { Option } from './FilterDropdown';
+import type { JSX } from 'react';
 
-export function Filters({ params }: Readonly<{ params: URLSearchParams }>) {
+export function Filters({ params }: Readonly<{ params: URLSearchParams }>): JSX.Element {
   const { data, error, retry } = useResource('/api/bench/v1/filter-options', filterOptionsSchema);
 
-  function change(key: string, value: string) {
+  function change(key: string, value: string): void {
     const next = resetPage(params);
 
     if (value) {
@@ -29,9 +30,9 @@ export function Filters({ params }: Readonly<{ params: URLSearchParams }>) {
     navigate(browseUrl(next));
   }
 
-  const named = (values: { id: string; name: string }[] = []) =>
+  const named = (values: { id: string; name: string }[] = []): Option[] =>
     values.map(value => ({ value: value.id, label: value.name }));
-  const select = (label: string, key: string, options: Option[]) => (
+  const select = (label: string, key: string, options: Option[]): JSX.Element => (
     <FilterDropdown
       label={label}
       value={params.get(key) ?? ''}

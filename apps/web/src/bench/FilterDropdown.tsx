@@ -1,6 +1,8 @@
 import { Dropdown } from '../elements/Dropdown';
 import { Field } from '../elements/Field';
 
+import type { JSX } from 'react';
+
 export type Option = { value: string; label: string };
 
 export function FilterDropdown({
@@ -17,7 +19,7 @@ export function FilterDropdown({
   onChange: (value: string) => void;
   disabled?: boolean;
   allowAny?: boolean;
-}>) {
+}>): JSX.Element {
   return (
     <Field label={label}>
       <Dropdown value={value} disabled={disabled} onChange={event => onChange(event.target.value)}>

@@ -5,6 +5,8 @@ import {
   groupSearchResponseSchema,
   publicRunDetailSchema,
   type CohortQuery,
+  type GroupSearchResponse,
+  type CohortResponse,
 } from '@timmy/contracts';
 import { describe, expect, it } from 'vitest';
 
@@ -27,14 +29,14 @@ const exact: CohortQuery = {
 };
 const app = createApp(new InMemoryBenchmarkRepository());
 
-async function groups(query = '', application = app) {
+async function groups(query = '', application = app): Promise<GroupSearchResponse> {
   const response = await application.request(`${base}/runs?${query}`);
   expect(response.status).toBe(200);
 
   return groupSearchResponseSchema.parse(await response.json());
 }
 
-async function position(body: unknown = exact, application = app) {
+async function position(body: unknown = exact, application = app): Promise<CohortResponse> {
   const response = await application.request(`${base}/cohorts/query`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -45,7 +47,12 @@ async function position(body: unknown = exact, application = app) {
   return cohortResponseSchema.parse(await response.json());
 }
 
-async function errorAt(path: string, status: number, code: string, application = app) {
+async function errorAt(
+  path: string,
+  status: number,
+  code: string,
+  application = app,
+): Promise<void> {
   const response = await application.request(`${base}${path}`);
   expect(response.status).toBe(status);
   const error = benchmarkErrorSchema.parse(await response.json());
@@ -474,16 +481,16 @@ describe('public allowlist and error privacy', () => {
   });
   it('masks internal exceptions', async () => {
     const failingRepository: BenchmarkRepository = {
-      filterOptions() {
+      filterOptions(): never {
         throw new Error('secret');
       },
-      search() {
+      search(): never {
         throw new Error('secret SQL path stack account_id');
       },
-      detail() {
+      detail(): never {
         throw new Error('secret');
       },
-      cohort() {
+      cohort(): never {
         throw new Error('secret');
       },
     };

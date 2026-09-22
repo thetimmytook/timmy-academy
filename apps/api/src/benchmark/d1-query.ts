@@ -6,7 +6,7 @@ import { projectDetail } from './projection';
 
 import type { StoredRun } from './stored-run';
 import type { BenchmarkFilters, PublicRunDetail } from '@timmy/contracts';
-import type { SQLWrapper } from 'drizzle-orm';
+import type { SQL, SQLWrapper } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core';
 
@@ -24,7 +24,9 @@ export const runColumns = {
 export type RunRow = Pick<typeof runs.$inferSelect, keyof typeof runColumns>;
 
 // Preserve Drizzle's inferred column types when selecting from a CTE alias.
-export function runFields<T extends Record<keyof typeof runColumns, AnySQLiteColumn>>(source: T) {
+export function runFields<T extends Record<keyof typeof runColumns, AnySQLiteColumn>>(
+  source: T,
+): Record<keyof typeof runColumns, AnySQLiteColumn> {
   return {
     detail: source.detail,
     contributor: source.contributor,
@@ -41,13 +43,17 @@ export type Anchor = [string, string, string];
 export type Tuple = [string, string, number];
 type OrderFields = Record<'day' | 'publishedAt' | 'publicId', SQLWrapper>;
 
-export function runOrder(ascending: boolean, source: OrderFields = runs) {
+export function runOrder(ascending: boolean, source: OrderFields = runs): SQL<unknown>[] {
   const direction = ascending ? asc : desc;
 
   return [direction(source.day), direction(source.publishedAt), direction(source.publicId)];
 }
 
-export function pagePredicate(ascending: boolean, after?: Anchor, source: OrderFields = runs) {
+export function pagePredicate(
+  ascending: boolean,
+  after?: Anchor,
+  source: OrderFields = runs,
+): SQL<unknown> | undefined {
   if (!after) {
     return undefined;
   }
@@ -84,11 +90,15 @@ export function stored(row: Pick<RunRow, 'detail' | 'contributor' | 'publishedAt
   };
 }
 
-export function detail(row: RunRow) {
+export function detail(row: RunRow): PublicRunDetail {
   return projectDetail(stored(row));
 }
 
-export function predicate(filters: BenchmarkFilters, watermark: number, hardware?: Tuple) {
+export function predicate(
+  filters: BenchmarkFilters,
+  watermark: number,
+  hardware?: Tuple,
+): SQL<unknown> | undefined {
   return and(
     eq(runs.visibility, 'published'),
     lte(runs.sequence, watermark),

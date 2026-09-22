@@ -1,7 +1,12 @@
 import { Button } from './Button';
 import { Message } from './Message';
 
-export function ErrorMessage({ message, retry }: Readonly<{ message: string; retry: () => void }>) {
+import type { JSX } from 'react';
+
+export function ErrorMessage({
+  message,
+  retry,
+}: Readonly<{ message: string; retry: () => void }>): JSX.Element {
   return (
     <Message tone="danger">
       <p role="alert">{message}</p>

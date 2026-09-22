@@ -14,11 +14,12 @@ import { RunPagination } from './RunPagination';
 import { muted, stack } from './styles';
 
 import type { HardwareGroup } from '@timmy/contracts';
+import type { JSX } from 'react';
 
 function ExpandedRuns({
   group,
   params,
-}: Readonly<{ group: HardwareGroup; params: URLSearchParams }>) {
+}: Readonly<{ group: HardwareGroup; params: URLSearchParams }>): JSX.Element {
   const query = searchParameters(params);
   query.delete('cursor');
   query.set('view', 'items');
@@ -61,7 +62,7 @@ function ExpandedRuns({
 export function HardwareGroupCard({
   group,
   params,
-}: Readonly<{ group: HardwareGroup; params: URLSearchParams }>) {
+}: Readonly<{ group: HardwareGroup; params: URLSearchParams }>): JSX.Element {
   const expanded = params.get('expanded') === group.group_key;
   const regionId = `runs-${group.group_key}`;
 

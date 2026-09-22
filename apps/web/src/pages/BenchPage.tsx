@@ -9,7 +9,9 @@ import { SearchResults } from '../bench/SearchResults';
 import { muted, stack } from '../bench/styles';
 import { navigate } from '../routing';
 
-export default function BenchPage({ url }: Readonly<{ url: string }>) {
+import type { JSX } from 'react';
+
+export default function BenchPage({ url }: Readonly<{ url: string }>): JSX.Element {
   const params = new URL(url, window.location.origin).searchParams;
   const parsed = runSearchQuerySchema.safeParse(Object.fromEntries(searchParameters(params)));
   const valid =

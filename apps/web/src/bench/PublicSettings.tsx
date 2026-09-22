@@ -6,6 +6,7 @@ import { words } from './format';
 import { muted, stack } from './styles';
 
 import type { PublicSettings as PublicSettingsData } from '@timmy/contracts';
+import type { JSX } from 'react';
 
 const settingLabels = new Map([
   ['automatic_ram_cleaner', 'Automatic RAM Cleaner'],
@@ -23,7 +24,7 @@ const settingLabels = new Map([
   ['game_fps_limit', 'Game FPS limit'],
 ]);
 
-function settingValue(value: string | number | boolean | undefined) {
+function settingValue(value: string | number | boolean | undefined): string {
   if (typeof value === 'boolean') {
     return value ? 'On' : 'Off';
   }
@@ -31,7 +32,9 @@ function settingValue(value: string | number | boolean | undefined) {
   return value === undefined ? 'Unknown' : String(value);
 }
 
-export function PublicSettings({ settings }: Readonly<{ settings: PublicSettingsData | null }>) {
+export function PublicSettings({
+  settings,
+}: Readonly<{ settings: PublicSettingsData | null }>): JSX.Element {
   return (
     <section className={`${panel()} ${stack}`}>
       <h2 className={css({ textStyle: 'h2' })}>Public settings</h2>

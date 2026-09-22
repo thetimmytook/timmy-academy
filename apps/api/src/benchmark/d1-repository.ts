@@ -30,6 +30,9 @@ import { searchFilters } from './search-filters';
 
 import type { D1Database } from '@cloudflare/workers-types';
 import type {
+  PublicRunDetail,
+  FilterOptions,
+  CohortResponse,
   CohortQuery,
   GroupRunsResponse,
   GroupSearchResponse,
@@ -46,7 +49,7 @@ export class D1BenchmarkRepository implements BenchmarkRepository {
     this.db = drizzle(database);
     this.navigation = new D1Navigation(this.db, now);
   }
-  async detail(id: string) {
+  async detail(id: string): Promise<PublicRunDetail | undefined> {
     const row = await this.db
       .select(runColumns)
       .from(runs)
@@ -55,14 +58,14 @@ export class D1BenchmarkRepository implements BenchmarkRepository {
 
     return row ? detail(row) : undefined;
   }
-  async filterOptions() {
+  async filterOptions(): Promise<FilterOptions> {
     const snapshot = await this.navigation.snapshot();
     const result = await queryFilterOptions(this.db);
     await this.navigation.assertFresh(snapshot);
 
     return result;
   }
-  async cohort(query: CohortQuery) {
+  async cohort(query: CohortQuery): Promise<CohortResponse> {
     const snapshot = await this.navigation.snapshot();
     const result = await queryCohort(this.db, query, snapshot.watermark);
     await this.navigation.assertFresh(snapshot);
@@ -97,7 +100,11 @@ export class D1BenchmarkRepository implements BenchmarkRepository {
 
     return result;
   }
-  private async next(query: RunSearchQuery, snapshot: Snapshot, rows: RunRow[]) {
+  private async next(
+    query: RunSearchQuery,
+    snapshot: Snapshot,
+    rows: RunRow[],
+  ): Promise<string | null> {
     const last = rows.at(query.limit - 1);
 
     return rows.length > query.limit && last
@@ -108,7 +115,12 @@ export class D1BenchmarkRepository implements BenchmarkRepository {
         })
       : null;
   }
-  private async facts(query: RunSearchQuery, snapshot: Snapshot, hardware: Tuple, first: RunRow) {
+  private async facts(
+    query: RunSearchQuery,
+    snapshot: Snapshot,
+    hardware: Tuple,
+    first: RunRow,
+  ): Promise<GroupRunsResponse['group']> {
     const where = predicate(searchFilters(query), snapshot.watermark, hardware);
     const counts = await this.db
       .select({ ...countFields, map_count: countDistinct(runs.map) })

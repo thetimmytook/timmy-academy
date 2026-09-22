@@ -18,7 +18,7 @@ import { BenchmarkRequestError } from './repository';
 
 import type { FilterOptions, CohortQuery, CohortResponse } from '@timmy/contracts';
 
-const normalize = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
+const normalize = (value: string): string => value.trim().toLowerCase().replace(/\s+/g, ' ');
 
 export async function queryCohort(
   db: BenchmarkDatabase,
@@ -121,7 +121,7 @@ export async function queryFilterOptions(db: BenchmarkDatabase): Promise<FilterO
   const named = async (
     id: typeof runs.cpu | typeof runs.gpu | typeof runs.map,
     namePath: '$.hardware.cpu.name' | '$.hardware.gpu.name' | '$.conditions.map.name',
-  ) => {
+  ): Promise<{ id: string; name: string }[]> => {
     const rows = await db
       .selectDistinct({
         id,

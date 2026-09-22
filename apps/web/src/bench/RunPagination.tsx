@@ -3,7 +3,9 @@ import { Button } from '../elements/Button';
 
 import { browseUrl } from './navigation';
 
-function pageUrl(params: URLSearchParams, cursor: string | null, key = 'cursor') {
+import type { JSX } from 'react';
+
+function pageUrl(params: URLSearchParams, cursor: string | null, key = 'cursor'): string {
   const next = new URLSearchParams(params);
 
   if (key === 'cursor') {
@@ -28,7 +30,7 @@ export function RunPagination({
   params: URLSearchParams;
   next: string | null;
   item?: boolean;
-}>) {
+}>): JSX.Element {
   const key = item ? 'item_cursor' : 'cursor';
 
   return (

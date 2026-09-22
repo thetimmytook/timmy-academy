@@ -1,20 +1,20 @@
 import { useSyncExternalStore } from 'react';
 
-function currentUrl() {
+function currentUrl(): string {
   return window.location.pathname + window.location.search;
 }
 
-function subscribe(callback: () => void) {
+function subscribe(callback: () => void): () => void {
   window.addEventListener('popstate', callback);
 
   return () => window.removeEventListener('popstate', callback);
 }
 
-export function useUrl() {
+export function useUrl(): string {
   return useSyncExternalStore(subscribe, currentUrl);
 }
 
-export function navigate(url: string, { replace = false }: { replace?: boolean } = {}) {
+export function navigate(url: string, { replace = false }: { replace?: boolean } = {}): void {
   if (replace) {
     window.history.replaceState(null, '', url);
   } else {
