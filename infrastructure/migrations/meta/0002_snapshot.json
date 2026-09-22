@@ -1,0 +1,351 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "51f94724-1bf2-4b19-9ca5-820bd0413e0e",
+  "prevId": "3d674c98-1137-4a33-a5c6-2b6193e6ce50",
+  "tables": {
+    "account_identities": {
+      "name": "account_identities",
+      "columns": {
+        "issuer": {
+          "name": "issuer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "subject": {
+          "name": "subject",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "identities_account": {
+          "name": "identities_account",
+          "columns": ["account_id"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "account_identities_account_id_accounts_id_fk": {
+          "name": "account_identities_account_id_accounts_id_fk",
+          "tableFrom": "account_identities",
+          "tableTo": "accounts",
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "account_identities_issuer_subject_pk": {
+          "columns": ["issuer", "subject"],
+          "name": "account_identities_issuer_subject_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "accounts": {
+      "name": "accounts",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "benchmark_runs": {
+      "name": "benchmark_runs",
+      "columns": {
+        "sequence": {
+          "name": "sequence",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "public_id": {
+          "name": "public_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "contributor_key": {
+          "name": "contributor_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "published_at": {
+          "name": "published_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "visibility": {
+          "name": "visibility",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'published'"
+        },
+        "detail": {
+          "name": "detail",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "cpu": {
+          "name": "cpu",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "generated": {
+            "as": "(json_extract(detail, '$.hardware.cpu.id'))",
+            "type": "virtual"
+          }
+        },
+        "gpu": {
+          "name": "gpu",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "generated": {
+            "as": "(json_extract(detail, '$.hardware.gpu.id'))",
+            "type": "virtual"
+          }
+        },
+        "ram_gb": {
+          "name": "ram_gb",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "generated": {
+            "as": "(json_extract(detail, '$.hardware.ram_gb'))",
+            "type": "virtual"
+          }
+        },
+        "map": {
+          "name": "map",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "generated": {
+            "as": "(json_extract(detail, '$.conditions.map.id'))",
+            "type": "virtual"
+          }
+        },
+        "execution": {
+          "name": "execution",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "generated": {
+            "as": "(json_extract(detail, '$.conditions.execution'))",
+            "type": "virtual"
+          }
+        },
+        "game_width": {
+          "name": "game_width",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "generated": {
+            "as": "(json_extract(detail, '$.conditions.game_resolution.width'))",
+            "type": "virtual"
+          }
+        },
+        "game_height": {
+          "name": "game_height",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "generated": {
+            "as": "(json_extract(detail, '$.conditions.game_resolution.height'))",
+            "type": "virtual"
+          }
+        },
+        "game_version": {
+          "name": "game_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "generated": {
+            "as": "(json_extract(detail, '$.conditions.game_version'))",
+            "type": "virtual"
+          }
+        },
+        "captured_day": {
+          "name": "captured_day",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "generated": {
+            "as": "(json_extract(detail, '$.captured_day'))",
+            "type": "virtual"
+          }
+        }
+      },
+      "indexes": {
+        "benchmark_runs_public_id_unique": {
+          "name": "benchmark_runs_public_id_unique",
+          "columns": ["public_id"],
+          "isUnique": true
+        },
+        "runs_order": {
+          "name": "runs_order",
+          "columns": ["visibility", "captured_day", "published_at", "public_id"],
+          "isUnique": false
+        },
+        "runs_hardware_cohort": {
+          "name": "runs_hardware_cohort",
+          "columns": [
+            "visibility",
+            "cpu",
+            "gpu",
+            "ram_gb",
+            "map",
+            "execution",
+            "game_width",
+            "game_height",
+            "game_version"
+          ],
+          "isUnique": false
+        },
+        "runs_gpu": {
+          "name": "runs_gpu",
+          "columns": ["visibility", "gpu", "ram_gb"],
+          "isUnique": false
+        },
+        "runs_map": {
+          "name": "runs_map",
+          "columns": ["visibility", "map"],
+          "isUnique": false
+        },
+        "runs_resolution_version": {
+          "name": "runs_resolution_version",
+          "columns": ["visibility", "game_width", "game_height", "game_version"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "valid_detail": {
+          "name": "valid_detail",
+          "value": "json_valid(\"benchmark_runs\".\"detail\") AND json_extract(\"benchmark_runs\".\"detail\", '$.public_run_id') = \"benchmark_runs\".\"public_id\""
+        },
+        "valid_visibility": {
+          "name": "valid_visibility",
+          "value": "\"benchmark_runs\".\"visibility\" IN ('published', 'hidden', 'deleted')"
+        }
+      }
+    },
+    "benchmark_state": {
+      "name": "benchmark_state",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "benchmark_tokens": {
+      "name": "benchmark_tokens",
+      "columns": {
+        "token": {
+          "name": "token",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "payload": {
+          "name": "payload",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "tokens_expiry": {
+          "name": "tokens_expiry",
+          "columns": ["expires_at"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {}
+  }
+}

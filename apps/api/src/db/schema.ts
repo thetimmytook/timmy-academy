@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { check, index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { check, index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 import type { HasGenerated } from 'drizzle-orm';
 import type {
@@ -12,6 +12,25 @@ type GeneratedText = HasGenerated<
   { type: 'always' }
 >;
 type GeneratedInteger = HasGenerated<SQLiteIntegerBuilderInitial<string>, { type: 'always' }>;
+
+// Provider identities are private and never appear in benchmark public projections.
+export const accounts = sqliteTable('accounts', {
+  id: text('id').primaryKey(),
+});
+export const accountIdentities = sqliteTable(
+  'account_identities',
+  {
+    issuer: text('issuer').notNull(),
+    subject: text('subject').notNull(),
+    accountId: text('account_id')
+      .notNull()
+      .references(() => accounts.id),
+  },
+  table => [
+    primaryKey({ columns: [table.issuer, table.subject] }),
+    index('identities_account').on(table.accountId),
+  ],
+);
 
 // JSON contains only the accepted public document; private ownership stays separate.
 // Generated columns keep indexed predicates inseparable from that document.
