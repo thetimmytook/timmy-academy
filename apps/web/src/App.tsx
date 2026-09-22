@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
 import { healthResponseSchema } from '@timmy/contracts';
+import { useEffect, useState } from 'react';
+
 import { css } from '../styled-system/css';
 import { button } from '../styled-system/recipes';
 

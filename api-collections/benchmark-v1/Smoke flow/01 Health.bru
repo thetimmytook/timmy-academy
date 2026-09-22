@@ -1,0 +1,18 @@
+meta {
+  name: 01 Health
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/api/bench/v1/health
+  body: none
+  auth: none
+}
+
+tests {
+  test('health is available', function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.deep.equal({ status: 'ok' });
+  });
+}

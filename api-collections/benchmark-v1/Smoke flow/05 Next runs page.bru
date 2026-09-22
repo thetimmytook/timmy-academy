@@ -1,0 +1,25 @@
+meta {
+  name: 05 Next runs page
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{base_url}}/api/bench/v1/runs?view=items&group_key={{group_key}}&gpu=geforce-rtx-4070-super&limit=2&cursor={{runs_cursor}}
+  body: none
+  auth: none
+}
+
+tests {
+  test('continues the selected group', function () {
+    expect(res.getStatus()).to.equal(200);
+    const body = res.getBody();
+    expect(body.view).to.equal('items');
+    expect(body.items).to.have.lengthOf(2);
+    expect(body.items[0].public_run_id).to.match(/^br_/);
+  });
+}
+
+docs {
+  Run 02 and 04 first. The group key, filter, sort and page limit remain bound to this cursor.
+}

@@ -1,6 +1,7 @@
 /* Panda extracts literal token names from these declarative style objects. */
 /* eslint-disable sonarjs/no-duplicate-string */
 import { defineGlobalStyles, defineGlobalFontface, defineRecipe } from '@pandacss/dev';
+
 import type { Config } from '@pandacss/dev';
 
 // Academy's shared visual language. Keep feature layouts in their owning screens.

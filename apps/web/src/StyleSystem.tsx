@@ -1,9 +1,8 @@
 /* Keep token names literal so Panda can generate the page's styles. */
 /* eslint-disable sonarjs/no-duplicate-string */
 import { useState } from 'react';
-import type { ReactNode } from 'react';
+
 import { css } from '../styled-system/css';
-import { token } from '../styled-system/tokens';
 import {
   badge,
   button,
@@ -14,6 +13,9 @@ import {
   tabs,
   tableRow,
 } from '../styled-system/recipes';
+import { token } from '../styled-system/tokens';
+
+import type { ReactNode } from 'react';
 
 const row = css({ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '3' });
 const stack = css({ display: 'grid', gap: '4' });
@@ -33,11 +35,11 @@ function Section({
   description,
   children,
 }: {
-  id: string;
-  number: string;
-  title: string;
-  description: string;
-  children: ReactNode;
+  readonly id: string;
+  readonly number: string;
+  readonly title: string;
+  readonly description: string;
+  readonly children: ReactNode;
 }) {
   return (
     <section
@@ -344,13 +346,15 @@ function Diagnostics() {
             onKeyDown={event => {
               if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
               event.preventDefault();
-              const nextIndex =
-                event.key === 'Home'
-                  ? 0
-                  : event.key === 'End'
-                    ? options.length - 1
-                    : (index + (event.key === 'ArrowRight' ? 1 : -1) + options.length) %
-                      options.length;
+              let nextIndex;
+              if (event.key === 'Home') {
+                nextIndex = 0;
+              } else if (event.key === 'End') {
+                nextIndex = options.length - 1;
+              } else {
+                const direction = event.key === 'ArrowRight' ? 1 : -1;
+                nextIndex = (index + direction + options.length) % options.length;
+              }
               const next = options.at(nextIndex);
               if (next) {
                 setActive(next);

@@ -10,6 +10,12 @@ Timmy Academy is currently in the design stage. The Windows Benchmark applicatio
 - Keep deployment and environment configuration separate under `infrastructure/` when implementation begins. Use distinct test/staging and production environments.
 - Respect the privacy boundary in `design/benchmark-backend-draft.md`: public benchmark records use an explicit allowlist, and raw captures or private identifiers are never published.
 
+## API file naming
+
+- Put HTTP route registrations and request/response validation in `apps/api/src/<feature>/<feature>.api.ts` (for example, `benchmark/benchmark.api.ts`). Use the `.api.ts` suffix consistently, including when a feature is split into smaller route modules; do not introduce a competing `.endpoint.ts` convention.
+- Keep `apps/api/src/index.ts` for app assembly and shared middleware/error handling. Keep repository/query logic, fixtures and public projections outside `.api.ts` files; shared runtime contracts belong in `packages/contracts`.
+- Name HTTP tests `*.api.test.ts` when adding a dedicated route-module test file. Existing broader integration tests may retain their names.
+
 ## Git hygiene
 
 - Do not commit unless the user asks. Do not rewrite history or discard user changes.

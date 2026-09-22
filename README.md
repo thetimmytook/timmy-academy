@@ -1,6 +1,6 @@
 # Timmy Academy
 
-Minimal npm workspace scaffold for the future Academy site and benchmark API.
+Timmy Academy workspace with a public Benchmark API slice backed by synthetic in-memory data.
 
 ## Local development
 
@@ -15,8 +15,61 @@ In VS Code, press **Ctrl+Shift+B** or run **Tasks: Run Task → Academy: dev** t
 and the contracts watcher in separate terminals. The task builds contracts first and closes that
 preparation terminal. Contract changes are rebuilt automatically.
 
-Open `http://127.0.0.1:5173`. The web app proxies `/api` to the local Cloudflare Worker on port 8787. The only API route is `GET /api/bench/v1/health` and returns `{ "status": "ok" }`. `dev` also
+Open `http://127.0.0.1:5173`. The web app proxies `/api` to the local Cloudflare Worker on port 8787. `GET /api/bench/v1/health` returns `{ "status": "ok" }`. `dev` also
 watches the shared contracts package. Use `npm run dev:web` or `npm run dev:api` for one app.
+
+## Public Benchmark API
+
+The [v1 contract](design/benchmark-backend-draft.md) is implemented by these anonymous routes:
+
+- `GET /api/bench/v1/runs`: grouped search; `view=items&group_key=...` expands one group.
+- `GET /api/bench/v1/runs/{publicRunId}`: one run's public details and reviewed settings.
+- `POST /api/bench/v1/cohorts/query`: exact Position comparison, without publication.
+
+Try `http://127.0.0.1:8787/api/bench/v1/runs?ram_gb=32&map=lighthouse` after `npm run dev:api`.
+Repeat the same filters and sort with a returned `group_key` and `view=items` to see every run.
+Copy a run's `public_run_id` into the detail route. A group is navigation, not an FPS aggregate.
+
+For manual API exploration, open `api-collections/benchmark-v1` as a collection in Bruno, select
+the `Local` environment, and start `npm run dev:api`. The `API` folder has one editable request
+per public endpoint. Start with Search groups, then Runs in group and Run details; returned IDs
+are saved automatically. If you change search filters or sort, repeat them when opening a group.
+The `Smoke flow` folder contains ordered requests with checks for search, pagination, details,
+Position and an invalid filter. Run that folder to check the complete flow. With Bruno CLI
+installed, run `bru run "Smoke flow" --env Local` from `api-collections/benchmark-v1`.
+These plain-text collection files live beside the API code in Git; there is no second repository
+or filesystem link to maintain. The collection uses only synthetic public data and sends no
+authentication or publication request.
+
+Runtime Zod schemas and inferred types live in `packages/contracts/src/benchmark.ts`.
+HTTP route registration and transport validation live in `apps/api/src/**/*.api.ts`;
+`apps/api/src/index.ts` assembles the app and shared error handling; `apps/api/src/benchmark/` contains
+the asynchronous repository boundary, query logic, synthetic fixtures and explicit public projections.
+There are 24 fictional runs across three CPU/GPU/RAM-capacity tuples and four maps. No data is
+loaded from Windows, local captures or real accounts. Settings and metrics belong to each run.
+
+The fixture catalog recognizes the CPU/GPU display names in `fixtures.ts` for Position,
+ignoring case and repeated whitespace; unrecognized names/maps return `422 invalid_input`.
+Search takes exact canonical IDs and returns an empty result when none match. This limited catalog
+is not a production hardware normalizer. Unknown game version/resolution stay `null` and yield
+`missing_conditions` in Position. Graphics settings never become default equality conditions.
+Derived render scale/upscaling remain `null`; quality notes stay empty until their codes are approved.
+
+Pagination uses opaque SHA-256 tokens bound to the immutable fixture snapshot, filters, sort,
+view, group and limit. Group keys allow a different item-page limit. Identical datasets work
+across Worker instances with no token registry. This demo's snapshot lasts for the dataset's
+lifetime; replacing the fixtures invalidates prior snapshots (`cursor_stale`/`group_key_stale`).
+There is no wall-clock expiry policy yet. All API responses use `Cache-Control: no-store`.
+The Position POST requires `Content-Type: application/json` (parameters are accepted) and
+caps the body at 4 KiB before JSON parsing, including streamed requests. Unsupported or
+missing media types return `415 unsupported_media_type`; oversized bodies return
+`413 payload_too_large`. These policies are recorded in the v1 design contract.
+
+Database work must supply durable snapshot/removal semantics and choose token expiry without
+changing the handlers' repository interface. Production catalog normalization, approved warning
+codes and abuse limits remain future work. Publishing must add validation/metric tolerances,
+idempotency, moderation, deletion and retention. Authentication/provider selection and ownership
+remain separate work; this slice implements no writes, owner endpoints or persistent storage.
 
 ## Style system
 

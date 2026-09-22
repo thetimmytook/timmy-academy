@@ -1,0 +1,33 @@
+meta {
+  name: Position query
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{base_url}}/api/bench/v1/cohorts/query
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "hardware": {
+      "cpu_name": "Ryzen 7 7800X3D",
+      "gpu_name": "GeForce RTX 4070 SUPER",
+      "ram_gb": 32
+    },
+    "map": "lighthouse",
+    "execution": "bsg_servers",
+    "game_resolution": { "width": 2560, "height": 1440 },
+    "game_version": "0.16.9.0"
+  }
+}
+
+docs {
+  Edit the body to compare exact conditions. This request does not publish a run.
+}

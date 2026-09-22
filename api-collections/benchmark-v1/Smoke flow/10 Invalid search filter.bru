@@ -1,0 +1,21 @@
+meta {
+  name: 10 Invalid search filter
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{base_url}}/api/bench/v1/runs?ram_gb=not-a-number
+  body: none
+  auth: none
+}
+
+tests {
+  test('rejects malformed filters without echoing input', function () {
+    expect(res.getStatus()).to.equal(422);
+    const body = res.getBody();
+    expect(body.code).to.equal('invalid_input');
+    expect(body.request_id).to.match(/^req_/);
+    expect(JSON.stringify(body)).to.not.contain('not-a-number');
+  });
+}

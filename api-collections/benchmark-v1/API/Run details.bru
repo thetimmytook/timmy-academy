@@ -1,0 +1,15 @@
+meta {
+  name: Run details
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{base_url}}/api/bench/v1/runs/{{public_run_id}}
+  body: none
+  auth: none
+}
+
+docs {
+  Uses the first ID from Runs in group. It also works alone with the fictional fallback ID in the Local environment.
+}

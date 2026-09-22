@@ -1,10 +1,37 @@
-import { healthResponseSchema } from '@timmy/contracts';
+import { benchmarkErrorSchema } from '@timmy/contracts';
 import { Hono } from 'hono';
 
-const app = new Hono();
+import { registerBenchmarkApi } from './benchmark/benchmark.api';
+import { InMemoryBenchmarkRepository } from './benchmark/in-memory-repository';
+import { BenchmarkRequestError, type BenchmarkRepository } from './benchmark/repository';
 
-app.get('/api/bench/v1/health', context => {
-  return context.json(healthResponseSchema.parse({ status: 'ok' }));
-});
+export function createApp(repository: BenchmarkRepository = new InMemoryBenchmarkRepository()) {
+  const app = new Hono();
+  registerBenchmarkApi(app, repository);
 
-export default app;
+  app.notFound(context =>
+    context.json(
+      benchmarkErrorSchema.parse({
+        code: 'not_found',
+        message: 'The resource was not found.',
+        request_id: `req_${crypto.randomUUID()}`,
+      }),
+      404,
+    ),
+  );
+
+  app.onError((error, context) => {
+    const known = error instanceof BenchmarkRequestError;
+    return context.json(
+      benchmarkErrorSchema.parse({
+        code: known ? error.code : 'internal_error',
+        message: known ? error.message : 'The benchmark request could not be completed.',
+        request_id: `req_${crypto.randomUUID()}`,
+      }),
+      known ? error.status : 500,
+    );
+  });
+  return app;
+}
+
+export default createApp();

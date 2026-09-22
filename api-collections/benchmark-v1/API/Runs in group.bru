@@ -1,0 +1,21 @@
+meta {
+  name: Runs in group
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{base_url}}/api/bench/v1/runs?view=items&group_key={{group_key}}
+  body: none
+  auth: none
+}
+
+script:post-response {
+  if (res.getStatus() === 200 && res.getBody().items?.length) {
+    bru.setVar('public_run_id', res.getBody().items[0].public_run_id);
+  }
+}
+
+docs {
+  Run Search groups first. If you added filters or sort there, repeat them here; the group key is bound to that search. The first returned public run ID is saved for Run details.
+}
