@@ -43,3 +43,22 @@ Deletion must hide or remove the run and clear the submission link atomically.
 Request fingerprinting, retry payload comparison, owner-list cursors, retention
 and anonymization remain separate steps. This schema does not implement the
 publication or deletion workflows.
+
+## Private read repository
+
+`D1SubmissionRepository` requires an internal account ID on both `list` and
+`findByClientId`. Every SQL query filters by that account. Missing and foreign
+client IDs both return `undefined`; deleted submissions are excluded from lists
+and return only a minimal deletion acknowledgement through the lookup.
+
+Cards are projected from the linked detail document. Pending/rejected cards omit
+the preallocated public ID and URL. Account IDs, contributor keys, settings and
+provider identities are not included. Rejection reasons remain internal codes;
+the HTTP layer must use the approved reason allowlist before exposing them.
+
+Lists support status filtering, a default limit of 20 (maximum 50), and keyset
+ordering by submission time and private sequence descending. The returned `next`
+position is internal repository state, not a public cursor. Before adding owner
+routes, the API must wrap continuation in an authenticated cursor bound to owner,
+status and limit, with a fixed snapshot/expiry and invalidation on submission
+changes. These read methods do not yet provide cross-request snapshot guarantees.
