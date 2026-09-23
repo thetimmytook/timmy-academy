@@ -1,5 +1,6 @@
 import { runSearchQuerySchema } from '@timmy/contracts';
 import { useEffect } from 'react';
+import { useNavigate } from 'react-router';
 
 import { css } from '../../styled-system/css';
 import { FilterDropdown } from '../bench/FilterDropdown';
@@ -7,11 +8,11 @@ import { Filters } from '../bench/Filters';
 import { browseUrl, rememberBrowse, resetPage, searchParameters } from '../bench/navigation';
 import { SearchResults } from '../bench/SearchResults';
 import { muted, stack } from '../bench/styles';
-import { navigate } from '../routing';
 
 import type { JSX } from 'react';
 
 export default function BenchPage({ url }: Readonly<{ url: string }>): JSX.Element {
+  const navigate = useNavigate();
   const params = new URL(url, window.location.origin).searchParams;
   const parsed = runSearchQuerySchema.safeParse(Object.fromEntries(searchParameters(params)));
   const valid =
@@ -46,7 +47,7 @@ export default function BenchPage({ url }: Readonly<{ url: string }>): JSX.Eleme
           onChange={value => {
             const next = resetPage(params);
             next.set('sort', value || 'captured_desc');
-            navigate(browseUrl(next));
+            void navigate(browseUrl(next));
           }}
         />
         <FilterDropdown
@@ -57,7 +58,7 @@ export default function BenchPage({ url }: Readonly<{ url: string }>): JSX.Eleme
           onChange={value => {
             const next = resetPage(params);
             next.set('limit', value || '20');
-            navigate(browseUrl(next));
+            void navigate(browseUrl(next));
           }}
         />
       </div>

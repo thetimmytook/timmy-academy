@@ -1,4 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { useEffect } from 'react';
+import { BrowserRouter, useNavigate } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Exercise the real read-only HTTP contract; server fixtures never enter the web bundle.
@@ -8,9 +10,10 @@ import { createApp } from '../../api/src/index';
 
 import App from './App';
 import { rememberBrowse } from './bench/navigation';
-import { navigate } from './routing';
 
 import type { RenderResult } from '@testing-library/react';
+import type { JSX } from 'react';
+import type { NavigateFunction } from 'react-router';
 
 let app = createApp(new InMemoryBenchmarkRepository());
 const nextRuns = 'Next runs →';
@@ -18,10 +21,25 @@ const firstRuns = 'First run page';
 const publicSettings = 'Public settings';
 const request = vi.fn((path: string) => app.request(path));
 
+let navigate: NavigateFunction;
+
+function TestApp(): JSX.Element {
+  const routerNavigate = useNavigate();
+  useEffect(() => {
+    navigate = routerNavigate;
+  }, [routerNavigate]);
+
+  return <App />;
+}
+
 function start(url = '/bench/'): RenderResult {
   window.history.replaceState(null, '', url);
 
-  return render(<App />);
+  return render(
+    <BrowserRouter>
+      <TestApp />
+    </BrowserRouter>,
+  );
 }
 
 async function results(): Promise<HTMLElement> {
@@ -72,11 +90,11 @@ describe('public benchmark UI', () => {
     expect(screen.getByRole('heading', { name: 'Page not found' })).toBeTruthy();
     expect(document.title).toBe('Page not found · Timmy Academy');
 
-    act(() => navigate(createSyntheticRuns()[0]!.detail.url));
+    await act(() => navigate(createSyntheticRuns()[0]!.detail.url));
     await screen.findByRole('heading', { name: publicSettings });
     expect(document.title).toBe('Public run · Timmy Academy');
 
-    act(() => navigate('/bench/runs/invalid'));
+    await act(() => navigate('/bench/runs/invalid'));
     expect(screen.getByRole('heading', { name: 'Page not found' })).toBeTruthy();
     expect(document.title).toBe('Page not found · Timmy Academy');
 
@@ -153,6 +171,12 @@ describe('public benchmark UI', () => {
     });
     await screen.findByRole('link', { name: firstRuns });
     expect(window.location.pathname + window.location.search).toBe(browse);
+    act(() => {
+      window.history.forward();
+    });
+    await screen.findByRole('heading', { name: publicSettings });
+    expect(window.location.pathname).toBe(href);
+    expect(document.activeElement).toBe(document.getElementById('main'));
   });
   it('paginates groups and clears both cursors and expansion on filter changes', async () => {
     start('/bench/?limit=2');
@@ -203,7 +227,11 @@ describe('public benchmark UI', () => {
     expect(screen.getByText('Automatic RAM Cleaner').nextElementSibling?.textContent).toBe('Off');
     expect(screen.queryByText('Clouds quality')).toBeNull();
     mounted.unmount();
-    render(<App />);
+    render(
+      <BrowserRouter>
+        <TestApp />
+      </BrowserRouter>,
+    );
     await screen.findByRole('heading', { name: publicSettings });
     expect(window.location.pathname).toBe(run.detail.url);
   });
@@ -220,7 +248,7 @@ describe('public benchmark UI', () => {
       screen.getByText('This public run is unavailable. It may have been removed.'),
     ).toBeTruthy();
     const run = createSyntheticRuns().find(item => item.detail.settings === null)!;
-    act(() => navigate(run.detail.url));
+    await act(() => navigate(run.detail.url));
     expect(await screen.findByText('No public settings recorded.')).toBeTruthy();
   });
   it('recovers from request failures and stale cursors', async () => {

@@ -1,37 +1,13 @@
-import { navigate } from '../routing';
+import { Link as RouterLink, useInRouterContext } from 'react-router';
 
-import type { JSX, ComponentPropsWithRef } from 'react';
+import type { ComponentPropsWithRef, JSX } from 'react';
 
-export function Link({
-  href,
-  onClick,
-  ...props
-}: Readonly<ComponentPropsWithRef<'a'>>): JSX.Element {
-  return (
-    <a
-      {...props}
-      href={href}
-      onClick={event => {
-        onClick?.(event);
+export function Link({ href, ...props }: Readonly<ComponentPropsWithRef<'a'>>): JSX.Element {
+  const inRouter = useInRouterContext();
 
-        if (
-          event.defaultPrevented ||
-          event.button !== 0 ||
-          event.metaKey ||
-          event.ctrlKey ||
-          event.shiftKey ||
-          event.altKey ||
-          props.target ||
-          props.download !== undefined ||
-          !href?.startsWith('/') ||
-          href.startsWith('//')
-        ) {
-          return;
-        }
+  if (inRouter && href?.startsWith('/') && !href.startsWith('//')) {
+    return <RouterLink {...props} to={href} reloadDocument={props.download !== undefined} />;
+  }
 
-        event.preventDefault();
-        navigate(href);
-      }}
-    />
-  );
+  return <a {...props} href={href} />;
 }

@@ -3,8 +3,22 @@
 The main Worker installs a lazy `requirePrincipal` function in the Hono context.
 A protected handler calls `await context.get('requirePrincipal')()` before any
 owner operation. The result is private and must never be serialized into public
-benchmark responses. Public routes do not call Clerk or create accounts. This step
-adds no HTTP route or browser sign-in UI.
+benchmark responses. Public routes do not call Clerk or create accounts. No new API
+route is registered by this integration.
+
+The main React app provides `/sign-in` and `/sign-up`, including Clerk's verification
+subroutes, and current-session logout in the header. Copy `.env.example` to
+`.env.local` here and set `VITE_CLERK_PUBLISHABLE_KEY` for the same Clerk instance as
+the API. Vite reads this directory; never expose a secret key through `VITE_*`.
+The key is embedded at build time, so build staging and production separately with
+their own public keys. Without a key, public browsing remains available and the
+sign-in pages show an unavailable message.
+
+Configure email-code sign-in and verified email in the Clerk instance; the widget
+uses the instance's enabled authentication methods. Successful sign-in returns to
+`/bench/`. Browser login alone does not create a D1 account: the first API handler
+that requires a principal performs that mapping. The existing public benchmark
+routes do not require one.
 
 The API reads runtime bindings once per request through `readConfig` in `config.ts`.
 It supplies database, indexing and auth settings without format validation. If any

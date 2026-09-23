@@ -15,7 +15,8 @@
     "@clerk/react": "^6.16.1",
     "@timmy/contracts": "*",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "react-router": "^8.4.0"
   },
   "devDependencies": {
     "@pandacss/dev": "^1.12.1",

@@ -1,10 +1,10 @@
 import { groupRunsResponseSchema } from '@timmy/contracts';
+import { useNavigate } from 'react-router';
 
 import { css } from '../../styled-system/css';
 import { panel } from '../../styled-system/recipes';
 import { Button } from '../elements/Button';
 import { ErrorMessage } from '../elements/ErrorMessage';
-import { navigate } from '../routing';
 
 import { counted } from './format';
 import { browseUrl, resetPage, searchParameters } from './navigation';
@@ -63,6 +63,7 @@ export function HardwareGroupCard({
   group,
   params,
 }: Readonly<{ group: HardwareGroup; params: URLSearchParams }>): JSX.Element {
+  const navigate = useNavigate();
   const expanded = params.get('expanded') === group.group_key;
   const regionId = `runs-${group.group_key}`;
 
@@ -98,7 +99,7 @@ export function HardwareGroupCard({
             next.set('expanded', group.group_key);
           }
 
-          navigate(browseUrl(next));
+          void navigate(browseUrl(next));
         }}
       >
         {expanded

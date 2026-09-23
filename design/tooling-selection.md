@@ -19,6 +19,14 @@ infrastructure/   # deployment and environment configuration when needed
 
 Keep the initial `apps/web` architecture simple: React + Vite with client-side rendering for the interactive Academy and benchmark UI. Do not introduce Astro, per-run SSR or a static-HTML generation pipeline for individual benchmark reports before a concrete indexing need justifies it. The public run detail URL remains stable and can initially load its data from the API. News pages, if introduced, may be generated as static HTML. Revisit rendering choices when the actual UI and indexing requirements are known.
 
+## Client routing decision
+
+Use React Router in Declarative Mode for the React/Vite SPA. Replace the manual
+path conditions in `App.tsx` and the custom History API routing module with explicit
+routes, including `/sign-in/*` and `/sign-up/*`. Preserve benchmark search parameters,
+Back/Forward navigation and native link behavior. This decision does not introduce
+SSR or framework mode. The application uses explicit React Router routes and router navigation.
+
 ## Deployment and request routing decision
 
 - Build `apps/web` as static Vite assets. Publish those assets together with the `apps/api` Hono Worker as one Cloudflare deployment per environment. Keep the web and API source code in their existing separate workspaces.
