@@ -1,28 +1,40 @@
 import { benchmarkErrorSchema } from '@timmy/contracts';
 import { Hono } from 'hono';
 
+import { AuthenticationDenied } from './auth/application-principal';
+import { requestPrincipal } from './auth/request-principal';
 import { registerBenchmarkApi } from './benchmark/benchmark.api';
 import { D1BenchmarkRepository } from './benchmark/d1-repository';
 import { BenchmarkRequestError, type BenchmarkRepository } from './benchmark/repository';
+import { readConfig } from './config';
 
-import type { D1Database } from '@cloudflare/workers-types';
+import type { AppBindings } from './config';
 
 export function createApp(repository?: BenchmarkRepository): Hono {
   const app = new Hono();
   app.use('*', async (context, next) => {
+    const config = readConfig(context.env as AppBindings | undefined);
+    context.set('config', config);
     await next();
-    const bindings = context.env as { DISABLE_INDEXING?: string } | undefined;
 
-    if (bindings?.DISABLE_INDEXING === 'true') {
+    if (config.disableIndexing) {
       context.header('X-Robots-Tag', 'noindex');
     }
   });
+  app.use('/api/*', requestPrincipal());
   registerBenchmarkApi(
     app,
     repository
       ? (): BenchmarkRepository => repository
-      : (context): BenchmarkRepository =>
-          new D1BenchmarkRepository((context.env as { BENCHMARK_DB: D1Database }).BENCHMARK_DB),
+      : (context): BenchmarkRepository => {
+          const { database } = context.get('config');
+
+          if (!database) {
+            throw new Error('Database is not configured.');
+          }
+
+          return new D1BenchmarkRepository(database);
+        },
   );
 
   app.notFound(context =>
@@ -37,6 +49,19 @@ export function createApp(repository?: BenchmarkRepository): Hono {
   );
 
   app.onError((error, context) => {
+    if (error instanceof AuthenticationDenied) {
+      context.header('Cache-Control', 'no-store');
+
+      return context.json(
+        benchmarkErrorSchema.parse({
+          code: 'authentication_required',
+          message: 'Authentication required.',
+          request_id: `req_${crypto.randomUUID()}`,
+        }),
+        401,
+      );
+    }
+
     const known = error instanceof BenchmarkRequestError;
 
     return context.json(
