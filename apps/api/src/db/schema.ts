@@ -1,5 +1,13 @@
 import { sql } from 'drizzle-orm';
-import { check, index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import {
+  check,
+  index,
+  integer,
+  primaryKey,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from 'drizzle-orm/sqlite-core';
 
 import type { HasGenerated } from 'drizzle-orm';
 import type {
@@ -44,7 +52,7 @@ export const runs = sqliteTable(
     sequence: integer('sequence').primaryKey({ autoIncrement: true }),
     publicId: text('public_id').notNull().unique(),
     contributor: text('contributor_key').notNull(),
-    publishedAt: text('published_at').notNull(),
+    publishedAt: text('published_at'),
     visibility: text('visibility', { enum: ['published', 'hidden', 'deleted'] })
       .notNull()
       .default('published'),
@@ -64,6 +72,10 @@ export const runs = sqliteTable(
       'valid_detail',
       sql`json_valid(${table.detail}) AND json_extract(${table.detail}, '$.public_run_id') = ${table.publicId}`,
     ),
+    check(
+      'published_timestamp',
+      sql`${table.visibility} <> 'published' OR ${table.publishedAt} IS NOT NULL`,
+    ),
     check('valid_visibility', sql`${table.visibility} IN ('published', 'hidden', 'deleted')`),
     index('runs_order').on(table.visibility, table.day, table.publishedAt, table.publicId),
     index('runs_hardware_cohort').on(
@@ -82,6 +94,48 @@ export const runs = sqliteTable(
     index('runs_resolution_version').on(table.visibility, table.width, table.height, table.version),
   ],
 );
+
+// Private submission metadata is never part of the anonymous benchmark projection.
+export const submissions = sqliteTable(
+  'benchmark_submissions',
+  {
+    sequence: integer('sequence').primaryKey({ autoIncrement: true }),
+    accountId: text('account_id')
+      .notNull()
+      .references(() => accounts.id),
+    clientRunId: text('client_run_id').notNull(),
+    submittedAt: text('submitted_at').notNull(),
+    status: text('status', { enum: ['pending_review', 'published', 'rejected', 'deleted'] })
+      .notNull()
+      .default('pending_review'),
+    runSequence: integer('run_sequence').references(() => runs.sequence),
+    statusReason: text('status_reason'),
+  },
+  table => [
+    uniqueIndex('submissions_account_client').on(table.accountId, table.clientRunId),
+    uniqueIndex('submissions_run').on(table.runSequence),
+    index('submissions_owner_order').on(table.accountId, table.submittedAt, table.sequence),
+    index('submissions_owner_status_order').on(
+      table.accountId,
+      table.status,
+      table.submittedAt,
+      table.sequence,
+    ),
+    check(
+      'submission_status',
+      sql`${table.status} IN ('pending_review', 'published', 'rejected', 'deleted')`,
+    ),
+    check(
+      'submission_run_link',
+      sql`(${table.status} = 'deleted' AND ${table.runSequence} IS NULL) OR (${table.status} <> 'deleted' AND ${table.runSequence} IS NOT NULL)`,
+    ),
+    check(
+      'submission_reason',
+      sql`(${table.status} = 'rejected' AND ${table.statusReason} IS NOT NULL AND length(trim(${table.statusReason})) > 0) OR (${table.status} <> 'rejected' AND ${table.statusReason} IS NULL)`,
+    ),
+  ],
+);
+
 export const state = sqliteTable('benchmark_state', {
   id: integer('id').primaryKey(),
   revision: integer('revision').notNull().default(0),

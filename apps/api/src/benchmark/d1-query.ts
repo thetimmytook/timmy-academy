@@ -67,8 +67,8 @@ export function pagePredicate(
 }
 
 export function anchor(row: RunRow): Anchor {
-  if (row.day === null) {
-    throw new Error('A public run must have a capture day.');
+  if (row.day === null || row.publishedAt === null) {
+    throw new Error('A public run must have capture and publication dates.');
   }
 
   return [row.day, row.publishedAt, row.publicId];
@@ -83,6 +83,10 @@ export function tuple(row: RunRow): Tuple {
 }
 
 export function stored(row: Pick<RunRow, 'detail' | 'contributor' | 'publishedAt'>): StoredRun {
+  if (row.publishedAt === null) {
+    throw new Error('A public run must have a publication date.');
+  }
+
   return {
     detail: JSON.parse(row.detail) as PublicRunDetail,
     contributor: row.contributor,
