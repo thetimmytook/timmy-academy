@@ -3,6 +3,7 @@ import { BrowserRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from '../App';
+import { rememberBrowse } from '../bench/navigation';
 
 import { BrowserAuthProvider } from './BrowserAuth';
 
@@ -60,6 +61,7 @@ function start(path = '/bench/'): ReturnType<typeof render> {
 }
 
 beforeEach(() => {
+  rememberBrowse('/bench/');
   vi.clearAllMocks();
   vi.stubEnv('VITE_CLERK_PUBLISHABLE_KEY', 'pk_test_fixture');
   clerk.loaded = true;
@@ -168,7 +170,24 @@ describe('browser authentication in the main app', () => {
     expect(screen.queryByRole('link', { name: signInLabel })).toBeNull();
   });
 
-  it('uses the configured key and SPA navigation with a fixed post-login destination', () => {
+  it.each(['/bench/', '/bench/?ram_gb=32&map=woods&limit=2'])(
+    'returns to the remembered search after sign-in or sign-up: %s',
+    destination => {
+      rememberBrowse(destination);
+      start('/sign-in');
+      expect(clerk.provider).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          signInForceRedirectUrl: destination,
+          signUpForceRedirectUrl: destination,
+        }),
+      );
+      fireEvent.click(screen.getByRole('link', { name: '← Back to benchmarks' }));
+      expect(window.location.pathname + window.location.search).toBe(destination);
+      expect(screen.getByText(publicBenchmarks)).toBeTruthy();
+    },
+  );
+
+  it('uses the configured key and SPA navigation with the default post-login destination', () => {
     vi.stubEnv('VITE_CLERK_PUBLISHABLE_KEY', 'pk_live_fixture');
     start('/sign-in');
     expect(clerk.provider).toHaveBeenCalledWith(

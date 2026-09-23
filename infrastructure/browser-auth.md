@@ -15,8 +15,8 @@ their own public keys. Without a key, public browsing remains available and the
 sign-in pages show an unavailable message.
 
 Configure email-code sign-in and verified email in the Clerk instance; the widget
-uses the instance's enabled authentication methods. Successful sign-in returns to
-`/bench/`. Browser login alone does not create a D1 account: the first API handler
+uses the instance's enabled authentication methods. Successful sign-in returns to the last benchmark search with its filters,
+or `/bench/` when no search is remembered. Browser login alone does not create a D1 account: the first API handler
 that requires a principal performs that mapping. The existing public benchmark
 routes do not require one.
 

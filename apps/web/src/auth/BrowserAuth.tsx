@@ -2,6 +2,7 @@ import { ClerkProvider, SignIn, SignUp, useClerk, useSession } from '@clerk/reac
 import { createContext, useContext } from 'react';
 import { useNavigate } from 'react-router';
 
+import { lastBrowse } from '../bench/navigation';
 import { readConfig } from '../config';
 import { Button } from '../elements/Button';
 import { Message } from '../elements/Message';
@@ -52,8 +53,8 @@ export function BrowserAuthProvider({ children }: Readonly<{ children: ReactNode
       publishableKey={auth.publishableKey}
       signInUrl="/sign-in"
       signUpUrl="/sign-up"
-      signInForceRedirectUrl="/bench/"
-      signUpForceRedirectUrl="/bench/"
+      signInForceRedirectUrl={lastBrowse()}
+      signUpForceRedirectUrl={lastBrowse()}
       routerPush={url => void navigate(url)}
       routerReplace={url => void navigate(url, { replace: true })}
       telemetry={false}
@@ -85,7 +86,7 @@ export function BrowserAuthForm({ mode }: Readonly<{ mode: 'sign-in' | 'sign-up'
   if (status === 'signed-in') {
     return (
       <Message>
-        You are signed in. <Button href="/bench/">Browse benchmarks</Button>
+        You are signed in. <Button href={lastBrowse()}>Browse benchmarks</Button>
       </Message>
     );
   }
