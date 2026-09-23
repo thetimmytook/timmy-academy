@@ -1,6 +1,7 @@
 import type { D1Database } from '@cloudflare/workers-types';
 
 export interface AppBindings {
+  BENCHMARK_CURSOR_SECRET?: string;
   BENCHMARK_DB?: D1Database;
   DISABLE_INDEXING?: string;
   APP_ORIGIN?: string;
@@ -20,6 +21,7 @@ export interface AuthConfig {
 
 export interface AppConfig {
   database: D1Database | undefined;
+  cursorSecret: string | undefined;
   disableIndexing: boolean;
   auth: AuthConfig | undefined;
 }
@@ -42,5 +44,10 @@ export function readConfig(env: AppBindings = {}): AppConfig {
         }
       : undefined;
 
-  return { database: env.BENCHMARK_DB, disableIndexing: env.DISABLE_INDEXING === 'true', auth };
+  return {
+    cursorSecret: env.BENCHMARK_CURSOR_SECRET,
+    database: env.BENCHMARK_DB,
+    disableIndexing: env.DISABLE_INDEXING === 'true',
+    auth,
+  };
 }

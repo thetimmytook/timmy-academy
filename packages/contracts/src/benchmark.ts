@@ -63,6 +63,7 @@ export const runSearchQuerySchema = z
 
     // Token validation belongs to the repository so malformed cursors return 400 invalid_cursor.
     cursor: z.string().optional(),
+    snapshot: z.string().optional(),
   })
   .superRefine((query, context) => {
     if ((query.view === 'items') !== (query.group_key !== undefined)) {

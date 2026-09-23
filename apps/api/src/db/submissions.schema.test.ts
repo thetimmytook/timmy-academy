@@ -179,7 +179,7 @@ describe('private benchmark submission schema', () => {
     'keeps full %s run data private across public reads',
     async status => {
       await insert({ status, reason: status === 'rejected' ? 'fixture_reason' : null });
-      const repository = new D1BenchmarkRepository(db);
+      const repository = new D1BenchmarkRepository(db, 'test-signing-secret');
       expect(await repository.detail('br_pending')).toBeUndefined();
       const search = await repository.search(runSearchQuerySchema.parse({}));
       expect(JSON.stringify(search)).not.toContain('br_pending');
@@ -226,7 +226,7 @@ describe('private benchmark submission schema', () => {
         .prepare("UPDATE benchmark_submissions SET status = 'published' WHERE run_sequence = ?")
         .bind(firstRun),
     ]);
-    const repository = new D1BenchmarkRepository(db);
+    const repository = new D1BenchmarkRepository(db, 'test-signing-secret');
     expect((await repository.detail('br_pending'))?.settings).toEqual(run.detail.settings);
     expect(
       await db

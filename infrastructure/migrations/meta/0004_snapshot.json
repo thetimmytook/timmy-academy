@@ -1,0 +1,431 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "73550d32-faa7-4bd6-87fe-f25cf21c36aa",
+  "prevId": "340dd9fe-5f58-4f95-9f25-1d10813d38bd",
+  "tables": {
+    "account_identities": {
+      "name": "account_identities",
+      "columns": {
+        "issuer": {
+          "name": "issuer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "subject": {
+          "name": "subject",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "identities_account": {
+          "name": "identities_account",
+          "columns": ["account_id"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "account_identities_account_id_accounts_id_fk": {
+          "name": "account_identities_account_id_accounts_id_fk",
+          "tableFrom": "account_identities",
+          "tableTo": "accounts",
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "account_identities_issuer_subject_pk": {
+          "columns": ["issuer", "subject"],
+          "name": "account_identities_issuer_subject_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "accounts": {
+      "name": "accounts",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "benchmark_runs": {
+      "name": "benchmark_runs",
+      "columns": {
+        "sequence": {
+          "name": "sequence",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "public_id": {
+          "name": "public_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "contributor_key": {
+          "name": "contributor_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "published_at": {
+          "name": "published_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "visibility": {
+          "name": "visibility",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'published'"
+        },
+        "detail": {
+          "name": "detail",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "cpu": {
+          "name": "cpu",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "generated": {
+            "as": "(json_extract(detail, '$.hardware.cpu.id'))",
+            "type": "virtual"
+          }
+        },
+        "gpu": {
+          "name": "gpu",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "generated": {
+            "as": "(json_extract(detail, '$.hardware.gpu.id'))",
+            "type": "virtual"
+          }
+        },
+        "ram_gb": {
+          "name": "ram_gb",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "generated": {
+            "as": "(json_extract(detail, '$.hardware.ram_gb'))",
+            "type": "virtual"
+          }
+        },
+        "map": {
+          "name": "map",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "generated": {
+            "as": "(json_extract(detail, '$.conditions.map.id'))",
+            "type": "virtual"
+          }
+        },
+        "execution": {
+          "name": "execution",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "generated": {
+            "as": "(json_extract(detail, '$.conditions.execution'))",
+            "type": "virtual"
+          }
+        },
+        "game_width": {
+          "name": "game_width",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "generated": {
+            "as": "(json_extract(detail, '$.conditions.game_resolution.width'))",
+            "type": "virtual"
+          }
+        },
+        "game_height": {
+          "name": "game_height",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "generated": {
+            "as": "(json_extract(detail, '$.conditions.game_resolution.height'))",
+            "type": "virtual"
+          }
+        },
+        "game_version": {
+          "name": "game_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "generated": {
+            "as": "(json_extract(detail, '$.conditions.game_version'))",
+            "type": "virtual"
+          }
+        },
+        "captured_day": {
+          "name": "captured_day",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "generated": {
+            "as": "(json_extract(detail, '$.captured_day'))",
+            "type": "virtual"
+          }
+        }
+      },
+      "indexes": {
+        "benchmark_runs_public_id_unique": {
+          "name": "benchmark_runs_public_id_unique",
+          "columns": ["public_id"],
+          "isUnique": true
+        },
+        "runs_order": {
+          "name": "runs_order",
+          "columns": ["visibility", "captured_day", "published_at", "public_id"],
+          "isUnique": false
+        },
+        "runs_hardware_cohort": {
+          "name": "runs_hardware_cohort",
+          "columns": [
+            "visibility",
+            "cpu",
+            "gpu",
+            "ram_gb",
+            "map",
+            "execution",
+            "game_width",
+            "game_height",
+            "game_version"
+          ],
+          "isUnique": false
+        },
+        "runs_gpu": {
+          "name": "runs_gpu",
+          "columns": ["visibility", "gpu", "ram_gb"],
+          "isUnique": false
+        },
+        "runs_map": {
+          "name": "runs_map",
+          "columns": ["visibility", "map"],
+          "isUnique": false
+        },
+        "runs_resolution_version": {
+          "name": "runs_resolution_version",
+          "columns": ["visibility", "game_width", "game_height", "game_version"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "valid_detail": {
+          "name": "valid_detail",
+          "value": "json_valid(\"benchmark_runs\".\"detail\") AND json_extract(\"benchmark_runs\".\"detail\", '$.public_run_id') = \"benchmark_runs\".\"public_id\""
+        },
+        "published_timestamp": {
+          "name": "published_timestamp",
+          "value": "\"benchmark_runs\".\"visibility\" <> 'published' OR \"benchmark_runs\".\"published_at\" IS NOT NULL"
+        },
+        "valid_visibility": {
+          "name": "valid_visibility",
+          "value": "\"benchmark_runs\".\"visibility\" IN ('published', 'hidden', 'deleted')"
+        }
+      }
+    },
+    "benchmark_state": {
+      "name": "benchmark_state",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "benchmark_submissions": {
+      "name": "benchmark_submissions",
+      "columns": {
+        "sequence": {
+          "name": "sequence",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "client_run_id": {
+          "name": "client_run_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "submitted_at": {
+          "name": "submitted_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'pending_review'"
+        },
+        "run_sequence": {
+          "name": "run_sequence",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status_reason": {
+          "name": "status_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "submissions_account_client": {
+          "name": "submissions_account_client",
+          "columns": ["account_id", "client_run_id"],
+          "isUnique": true
+        },
+        "submissions_run": {
+          "name": "submissions_run",
+          "columns": ["run_sequence"],
+          "isUnique": true
+        },
+        "submissions_owner_order": {
+          "name": "submissions_owner_order",
+          "columns": ["account_id", "submitted_at", "sequence"],
+          "isUnique": false
+        },
+        "submissions_owner_status_order": {
+          "name": "submissions_owner_status_order",
+          "columns": ["account_id", "status", "submitted_at", "sequence"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "benchmark_submissions_account_id_accounts_id_fk": {
+          "name": "benchmark_submissions_account_id_accounts_id_fk",
+          "tableFrom": "benchmark_submissions",
+          "tableTo": "accounts",
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "benchmark_submissions_run_sequence_benchmark_runs_sequence_fk": {
+          "name": "benchmark_submissions_run_sequence_benchmark_runs_sequence_fk",
+          "tableFrom": "benchmark_submissions",
+          "tableTo": "benchmark_runs",
+          "columnsFrom": ["run_sequence"],
+          "columnsTo": ["sequence"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "submission_status": {
+          "name": "submission_status",
+          "value": "\"benchmark_submissions\".\"status\" IN ('pending_review', 'published', 'rejected', 'deleted')"
+        },
+        "submission_run_link": {
+          "name": "submission_run_link",
+          "value": "(\"benchmark_submissions\".\"status\" = 'deleted' AND \"benchmark_submissions\".\"run_sequence\" IS NULL) OR (\"benchmark_submissions\".\"status\" <> 'deleted' AND \"benchmark_submissions\".\"run_sequence\" IS NOT NULL)"
+        },
+        "submission_reason": {
+          "name": "submission_reason",
+          "value": "(\"benchmark_submissions\".\"status\" = 'rejected' AND \"benchmark_submissions\".\"status_reason\" IS NOT NULL AND length(trim(\"benchmark_submissions\".\"status_reason\")) > 0) OR (\"benchmark_submissions\".\"status\" <> 'rejected' AND \"benchmark_submissions\".\"status_reason\" IS NULL)"
+        }
+      }
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {}
+  }
+}

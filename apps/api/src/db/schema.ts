@@ -140,12 +140,3 @@ export const state = sqliteTable('benchmark_state', {
   id: integer('id').primaryKey(),
   revision: integer('revision').notNull().default(0),
 });
-export const tokens = sqliteTable(
-  'benchmark_tokens',
-  {
-    token: text('token').primaryKey(),
-    expiresAt: integer('expires_at').notNull(),
-    payload: text('payload').notNull(),
-  },
-  table => [index('tokens_expiry').on(table.expiresAt)],
-);

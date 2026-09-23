@@ -5,3 +5,6 @@ CLERK_PUBLISHABLE_KEY=pk_test_REPLACE
 CLERK_SECRET_KEY=sk_test_REPLACE
 # Optional PEM public key for networkless JWT verification; otherwise Clerk JWKS is used.
 # CLERK_JWT_KEY="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
+
+# Server-only random signing secret for benchmark navigation (separate per environment).
+BENCHMARK_CURSOR_SECRET=

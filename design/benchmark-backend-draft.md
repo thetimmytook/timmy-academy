@@ -416,9 +416,19 @@ Test public allowlists by snapshotting search, detail, Position and error respon
 
 The public read implementation now uses persistent D1 with Drizzle schema and generated Wrangler
 migrations. Navigation snapshots have a fixed 30-minute lifetime, exclude later ingestion sequences,
-and conservatively become stale after any run UPDATE or DELETE. Opaque server-stored tokens bind
+and conservatively become stale after any run UPDATE or DELETE. Client-held signed tokens bind
 filters/sort/view/group/page limit and use keyset continuation. Reads go to primary D1; removed runs
 are never read from historic documents. Production has no fixture fallback or seed. See
 [infrastructure/README.md](../infrastructure/README.md#d1-persistence-and-migrations) for the precise
 expiry/removal rules, schema organization, query costs, safe deployment order and staging cases.
 This resolves navigation expiry in open question 4; publication/auth/ownership remain out of scope.
+
+
+### Client-held navigation implementation
+
+Public D1 search uses versioned HMAC-signed cursors/group tokens carried by the client.
+The API stores no navigation tokens. A groups request may send a previously issued group
+token as `snapshot` to preserve expansion across Back/reload. Its filters/sort and snapshot
+are validated; supplying conflicting cursor/group snapshots is rejected. The fixed 30-minute
+expiry and dataset-revision invalidation still apply. The server signing secret is configured
+per environment. Old database-backed links expire when the token table is removed.

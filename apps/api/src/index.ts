@@ -27,13 +27,13 @@ export function createApp(repository?: BenchmarkRepository): Hono {
     repository
       ? (): BenchmarkRepository => repository
       : (context): BenchmarkRepository => {
-          const { database } = context.get('config');
+          const { database, cursorSecret } = context.get('config');
 
           if (!database) {
             throw new Error('Database is not configured.');
           }
 
-          return new D1BenchmarkRepository(database);
+          return new D1BenchmarkRepository(database, cursorSecret);
         },
   );
 

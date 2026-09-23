@@ -59,7 +59,7 @@ is not a production hardware normalizer. Unknown game version/resolution stay `n
 `missing_conditions` in Position. Graphics settings never become default equality conditions.
 Derived render scale/upscaling remain `null`; quality notes stay empty until their codes are approved.
 
-Pagination uses opaque persisted navigation tokens with a fixed 30-minute lifetime. New publications
+Pagination uses client-held, HMAC-signed navigation tokens with a fixed 30-minute lifetime. New publications
 are excluded from existing snapshots; updates/deletions invalidate them with 409. Cursors bind
 filters, sort, view, group and limit, and use keyset continuation. See the [D1 policy, setup commands
 and staging acceptance table](infrastructure/README.md#d1-persistence-and-migrations). All API
