@@ -15,6 +15,10 @@ export interface BenchmarkRepository {
 }
 
 const errors = {
+  idempotency_conflict: {
+    status: 409,
+    message: 'This local run ID was already submitted with different data.',
+  },
   invalid_input: { status: 422, message: 'The benchmark request is invalid.' },
   unsupported_media_type: { status: 415, message: 'Use application/json for this request.' },
   payload_too_large: { status: 413, message: 'The benchmark request body exceeds the size limit.' },

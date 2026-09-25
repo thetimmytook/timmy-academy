@@ -40,8 +40,7 @@ sequences and publication dates are preserved. The new submissions table starts
 empty; fixture contributors are not silently converted into account owners.
 
 Deletion must hide or remove the run and clear the submission link atomically.
-Request fingerprinting, retry payload comparison, retention
-and anonymization remain separate steps. This schema does not implement the
+Transport-payload fingerprinting, retention and anonymization remain separate steps. This schema does not implement the
 publication or deletion workflows.
 
 ## Private read repository
@@ -87,3 +86,31 @@ altered or differently bound owner cursors return 400 `invalid_cursor`.
 
 Apply local migrations before using these endpoints. This step adds no My Bench UI,
 submission upload, moderation or deletion endpoint.
+
+## Atomic submission storage
+
+`D1SubmissionWriter.submit(accountId, clientRunId, data)` accepts an authenticated
+internal account ID, a UUID client ID, and an already normalized public-safe run
+document without public ID/URL. This is a private storage boundary, not an upload
+contract: capture-quality checks and transport validation belong before it.
+The writer still validates the strict document allowlist before any SQL writes.
+
+A single Drizzle D1 batch conditionally inserts the hidden run and its pending-review
+submission, then reads the winning submission. Failed inserts roll back the run;
+concurrent retries cannot leave unused run records. Public IDs and submission time
+are server-generated. The private contributor key uses the stable account ID.
+New runs remain invisible to public queries until a separate approval operation.
+
+For an existing account/client pair, the writer compares the normalized document
+against the stored detail, excluding the generated ID/URL. Schema parsing fixes
+JSON object-key order before comparison; no second document or hash column is
+stored. An identical retry returns the existing pending result without changing
+data, IDs or submission time. A changed document returns `idempotency_conflict`.
+This writer currently supports only pending submissions. An existing non-pending
+record fails closed and is never replaced. Retry responses after moderation or
+deletion will be implemented alongside those workflows.
+
+This compares normalized storage data, not a future raw upload envelope. When the
+upload contract is introduced, any additional fields relevant to retry identity
+must be accounted for explicitly. Cross-client-ID duplicate detection, quotas,
+moderation writes and the POST endpoint are not implemented by this step.
