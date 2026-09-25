@@ -131,3 +131,15 @@ These checks do not establish capture plausibility: metric consistency checks,
 normalization, intake metadata/idempotency handling and request body limits still
 need implementation before connecting the POST route. This schema adds no route
 or automatic publication behavior.
+
+## Selected settings projection
+
+`projectSubmissionSettings` maps a validated settings snapshot to the explicit
+public settings allowlist. It preserves false toggles, zero values and accepted
+raw enum codes/tokens. Screen modes map 0/1/2 to fullscreen/borderless/windowed;
+`SetAffinityToLogicalCores` maps directly without inversion. Missing fields and
+empty output sections are omitted. If only resolution was supplied, settings are
+null: the selected screen resolution belongs to run conditions, not settings.
+No render-scale or upscaling effects are inferred, and unrelated source keys are
+never copied. Hardware canonicalization and full submission normalization remain
+separate work; the existing observed-value lookup is not a production catalog.
