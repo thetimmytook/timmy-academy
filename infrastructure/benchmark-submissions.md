@@ -114,3 +114,20 @@ This compares normalized storage data, not a future raw upload envelope. When th
 upload contract is introduced, any additional fields relevant to retry identity
 must be accounted for explicitly. Cross-client-ID duplicate detection, quotas,
 moderation writes and the POST endpoint are not implemented by this step.
+
+## Submission transport contract
+
+`submissionRequestSchema` in `packages/contracts` defines the version-1 request
+from the backend design. It is separate from the writer's normalized storage input.
+`settingsSnapshotSchema` accepts only the reviewed saved-key paths from
+`design/benchmark-settings-allowlist.md`; unknown fields fail rather than being
+silently discarded. Missing settings remain missing, and `false` is retained.
+Empty settings sections must be omitted; use `settings_snapshot: null` when no
+reviewed settings are available.
+
+The structural contract requires at least 110 measured seconds and 120 frame
+samples. A settings resolution, when provided, must match `game_resolution`.
+These checks do not establish capture plausibility: metric consistency checks,
+normalization, intake metadata/idempotency handling and request body limits still
+need implementation before connecting the POST route. This schema adds no route
+or automatic publication behavior.
