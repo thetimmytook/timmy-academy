@@ -3,8 +3,9 @@
 The main Worker installs a lazy `requirePrincipal` function in the Hono context.
 A protected handler calls `await context.get('requirePrincipal')()` before any
 owner operation. The result is private and must never be serialized into public
-benchmark responses. Public routes do not call Clerk or create accounts. No new API
-route is registered by this integration.
+benchmark responses. Public routes do not call Clerk or create accounts. The owner
+list and by-client-ID lookup under `/api/bench/v1/me/runs` require this principal
+and create the stable account mapping on the first authenticated owner request.
 
 The main React app provides `/sign-in` and `/sign-up`, including Clerk's verification
 subroutes, and current-session logout in the header. Copy `.env.example` to

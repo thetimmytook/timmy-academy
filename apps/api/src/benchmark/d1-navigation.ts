@@ -2,7 +2,7 @@ import { eq, max, sql } from 'drizzle-orm';
 
 import { runs, state } from '../db/schema';
 
-import { NavigationToken } from './navigation-token';
+import { BenchmarkCursor } from './benchmark-cursor';
 import { BenchmarkRequestError } from './repository';
 import { searchFilters } from './search-filters';
 
@@ -25,10 +25,9 @@ export class D1Navigation {
   private readonly codec;
   constructor(
     private readonly db: BenchmarkDatabase,
-    private readonly now: () => number,
     secret: string | undefined,
   ) {
-    this.codec = new NavigationToken(secret);
+    this.codec = new BenchmarkCursor(secret);
   }
 
   async snapshot(): Promise<Snapshot> {
@@ -46,7 +45,7 @@ export class D1Navigation {
       throw new Error('Benchmark migrations have not been applied.');
     }
 
-    return { ...row, expires: this.now() + TOKEN_LIFETIME_MS };
+    return { ...row, expires: Date.now() + TOKEN_LIFETIME_MS };
   }
 
   async assertFresh(
@@ -55,7 +54,7 @@ export class D1Navigation {
   ): Promise<void> {
     const current = await this.snapshot();
 
-    if (current.revision !== snapshot.revision || this.now() >= snapshot.expires) {
+    if (current.revision !== snapshot.revision || Date.now() >= snapshot.expires) {
       throw new BenchmarkRequestError(code);
     }
   }

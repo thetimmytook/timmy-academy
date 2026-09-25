@@ -234,9 +234,9 @@ describe('private benchmark submission schema', () => {
         .bind(firstRun)
         .first('detail'),
     ).toBe(before);
-    expect(await db.prepare(revisionQuery).first('revision')).toBe(revision + 1);
-    await db.prepare(deleteRun).bind(secondRun).run();
     expect(await db.prepare(revisionQuery).first('revision')).toBe(revision + 2);
+    await db.prepare(deleteRun).bind(secondRun).run();
+    expect(await db.prepare(revisionQuery).first('revision')).toBe(revision + 3);
   });
 
   it('requires a publication time before a run becomes visible', async () => {

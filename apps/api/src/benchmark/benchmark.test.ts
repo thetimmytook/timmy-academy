@@ -496,9 +496,8 @@ describe('public allowlist and error privacy', () => {
     };
     await errorAt('/runs', 500, 'internal_error', createApp(failingRepository));
   });
-  it('has no publication or owner routes', async () => {
+  it('keeps public reads read-only', async () => {
     const before = await groups();
-    expect((await app.request(`${base}/me/runs`, { method: 'POST', body: '{}' })).status).toBe(404);
     await position();
     expect(await groups()).toEqual(before);
   });

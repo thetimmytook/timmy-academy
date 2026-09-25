@@ -30,7 +30,7 @@ The `(account_id, client_run_id)` unique index reserves the client's ID within i
 account, including after deletion. Each run can belong to only one submission.
 Foreign keys prevent deleting referenced accounts or run records accidentally.
 Owner/time and owner/status/time indexes support stable owner lists. Rejection
-reason codes still need an approved allowlist before being exposed through an API.
+details remain private. The HTTP API currently exposes only the generic code `rejected`.
 
 The migration rebuilds `benchmark_runs` to allow a null publication timestamp,
 copies only writable columns (generated search columns recompute from detail),
@@ -40,7 +40,7 @@ sequences and publication dates are preserved. The new submissions table starts
 empty; fixture contributors are not silently converted into account owners.
 
 Deletion must hide or remove the run and clear the submission link atomically.
-Request fingerprinting, retry payload comparison, owner-list cursors, retention
+Request fingerprinting, retry payload comparison, retention
 and anonymization remain separate steps. This schema does not implement the
 publication or deletion workflows.
 
@@ -53,12 +53,37 @@ and return only a minimal deletion acknowledgement through the lookup.
 
 Cards are projected from the linked detail document. Pending/rejected cards omit
 the preallocated public ID and URL. Account IDs, contributor keys, settings and
-provider identities are not included. Rejection reasons remain internal codes;
-the HTTP layer must use the approved reason allowlist before exposing them.
+provider identities are not included. Stored rejection reasons remain private;
+the HTTP layer replaces them with the generic code `rejected`.
 
 Lists support status filtering, a default limit of 20 (maximum 50), and keyset
 ordering by submission time and private sequence descending. The returned `next`
-position is internal repository state, not a public cursor. Before adding owner
-routes, the API must wrap continuation in an authenticated cursor bound to owner,
-status and limit, with a fixed snapshot/expiry and invalidation on submission
-changes. These read methods do not yet provide cross-request snapshot guarantees.
+position is internal repository state, not a public cursor.
+
+## Protected owner reads
+
+- `GET /api/bench/v1/me/runs` accepts `status` (all, published, pending_review or rejected), `limit` (1–50, default 20), and an optional `cursor`.
+- `GET /api/bench/v1/me/runs/by-client-id/:clientRunId` accepts a UUID and returns the owner's card or a minimal deleted marker. Missing and foreign IDs both return 404.
+
+Both routes require a verified application principal before validating inputs and
+return `Cache-Control: no-store`. Unknown or duplicate query fields are rejected.
+There is no request parameter for selecting another account.
+
+The owner cursor is HMAC-signed using `BENCHMARK_CURSOR_SECRET`, bound to a hash
+of account ID, status and limit, and valid for 30 minutes from the first page.
+The account ID is not serialized in the token. The token is signed, not encrypted;
+its internal pagination position is readable. It cannot be used as a public cursor.
+Owner pagination follows the current list rather than freezing inserts at the first
+page. New submissions below the cursor can appear on subsequent pages; new ones
+above it appear after restarting the list. Revision checks before and after reading
+detect updates and deletions.
+
+Migration `0005_submission-revision.sql` adds submission update/delete triggers
+using the existing dataset revision. Run updates/deletes already increment it.
+This deliberately conservative revision invalidates all active owner and public
+cursors when a submission changes, including cursors for other accounts. Such
+requests return 409 `cursor_stale` and must restart at the first page. Invalid,
+altered or differently bound owner cursors return 400 `invalid_cursor`.
+
+Apply local migrations before using these endpoints. This step adds no My Bench UI,
+submission upload, moderation or deletion endpoint.

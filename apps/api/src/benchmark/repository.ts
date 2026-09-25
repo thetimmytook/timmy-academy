@@ -18,7 +18,7 @@ const errors = {
   invalid_input: { status: 422, message: 'The benchmark request is invalid.' },
   unsupported_media_type: { status: 415, message: 'Use application/json for this request.' },
   payload_too_large: { status: 413, message: 'The benchmark request body exceeds the size limit.' },
-  not_found: { status: 404, message: 'The public run or group was not found.' },
+  not_found: { status: 404, message: 'The requested run or group was not found.' },
   invalid_cursor: { status: 400, message: 'The search cursor is invalid.' },
   cursor_stale: { status: 409, message: 'Search results changed. Start from the first page.' },
   group_key_stale: {

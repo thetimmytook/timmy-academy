@@ -11,7 +11,7 @@ import {
 import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { runs } from '../db/schema';
 import { createApp } from '../index';
@@ -33,7 +33,7 @@ const filterOptionsPath = '/filter-options';
 let mf: Miniflare;
 let db: D1Database;
 let now = 1000000;
-const app = (): Hono => createApp(new D1BenchmarkRepository(db, signingSecret, () => now));
+const app = (): Hono => createApp(new D1BenchmarkRepository(db, signingSecret));
 const request = (path: string): Response | Promise<Response> => app().request(base + path);
 
 const groups = async (query = ''): Promise<GroupSearchResponse> => {
@@ -114,7 +114,12 @@ beforeAll(async () => {
 afterAll(async () => {
   await mf?.dispose();
 });
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 beforeEach(async () => {
+  vi.spyOn(Date, 'now').mockImplementation(() => now);
   now = 1000000;
   await db.batch([db.prepare('DELETE FROM benchmark_runs')]);
   await seed();

@@ -43,11 +43,11 @@ import type {
 export class D1BenchmarkRepository implements BenchmarkRepository {
   private readonly db;
   private readonly navigation;
-  constructor(database: D1Database, signingSecret?: string, now: () => number = Date.now) {
+  constructor(database: D1Database, signingSecret?: string) {
     // All statements use the primary. A session could route the final revision
     // check to a replica that has not observed a concurrent removal.
     this.db = drizzle(database);
-    this.navigation = new D1Navigation(this.db, now, signingSecret);
+    this.navigation = new D1Navigation(this.db, signingSecret);
   }
   async detail(id: string): Promise<PublicRunDetail | undefined> {
     const row = await this.db

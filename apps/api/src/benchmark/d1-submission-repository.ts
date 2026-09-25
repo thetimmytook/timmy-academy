@@ -2,7 +2,7 @@ import { publicRunDetailSchema } from '@timmy/contracts';
 import { and, desc, eq, ne, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 
-import { runs, submissions } from '../db/schema';
+import { runs, submissions, state } from '../db/schema';
 
 import type { D1Database } from '@cloudflare/workers-types';
 import type { PublicRunDetail } from '@timmy/contracts';
@@ -113,6 +113,22 @@ export class D1SubmissionRepository {
   private readonly db;
   constructor(database: D1Database) {
     this.db = drizzle(database);
+  }
+
+  async revision(): Promise<number> {
+    const result = await this.db
+      .select({
+        revision: state.revision,
+      })
+      .from(state)
+      .where(eq(state.id, 1))
+      .get();
+
+    if (!result) {
+      throw new Error('Benchmark migrations have not been applied.');
+    }
+
+    return result.revision;
   }
 
   async findByClientId(

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { NavigationToken } from './navigation-token';
+import { BenchmarkCursor } from './benchmark-cursor';
 
 import type { Navigation } from './d1-navigation';
 
@@ -13,21 +13,21 @@ const navigation: Navigation = {
 
 describe('signed client navigation', () => {
   it('round-trips across independent instances without a registry', async () => {
-    const token = await new NavigationToken(secret).sign('cur', navigation);
-    expect(await new NavigationToken(secret).verify(token, navigation.binding, 'cur')).toEqual(
+    const token = await new BenchmarkCursor(secret).sign('cur', navigation);
+    expect(await new BenchmarkCursor(secret).verify(token, navigation.binding, 'cur')).toEqual(
       navigation,
     );
     expect(token.length).toBeLessThan(1024);
   });
 
   it('authenticates cursor kind, filters, snapshot, position and signing environment', async () => {
-    const codec = new NavigationToken(secret);
+    const codec = new BenchmarkCursor(secret);
     const token = await codec.sign('cur', navigation);
     await expect(codec.verify(token, 'changed-filters', 'cur')).rejects.toMatchObject({
       code: 'invalid_cursor',
     });
     await expect(
-      new NavigationToken('another-environment').verify(token, navigation.binding, 'cur'),
+      new BenchmarkCursor('another-environment').verify(token, navigation.binding, 'cur'),
     ).rejects.toMatchObject({ code: 'invalid_cursor' });
     await expect(
       codec.verify(token.replace('cur_', 'hg_'), navigation.binding, 'hg'),
@@ -52,16 +52,16 @@ describe('signed client navigation', () => {
     'rejects malformed or oversized tokens',
     async token => {
       await expect(
-        new NavigationToken(secret).verify(token, navigation.binding, 'cur'),
+        new BenchmarkCursor(secret).verify(token, navigation.binding, 'cur'),
       ).rejects.toMatchObject({ code: 'invalid_cursor' });
     },
   );
 
   it('marks old database-backed links stale and fails explicitly without configuration', async () => {
     await expect(
-      new NavigationToken(secret).verify('cur_' + 'a'.repeat(32), navigation.binding, 'cur'),
+      new BenchmarkCursor(secret).verify('cur_' + 'a'.repeat(32), navigation.binding, 'cur'),
     ).rejects.toMatchObject({ code: 'cursor_stale' });
-    await expect(new NavigationToken(undefined).sign('cur', navigation)).rejects.toThrow(
+    await expect(new BenchmarkCursor(undefined).sign('cur', navigation)).rejects.toThrow(
       'not configured',
     );
   });
@@ -72,10 +72,10 @@ describe('signed client navigation', () => {
       binding: navigation.binding,
       hardware: ['cpu', 'gpu', 32] as [string, string, number],
     };
-    const first = await new NavigationToken(secret).sign('hg', group);
-    expect(await new NavigationToken(secret).sign('hg', group)).toBe(first);
-    expect(await new NavigationToken(secret).verify(first, group.binding, 'hg')).toEqual(group);
-    const decoded = await new NavigationToken(secret).verify(first, group.binding, 'hg');
-    expect(await new NavigationToken(secret).sign('hg', decoded)).toBe(first);
+    const first = await new BenchmarkCursor(secret).sign('hg', group);
+    expect(await new BenchmarkCursor(secret).sign('hg', group)).toBe(first);
+    expect(await new BenchmarkCursor(secret).verify(first, group.binding, 'hg')).toEqual(group);
+    const decoded = await new BenchmarkCursor(secret).verify(first, group.binding, 'hg');
+    expect(await new BenchmarkCursor(secret).sign('hg', decoded)).toBe(first);
   });
 });

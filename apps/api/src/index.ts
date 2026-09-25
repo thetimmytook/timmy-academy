@@ -5,6 +5,7 @@ import { AuthenticationDenied } from './auth/application-principal';
 import { requestPrincipal } from './auth/request-principal';
 import { registerBenchmarkApi } from './benchmark/benchmark.api';
 import { D1BenchmarkRepository } from './benchmark/d1-repository';
+import { createOwnerRunsRouter } from './benchmark/owner-runs.api';
 import { BenchmarkRequestError, type BenchmarkRepository } from './benchmark/repository';
 import { readConfig } from './config';
 
@@ -22,6 +23,7 @@ export function createApp(repository?: BenchmarkRepository): Hono {
     }
   });
   app.use('/api/*', requestPrincipal());
+  app.route('/api/bench/v1/me', createOwnerRunsRouter());
   registerBenchmarkApi(
     app,
     repository
