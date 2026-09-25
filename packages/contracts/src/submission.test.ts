@@ -92,6 +92,14 @@ describe('submission transport contract', () => {
       submissionRequestSchema.safeParse({
         ...request,
         capture: { duration_sec: 110, sample_count: 120 },
+        metrics: {
+          average_fps: 1.09,
+          one_percent_low_fps: 1,
+          zero_point_one_percent_low_fps: 0.9,
+          average_frametime_ms: 916.667,
+          p95_frametime_ms: 1000,
+          p99_frametime_ms: 1100,
+        },
       }).success,
     ).toBe(true);
   });
@@ -151,5 +159,76 @@ describe('selected settings allowlist', () => {
     { schema_version: 1, graphics: { GameFramerate: 1001 } },
   ])('rejects unreviewed keys, empty sections and values outside bounds: %j', input => {
     expect(settingsSnapshotSchema.safeParse(input).success).toBe(false);
+  });
+});
+
+describe('submission metric consistency', () => {
+  it.each([
+    { average_fps: 150 },
+    { average_frametime_ms: 12 },
+    { one_percent_low_fps: 130 },
+    { zero_point_one_percent_low_fps: 90 },
+    { p95_frametime_ms: 20 },
+  ])('rejects inconsistent measurements without rewriting them: %j', overrides => {
+    const input = { ...request, metrics: { ...request.metrics, ...overrides } };
+    const before = JSON.stringify(input);
+    expect(submissionRequestSchema.safeParse(input).success).toBe(false);
+    expect(JSON.stringify(input)).toBe(before);
+  });
+  it('rejects a requested duration substituted for measured duration', () => {
+    expect(
+      submissionRequestSchema.safeParse({
+        ...request,
+        capture: { ...request.capture, duration_sec: 120 },
+      }).success,
+    ).toBe(false);
+  });
+  it('rejects an unrelated frame count', () => {
+    expect(
+      submissionRequestSchema.safeParse({
+        ...request,
+        capture: { ...request.capture, sample_count: 20000 },
+      }).success,
+    ).toBe(false);
+  });
+  it('accepts independently rounded values at the supported precision', () => {
+    const input = {
+      ...request,
+      capture: { duration_sec: 120.001, sample_count: 14400 },
+      metrics: { ...request.metrics, average_fps: 120, average_frametime_ms: 8.33 },
+    };
+    expect(submissionRequestSchema.parse(input)).toEqual(input);
+  });
+  it('accepts mean frametime above P95 when rare long frames raise the average', () => {
+    // 11,999 frames at 8 ms plus one at 24,000 ms; same formulas as the collector.
+    const input = {
+      ...request,
+      capture: { duration_sec: 119.992, sample_count: 12000 },
+      metrics: {
+        average_fps: 100.01,
+        average_frametime_ms: 9.999,
+        one_percent_low_fps: 4.81,
+        zero_point_one_percent_low_fps: 0.5,
+        p95_frametime_ms: 8,
+        p99_frametime_ms: 8,
+      },
+    };
+    expect(submissionRequestSchema.parse(input)).toEqual(input);
+  });
+  it('accepts equal lows and percentiles for an even capture', () => {
+    expect(
+      submissionRequestSchema.safeParse({
+        ...request,
+        capture: { duration_sec: 120, sample_count: 12000 },
+        metrics: {
+          average_fps: 100,
+          one_percent_low_fps: 100,
+          zero_point_one_percent_low_fps: 100,
+          average_frametime_ms: 10,
+          p95_frametime_ms: 10,
+          p99_frametime_ms: 10,
+        },
+      }).success,
+    ).toBe(true);
   });
 });

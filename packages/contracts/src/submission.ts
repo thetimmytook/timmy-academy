@@ -11,7 +11,28 @@ import {
 import { clientRunIdSchema } from './owner-runs.js';
 import { settingsSnapshotSchema } from './settings-snapshot.js';
 
-// Transport shape only. Cross-metric plausibility checks must precede persistence.
+// Accepted rounding: duration to 0.001 s; FPS and frametime to at least 0.01.
+// Desktop currently records frametime more precisely (0.001 ms).
+function isConsistentCapture(
+  capture: { duration_sec: number; sample_count: number },
+  metrics: { average_fps: number; average_frametime_ms: number },
+): boolean {
+  const count = capture.sample_count;
+  const earliest = Math.max(
+    capture.duration_sec - 0.0005,
+    (count * (metrics.average_frametime_ms - 0.005)) / 1000,
+    count / (metrics.average_fps + 0.005),
+  );
+  const latest = Math.min(
+    capture.duration_sec + 0.0005,
+    (count * (metrics.average_frametime_ms + 0.005)) / 1000,
+    metrics.average_fps > 0.005 ? count / (metrics.average_fps - 0.005) : Infinity,
+  );
+
+  // Floating-point slack at interval boundaries, not a measurement tolerance.
+  return earliest <= latest + 1e-9;
+}
+
 export const submissionRequestSchema = z
   .strictObject({
     schema_version: z.literal(1),
@@ -40,6 +61,35 @@ export const submissionRequestSchema = z
     metrics: metricsSchema,
   })
   .superRefine((request, context) => {
+    const { metrics, capture } = request;
+
+    if (!isConsistentCapture(capture, metrics)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['metrics'],
+        message: 'Capture duration, sample count and average metrics are inconsistent.',
+      });
+    }
+
+    if (
+      metrics.one_percent_low_fps > metrics.average_fps ||
+      metrics.zero_point_one_percent_low_fps > metrics.one_percent_low_fps
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['metrics'],
+        message: 'Low FPS metrics must not exceed their wider averages.',
+      });
+    }
+
+    if (metrics.p95_frametime_ms > metrics.p99_frametime_ms) {
+      context.addIssue({
+        code: 'custom',
+        path: ['metrics', 'p99_frametime_ms'],
+        message: 'P99 frametime must not be less than P95.',
+      });
+    }
+
     const saved = request.settings_snapshot?.graphics?.DisplaySettings?.Resolution;
 
     if (

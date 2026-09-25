@@ -127,9 +127,9 @@ reviewed settings are available.
 
 The structural contract requires at least 110 measured seconds and 120 frame
 samples. A settings resolution, when provided, must match `game_resolution`.
-These checks do not establish capture plausibility: metric consistency checks,
-normalization, intake metadata/idempotency handling and request body limits still
-need implementation before connecting the POST route. This schema adds no route
+The contract also checks metric consistency as described below. Normalization,
+intake metadata/idempotency handling and request body limits still need
+implementation before connecting the POST route. This schema adds no route
 or automatic publication behavior.
 
 ## Selected settings projection
@@ -143,3 +143,22 @@ null: the selected screen resolution belongs to run conditions, not settings.
 No render-scale or upscaling effects are inferred, and unrelated source keys are
 never copied. Hardware canonicalization and full submission normalization remain
 separate work; the existing observed-value lookup is not a production catalog.
+
+## Capture metric consistency
+
+The submission contract cross-checks sample count, measured duration, Average FPS
+and mean frametime. All three duration intervals must overlap: reported duration,
+sample count multiplied by mean frametime, and sample count divided by Average FPS.
+Accepted rounding is half of 0.001 seconds for duration and half of 0.01 for FPS
+and frametime milliseconds. This supports the documented DTO's two-decimal values;
+the current desktop collector retains three decimals for mean frametime. A 1e-9
+second slack handles floating-point interval boundaries only.
+
+Source formulas were checked in `TarkovSkills.Core/BenchmarkServices.cs` at desktop
+commit `e4526da`: duration is summed valid frametimes, Average FPS is frame count
+divided by duration, lows use the slowest ceil(1%/0.1%) samples, and percentiles
+use sorted nearest ranks. Require 0.1% low <= 1% low <= Average FPS and P95 <= P99.
+Do not require mean frametime <= P95: rare stalls can make the mean larger.
+Rejected values are never corrected silently. These arithmetic checks cannot
+prove authenticity or reconstruct percentiles without raw frames; no arbitrary
+hardware performance threshold or new moderation workflow is introduced.

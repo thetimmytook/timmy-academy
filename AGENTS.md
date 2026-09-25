@@ -12,6 +12,8 @@ Timmy Academy is currently in the design stage. The Windows Benchmark applicatio
 
 ## Implementation and review approach
 
+- Name boolean-returning predicates with an `is` or `are` prefix, as grammatically appropriate (for example, `isConsistentCapture`), so their return type is clear at call sites.
+
 - When the user says to discuss, agree, or record a decision without implementing it, do not edit application code or tests. Record the decision and wait for an explicit instruction to implement it.
 - Implement only the agreed current step. Do not add behavior for future workflows or tests that manually simulate those workflows before they are implemented. Keep existing data safe without implementing speculative lifecycle branches.
 - Use Drizzle for repository queries and D1 batch transactions, following existing repository patterns. Use small parameterized `sql` fragments where the query builder needs them; do not default to handwritten `.prepare().bind()` queries in application repositories.
