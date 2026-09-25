@@ -19,6 +19,8 @@ import { createApp } from '../index';
 import { TOKEN_LIFETIME_MS } from './d1-navigation';
 import { predicate } from './d1-query';
 import { D1BenchmarkRepository } from './d1-repository';
+import { syntheticHardware } from './fixtures';
+import { normalizeHardware } from './hardware-normalization';
 import { InMemoryBenchmarkRepository } from './in-memory-repository';
 import { seedRows, seedStatements } from './seed';
 
@@ -26,6 +28,10 @@ import type { StoredRun } from './stored-run';
 import type { GroupSearchResponse, GroupRunsResponse, CohortResponse } from '@timmy/contracts';
 import type { Hono } from 'hono';
 
+const fixtureCpuId = syntheticHardware[0]!.cpu.id;
+const fixtureGpuId = syntheticHardware[0]!.gpu.id;
+const otherCpuId = syntheticHardware[2]!.cpu.id;
+const otherGpuId = syntheticHardware[2]!.gpu.id;
 const signingSecret = 'test-signing-secret';
 const base = '/api/bench/v1';
 const firstSeedRunPath = '/runs/br_test_01';
@@ -159,8 +165,8 @@ describe('real local D1 public HTTP integration', { timeout: 30000 }, () => {
     for (const raw of [
       {},
       { sort: 'captured_asc' },
-      { cpu: 'ryzen-7-7800x3d' },
-      { gpu: 'geforce-rtx-3060-ti', ram_gb: '16' },
+      { cpu: fixtureCpuId },
+      { gpu: otherGpuId, ram_gb: '16' },
       { map: 'woods' },
       { execution: 'local' },
       { game_width: '1920', game_height: '1080' },
@@ -276,10 +282,10 @@ describe('real local D1 public HTTP integration', { timeout: 30000 }, () => {
       expect((await groups()).summary.run_count).toBe(23);
       expect((await position()).runs.map(run => run.public_run_id)).toEqual(['br_test_05']);
       await db
-        .prepare("UPDATE benchmark_runs SET visibility = 'hidden' WHERE cpu = 'core-i5-12400f'")
+        .prepare(`UPDATE benchmark_runs SET visibility = 'hidden' WHERE cpu = '${otherCpuId}'`)
         .run();
       const options = filterOptionsSchema.parse(await (await request(filterOptionsPath)).json());
-      expect(options.cpus.map(cpu => cpu.id)).not.toContain('core-i5-12400f');
+      expect(options.cpus.map(cpu => cpu.id)).not.toContain(otherCpuId);
       expect(options.ram_gb).toEqual([32, 64]);
     },
   );
@@ -315,6 +321,24 @@ describe('real local D1 public HTTP integration', { timeout: 30000 }, () => {
     for (const id of ['br_test_hidden', 'br_test_deleted']) {
       expect((await request(`/runs/${id}`)).status).toBe(404);
     }
+  });
+  it('compares unfamiliar hardware using the same IDs as submission normalization', async () => {
+    const input = { cpu_name: 'New CPU 123', gpu_name: 'New GPU 456 Laptop', ram_gb: 32 };
+    expect((await position({ ...exact, hardware: input })).status).toBe('no_data');
+    const source = seedRows()[0]!;
+    await insert(
+      { ...source, detail: { ...source.detail, hardware: await normalizeHardware(input) } },
+      'br_new_hardware',
+    );
+    const result = await position({
+      ...exact,
+      hardware: { ...input, cpu_name: ' NEW  cpu 123 ', gpu_name: 'new gpu 456 LAPTOP' },
+    });
+    expect(result.status).toBe('matches');
+    expect(result.runs.map(run => run.public_run_id)).toEqual(['br_new_hardware']);
+    expect(
+      (await position({ ...exact, hardware: { ...input, gpu_name: 'New GPU 456' } })).status,
+    ).toBe('no_data');
   });
   it('bounds Position examples without averaging and counts distinct contributors', async () => {
     for (let index = 0; index < 22; index++) {
@@ -385,8 +409,8 @@ describe('real local D1 public HTTP integration', { timeout: 30000 }, () => {
       .where(
         predicate(
           {
-            cpu: 'ryzen-7-7800x3d',
-            gpu: 'geforce-rtx-4070-super',
+            cpu: fixtureCpuId,
+            gpu: fixtureGpuId,
             ram_gb: 32,
             map: 'lighthouse',
             execution: 'bsg_servers',

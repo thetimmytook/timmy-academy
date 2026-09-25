@@ -11,7 +11,8 @@ import {
 } from '@timmy/contracts';
 
 import { publicFilterOptions } from './filter-options';
-import { createSyntheticRuns, syntheticHardware, syntheticMaps, type StoredRun } from './fixtures';
+import { createSyntheticRuns, syntheticMaps, type StoredRun } from './fixtures';
+import { normalizeHardware } from './hardware-normalization';
 import { projectDetail, projectHardware, projectSummary } from './projection';
 import { BenchmarkRequestError, type BenchmarkRepository } from './repository';
 import { searchFilters } from './search-filters';
@@ -75,10 +76,6 @@ function tuple(run: StoredRun): string {
   const hardware = run.detail.hardware;
 
   return JSON.stringify([hardware.cpu.id, hardware.gpu.id, hardware.ram_gb]);
-}
-
-function normalizeName(value: string): string {
-  return value.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
 // This immutable fixture snapshot is identical across Worker isolates. There is
@@ -262,25 +259,20 @@ export class InMemoryBenchmarkRepository implements BenchmarkRepository {
   }
 
   cohort(query: CohortQuery): Promise<CohortResponse> {
-    return Promise.resolve(this.queryCohort(query));
+    return this.queryCohort(query);
   }
 
-  private queryCohort(query: CohortQuery): CohortResponse {
-    // A deliberately small fixture catalog, not a production hardware normalizer.
-    const cpu = syntheticHardware
-      .map(item => item.cpu)
-      .find(model => normalizeName(model.name) === normalizeName(query.hardware.cpu_name));
-    const gpu = syntheticHardware
-      .map(item => item.gpu)
-      .find(model => normalizeName(model.name) === normalizeName(query.hardware.gpu_name));
+  private async queryCohort(query: CohortQuery): Promise<CohortResponse> {
+    const hardware = await normalizeHardware(query.hardware);
+    const { cpu, gpu } = hardware;
     const map = syntheticMaps.find(candidate => candidate.id === query.map);
 
-    if (!cpu || !gpu || !map) {
+    if (!map) {
       throw new BenchmarkRequestError('invalid_input');
     }
 
     const criteria = {
-      hardware: { cpu, gpu, ram_gb: query.hardware.ram_gb },
+      hardware,
       map,
       execution: query.execution,
       game_resolution: query.game_resolution,

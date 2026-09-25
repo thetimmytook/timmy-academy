@@ -16,6 +16,7 @@ Timmy Academy is currently in the design stage. The Windows Benchmark applicatio
 
 - When the user says to discuss, agree, or record a decision without implementing it, do not edit application code or tests. Record the decision and wait for an explicit instruction to implement it.
 - Implement only the agreed current step. Do not add behavior for future workflows or tests that manually simulate those workflows before they are implemented. Keep existing data safe without implementing speculative lifecycle branches.
+- Keep fixture data separate from production rules. Do not use hardcoded test models or preserve demo IDs as exceptions in production normalization.
 - Use Drizzle for repository queries and D1 batch transactions, following existing repository patterns. Use small parameterized `sql` fragments where the query builder needs them; do not default to handwritten `.prepare().bind()` queries in application repositories.
 - Do not add production constructor parameters or abstractions solely to support tests. Use `Date.now()` directly for cursor expiry and `vi.spyOn(Date, 'now')` with cleanup in tests.
 - Validate untrusted input at its boundary. Avoid redundant guards for internal values already guaranteed by the authenticated principal, types, or database constraints. Keep required parameters required.

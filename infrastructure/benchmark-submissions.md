@@ -141,8 +141,8 @@ raw enum codes/tokens. Screen modes map 0/1/2 to fullscreen/borderless/windowed;
 empty output sections are omitted. If only resolution was supplied, settings are
 null: the selected screen resolution belongs to run conditions, not settings.
 No render-scale or upscaling effects are inferred, and unrelated source keys are
-never copied. Hardware canonicalization and full submission normalization remain
-separate work; the existing observed-value lookup is not a production catalog.
+never copied. The hardware and submission normalization below uses this projection; the
+observed-value list itself is not a complete hardware catalog.
 
 ## Capture metric consistency
 
@@ -162,3 +162,30 @@ Do not require mean frametime <= P95: rare stalls can make the mean larger.
 Rejected values are never corrected silently. These arithmetic checks cannot
 prove authenticity or reconstruct percentiles without raw frames; no arbitrary
 hardware performance threshold or new moderation workflow is introduced.
+
+## Hardware and submission normalization
+
+`normalizeHardware` is shared by submission normalization and both Position
+repositories. It trims/collapses whitespace and compares complete names in lower
+case. Every model uses the same rule, with no catalog exceptions. Each name gets
+`cpu-` or `gpu-` plus the SHA-256 hex digest of that comparison name; its display
+label keeps the supplied spelling with normalized whitespace. RAM GB is already
+a validated positive integer and is retained unchanged.
+
+Suffixes, punctuation, vendor names and laptop distinctions are not stripped.
+Different names are not merged. An alias mechanism will be introduced only when
+specific mappings are agreed; fixture names are not aliases or a production
+catalog. Test/seed hardware lives in `fixture-hardware.ts` and uses the same
+name-derived IDs as other hardware. Old demo IDs are not retained as production
+exceptions. Existing demo databases require a deliberate reseed/reset; this code
+change does not rewrite stored rows or modify a live database.
+An unknown model is valid: Position returns `no_data` if it has no public matches,
+and the writer accepts its normalized run as `pending_review`.
+
+`normalizeSubmission` maps the validated DTO to the writer document using those
+same IDs and the selected-settings projection. Metrics are preserved; author is
+null, quality notes are empty, and render scale/upscaling effects are not inferred.
+Client ID, app version and raw settings keys are not copied into public run data.
+Map IDs still use the existing reviewed map list; this step does not add maps.
+The POST endpoint and preservation of intake metadata for retry identity remain
+separate work before this transformation is connected to HTTP submission.

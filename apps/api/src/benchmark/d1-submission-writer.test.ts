@@ -7,6 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { D1BenchmarkRepository } from './d1-repository';
 import { D1SubmissionWriter } from './d1-submission-writer';
 import { createSyntheticRuns } from './fixtures';
+import { normalizeHardware } from './hardware-normalization';
 let mf: Miniflare;
 let db: D1Database;
 let writer: D1SubmissionWriter;
@@ -148,6 +149,19 @@ describe('atomic submission writes', () => {
     await expect(writer.submit('missing_account', client, data)).rejects.toThrow();
     expect(await countRuns()).toBe(0);
     expect(await countSubmissions()).toBe(0);
+  });
+  it('accepts unfamiliar hardware as a pending submission', async () => {
+    const hardware = await normalizeHardware({
+      cpu_name: 'New CPU 123',
+      gpu_name: 'New GPU 456',
+      ram_gb: 32,
+    });
+    expect(await writer.submit(owner, client, { ...data, hardware })).toMatchObject({
+      publication_status: 'pending_review',
+      public_run_id: null,
+      url: null,
+    });
+    expect(await countRuns()).toBe(1);
   });
   it('rejects extra private fields before writing', async () => {
     await expect(

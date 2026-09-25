@@ -12,11 +12,15 @@ import { describe, expect, it } from 'vitest';
 
 import { createApp } from '../index';
 
-import { createSyntheticRuns } from './fixtures';
+import { createSyntheticRuns, syntheticHardware } from './fixtures';
 import { InMemoryBenchmarkRepository } from './in-memory-repository';
 
 import type { BenchmarkRepository } from './repository';
 
+const fixtureCpuId = syntheticHardware[0]!.cpu.id;
+const fixtureGpuId = syntheticHardware[0]!.gpu.id;
+const otherCpuId = syntheticHardware[2]!.cpu.id;
+const otherGpuId = syntheticHardware[2]!.gpu.id;
 const base = '/api/bench/v1';
 const missingGroup = 'Expected fixture group.';
 const missingRun = 'Expected fixture run.';
@@ -79,19 +83,19 @@ describe('public search and navigation', () => {
     }
   });
   it.each([
-    ['cpu=ryzen-7-7800x3d', 16, 2],
-    ['gpu=geforce-rtx-3060-ti', 8, 1],
+    [`cpu=${fixtureCpuId}`, 16, 2],
+    [`gpu=${otherGpuId}`, 8, 1],
     ['ram_gb=64', 8, 1],
     ['map=lighthouse', 6, 3],
     ['execution=local', 6, 3],
     ['game_width=1920&game_height=1080', 3, 3],
     ['game_version=0.16.8.0', 3, 3],
     [
-      'cpu=ryzen-7-7800x3d&gpu=geforce-rtx-4070-super&ram_gb=32&map=lighthouse&execution=bsg_servers&game_width=2560&game_height=1440&game_version=0.16.9.0',
+      `cpu=${fixtureCpuId}&gpu=${fixtureGpuId}&ram_gb=32&map=lighthouse&execution=bsg_servers&game_width=2560&game_height=1440&game_version=0.16.9.0`,
       2,
       1,
     ],
-    ['cpu=ryzen-7-7800x3d&gpu=geforce-rtx-3060-ti', 0, 0],
+    [`cpu=${fixtureCpuId}&gpu=${otherGpuId}`, 0, 0],
     ['ram_gb=48', 0, 0],
     ['game_version=0.0.0.0', 0, 0],
   ])('applies AND filters without widening: %s', async (query, runs, count) => {
@@ -213,7 +217,7 @@ describe('public search and navigation', () => {
       'limit=2',
       'limit=1&sort=captured_asc',
       'limit=1&ram_gb=32',
-      'limit=1&cpu=core-i5-12400f',
+      `limit=1&cpu=${otherCpuId}`,
     ]) {
       await errorAt(`/runs?${query}&cursor=${first.next_cursor}`, 400, 'invalid_cursor');
     }
@@ -317,6 +321,7 @@ describe('exact Position comparison', () => {
   });
   it.each([
     { hardware: { ...exact.hardware, ram_gb: 48 } },
+    { hardware: { ...exact.hardware, cpu_name: 'New CPU 123', gpu_name: 'New GPU 456' } },
     { hardware: { ...exact.hardware, gpu_name: 'GeForce RTX 3060 Ti' } },
     { hardware: { ...exact.hardware, cpu_name: 'Core i5-12400F' } },
     { map: 'woods' },
@@ -340,14 +345,14 @@ describe('exact Position comparison', () => {
       reason_codes: ['unknown_game_resolution', 'game_version_missing'],
     });
   });
-  it('normalizes only known fixture hardware names and returns canonical criteria', async () => {
+  it('normalizes hardware IDs without changing the supplied display spelling', async () => {
     const result = await position({
       ...exact,
       hardware: { ...exact.hardware, cpu_name: '  ryzen 7 7800x3d  ' },
     });
     expect(result.criteria.hardware.cpu).toEqual({
-      id: 'ryzen-7-7800x3d',
-      name: 'Ryzen 7 7800X3D',
+      id: fixtureCpuId,
+      name: 'ryzen 7 7800x3d',
     });
   });
   it('bounds examples to 20 while retaining full counts', async () => {

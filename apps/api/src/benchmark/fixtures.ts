@@ -1,7 +1,9 @@
-import { hardwareCatalog as syntheticHardware, mapCatalog as syntheticMaps } from './catalog';
+import { mapCatalog as syntheticMaps } from './catalog';
+import { syntheticHardware } from './fixture-hardware';
 
 import type { StoredRun } from './stored-run';
-export { hardwareCatalog as syntheticHardware, mapCatalog as syntheticMaps } from './catalog';
+export { mapCatalog as syntheticMaps } from './catalog';
+export { syntheticHardware } from './fixture-hardware';
 export type { StoredRun } from './stored-run';
 
 const ids = [
