@@ -2,6 +2,7 @@ import { deletePublicationResponseSchema } from '@timmy/contracts';
 import { useEffect, useRef, useState } from 'react';
 
 import { css } from '../../styled-system/css';
+import { useApiFetch } from '../auth/useApiFetch';
 import { Button } from '../elements/Button';
 import { Message } from '../elements/Message';
 
@@ -16,6 +17,7 @@ export function DeletePublication({
   onDeleted,
 }: Readonly<{ publicRunId: string; onDeleted: () => void }>): JSX.Element {
   const [confirming, setConfirming] = useState(false);
+  const apiFetch = useApiFetch();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string>();
   const request = useRef<AbortController | null>(null);
@@ -40,7 +42,7 @@ export function DeletePublication({
     setError(undefined);
 
     try {
-      const response = await fetch('/api/bench/v1/me/runs/' + publicRunId, {
+      const response = await apiFetch('/api/bench/v1/me/runs/' + publicRunId, {
         method: 'DELETE',
         signal: controller.signal,
       });

@@ -1,6 +1,8 @@
 import { benchmarkErrorSchema } from '@timmy/contracts';
 import { useEffect, useState } from 'react';
 
+import { useApiFetch } from '../auth/useApiFetch';
+
 type Parser<T> = { parse: (value: unknown) => T };
 type Result<T> = { url: string; data?: T; error?: string };
 const unavailable = 'Unable to load benchmark data. Please retry.';
@@ -16,8 +18,13 @@ const errorMessages = new Map([
   ['rate_limited', 'Too many requests. Please wait a moment and retry.'],
 ]);
 
-async function read<T>(url: string, schema: Parser<T>, signal: AbortSignal): Promise<T> {
-  const response = await fetch(url, { signal });
+async function read<T>(
+  url: string,
+  schema: Parser<T>,
+  signal: AbortSignal,
+  apiFetch: ReturnType<typeof useApiFetch>,
+): Promise<T> {
+  const response = await apiFetch(url, { signal });
   const body: unknown = await response.json();
 
   if (!response.ok) {
@@ -36,9 +43,10 @@ export function useResource<T>(
 ): { data: T | undefined; error: string | undefined; retry: () => void } {
   const [result, setResult] = useState<Result<T>>();
   const [attempt, setAttempt] = useState(0);
+  const apiFetch = useApiFetch();
   useEffect(() => {
     const controller = new AbortController();
-    void read(url, schema, controller.signal)
+    void read(url, schema, controller.signal, apiFetch)
       .then(data => {
         if (!controller.signal.aborted) {
           setResult({ url, data });
@@ -57,7 +65,7 @@ export function useResource<T>(
       });
 
     return (): void => controller.abort();
-  }, [url, schema, attempt]);
+  }, [url, schema, attempt, apiFetch]);
   const current = result?.url === url ? result : undefined;
 
   return {

@@ -2,6 +2,7 @@ import { moderationDecisionResponseSchema } from '@timmy/contracts';
 import { useEffect, useRef, useState } from 'react';
 
 import { css } from '../../styled-system/css';
+import { useApiFetch } from '../auth/useApiFetch';
 import { Button } from '../elements/Button';
 import { Message } from '../elements/Message';
 
@@ -25,6 +26,7 @@ export function ModerationActions({
   onChanged: () => void;
 }>): JSX.Element {
   const [decision, setDecision] = useState<ModerationDecision>();
+  const apiFetch = useApiFetch();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string>();
   const request = useRef<AbortController | null>(null);
@@ -41,7 +43,7 @@ export function ModerationActions({
     setError(undefined);
 
     try {
-      const response = await fetch(`/api/admin/v1/approvals/${submissionId}/${selected}`, {
+      const response = await apiFetch(`/api/admin/v1/approvals/${submissionId}/${selected}`, {
         method: 'POST',
         signal: controller.signal,
       });

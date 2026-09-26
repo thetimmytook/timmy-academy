@@ -1,5 +1,5 @@
 import { ClerkProvider, SignIn, SignUp, useClerk, useSession } from '@clerk/react';
-import { createContext, useContext, useEffect } from 'react';
+import { createContext, useCallback, useContext, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router';
 
 import { lastBrowse } from '../bench/navigation';
@@ -29,6 +29,12 @@ function SessionProvider({ children }: Readonly<{ children: ReactNode }>): JSX.E
   const { isLoaded, session } = useSession();
   const clerk = useClerk();
   const loadedStatus = session ? 'signed-in' : 'signed-out';
+  const sessionId = session?.id;
+  const signOut = useCallback(async (): Promise<void> => {
+    if (sessionId) {
+      await clerk.signOut({ sessionId });
+    }
+  }, [clerk, sessionId]);
 
   return (
     <SessionContext.Provider
@@ -36,11 +42,7 @@ function SessionProvider({ children }: Readonly<{ children: ReactNode }>): JSX.E
         canModerate: isLoaded && session?.user.publicMetadata.role === 'admin',
         sessionKey: session?.id ?? null,
         status: isLoaded ? loadedStatus : 'loading',
-        async signOut(): Promise<void> {
-          if (session) {
-            await clerk.signOut({ sessionId: session.id });
-          }
-        },
+        signOut,
       }}
     >
       {children}
@@ -102,8 +104,9 @@ function AvailableAuthForm({ mode }: Readonly<{ mode: 'sign-in' | 'sign-up' }>):
   const { search } = useLocation();
   const continuation = oauthContinuation(search, clerk.frontendApi, clerk.buildUserProfileUrl());
   const destination = signInDestination(search);
-  const webSuffix =
-    destination === '/bench/me' || destination === '/admin' ? '?returnTo=' + destination : '';
+  const webSuffix = isPrivateDestination(destination)
+    ? '?' + new URLSearchParams({ returnTo: destination }).toString()
+    : '';
   const suffix = continuation
     ? '?' + new URLSearchParams({ redirect_url: continuation }).toString()
     : webSuffix;
@@ -125,7 +128,7 @@ function AvailableAuthForm({ mode }: Readonly<{ mode: 'sign-in' | 'sign-up' }>):
   }
 
   if (status === 'signed-in') {
-    const pageLabel = destination === '/admin' ? 'Admin' : 'My Bench';
+    const pageLabel = destination.startsWith('/admin') ? 'Admin' : 'My Bench';
 
     return (
       <Message>
@@ -145,5 +148,14 @@ function AvailableAuthForm({ mode }: Readonly<{ mode: 'sign-in' | 'sign-up' }>):
 function signInDestination(search: string): string {
   const destination = new URLSearchParams(search).get('returnTo');
 
-  return destination === '/bench/me' || destination === '/admin' ? destination : lastBrowse();
+  return destination && isPrivateDestination(destination) ? destination : lastBrowse();
+}
+
+function isPrivateDestination(destination: string): boolean {
+  return ['/bench/me', '/admin'].some(
+    path =>
+      destination === path ||
+      destination.startsWith(path + '?') ||
+      destination.startsWith(path + '#'),
+  );
 }

@@ -169,7 +169,7 @@ describe('browser authentication in the main app', () => {
       }),
     );
     expect(clerk.signIn).toHaveBeenLastCalledWith(
-      expect.objectContaining({ signUpUrl: '/sign-up?returnTo=/admin' }),
+      expect.objectContaining({ signUpUrl: '/sign-up?returnTo=%2Fadmin' }),
     );
   });
   it('toggles the profile panel and closes with Escape, outside click and focus leaving', () => {
@@ -362,11 +362,26 @@ it('returns a My Bench sign-in to the owner page and ignores external destinatio
     }),
   );
   expect(clerk.signIn).toHaveBeenLastCalledWith(
-    expect.objectContaining({ signUpUrl: '/sign-up?returnTo=/bench/me' }),
+    expect.objectContaining({ signUpUrl: '/sign-up?returnTo=%2Fbench%2Fme' }),
   );
   cleanup();
   start('/sign-in?returnTo=https://untrusted.example');
   expect(clerk.provider).toHaveBeenLastCalledWith(
     expect.objectContaining({ signInForceRedirectUrl: '/bench/' }),
+  );
+});
+
+it('preserves owner filters through sign-in and sign-up', () => {
+  const destination = '/bench/me?status=rejected#runs';
+  const search = new URLSearchParams({ returnTo: destination }).toString();
+  start('/sign-in?' + search);
+  expect(clerk.provider).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      signInForceRedirectUrl: destination,
+      signUpForceRedirectUrl: destination,
+    }),
+  );
+  expect(clerk.signIn).toHaveBeenLastCalledWith(
+    expect.objectContaining({ signUpUrl: '/sign-up?' + search }),
   );
 });
