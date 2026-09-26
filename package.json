@@ -31,6 +31,9 @@
     "db:migrate:production": "node infrastructure/migrate.ts production",
     "db:seed:local": "npm run db:migrate:local && npm run build -w @timmy/contracts && tsx infrastructure/seed.ts local",
     "db:seed:staging": "npm run build -w @timmy/contracts && tsx infrastructure/seed.ts staging",
+    "db:seed:demo:local": "npm run build -w @timmy/contracts && tsx infrastructure/seed-demo.ts local",
+    "db:seed:demo:staging": "npm run build -w @timmy/contracts && tsx infrastructure/seed-demo.ts staging",
+    "db:seed:demo:production": "npm run build -w @timmy/contracts && tsx infrastructure/seed-demo.ts production",
     "db:reset:local": "node infrastructure/reset-local.ts",
     "db:prepare:staging": "npm run db:migrate:staging && npm run db:seed:staging"
   },
