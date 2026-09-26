@@ -1,6 +1,6 @@
 import { ClerkProvider, SignIn, SignUp, useClerk, useSession } from '@clerk/react';
 import { createContext, useContext } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useLocation } from 'react-router';
 
 import { lastBrowse } from '../bench/navigation';
 import { readConfig } from '../config';
@@ -10,11 +10,13 @@ import { Message } from '../elements/Message';
 import type { JSX, ReactNode } from 'react';
 
 interface BrowserSession {
+  sessionKey: string | null;
   status: 'unavailable' | 'loading' | 'signed-out' | 'signed-in';
   signOut: () => Promise<void>;
 }
 
 const SessionContext = createContext<BrowserSession>({
+  sessionKey: null,
   status: 'unavailable',
   signOut: () => Promise.resolve(),
 });
@@ -27,6 +29,7 @@ function SessionProvider({ children }: Readonly<{ children: ReactNode }>): JSX.E
   return (
     <SessionContext.Provider
       value={{
+        sessionKey: session?.id ?? null,
         status: isLoaded ? loadedStatus : 'loading',
         async signOut(): Promise<void> {
           if (session) {
@@ -42,6 +45,8 @@ function SessionProvider({ children }: Readonly<{ children: ReactNode }>): JSX.E
 
 export function BrowserAuthProvider({ children }: Readonly<{ children: ReactNode }>): JSX.Element {
   const navigate = useNavigate();
+  const { search } = useLocation();
+  const destination = signInDestination(search);
   const { auth } = readConfig();
 
   if (!auth) {
@@ -53,8 +58,8 @@ export function BrowserAuthProvider({ children }: Readonly<{ children: ReactNode
       publishableKey={auth.publishableKey}
       signInUrl="/sign-in"
       signUpUrl="/sign-up"
-      signInForceRedirectUrl={lastBrowse()}
-      signUpForceRedirectUrl={lastBrowse()}
+      signInForceRedirectUrl={destination}
+      signUpForceRedirectUrl={destination}
       routerPush={url => void navigate(url)}
       routerReplace={url => void navigate(url, { replace: true })}
       telemetry={false}
@@ -70,6 +75,9 @@ export function useBrowserSession(): BrowserSession {
 
 export function BrowserAuthForm({ mode }: Readonly<{ mode: 'sign-in' | 'sign-up' }>): JSX.Element {
   const { status } = useBrowserSession();
+  const { search } = useLocation();
+  const destination = signInDestination(search);
+  const suffix = destination === '/bench/me' ? '?returnTo=/bench/me' : '';
 
   if (status === 'unavailable') {
     return (
@@ -86,14 +94,19 @@ export function BrowserAuthForm({ mode }: Readonly<{ mode: 'sign-in' | 'sign-up'
   if (status === 'signed-in') {
     return (
       <Message>
-        You are signed in. <Button href={lastBrowse()}>Browse benchmarks</Button>
+        You are signed in.{' '}
+        <Button href={destination}>{suffix ? 'My Bench' : 'Browse benchmarks'}</Button>
       </Message>
     );
   }
 
   return mode === 'sign-in' ? (
-    <SignIn routing="path" path="/sign-in" signUpUrl="/sign-up" />
+    <SignIn routing="path" path="/sign-in" signUpUrl={'/sign-up' + suffix} />
   ) : (
-    <SignUp routing="path" path="/sign-up" signInUrl="/sign-in" />
+    <SignUp routing="path" path="/sign-up" signInUrl={'/sign-in' + suffix} />
   );
+}
+
+function signInDestination(search: string): string {
+  return new URLSearchParams(search).get('returnTo') === '/bench/me' ? '/bench/me' : lastBrowse();
 }

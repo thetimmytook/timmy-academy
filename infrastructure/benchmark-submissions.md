@@ -84,8 +84,7 @@ cursors when a submission changes, including cursors for other accounts. Such
 requests return 409 `cursor_stale` and must restart at the first page. Invalid,
 altered or differently bound owner cursors return 400 `invalid_cursor`.
 
-Apply local migrations before using these endpoints. This step adds no My Bench UI,
-moderation or deletion endpoint. Submission upload is described below.
+Apply local migrations before using these endpoints. Submission upload is described below.
 
 ## Atomic submission storage
 
@@ -204,3 +203,15 @@ Client ID, app version and raw settings keys are not copied into public run data
 Map IDs still use the existing reviewed map list; this step does not add maps.
 The POST endpoint uses this transformation after validation and fingerprints the
 validated input separately to retain complete retry identity.
+
+## My Bench web page
+
+The signed-in profile menu opens `/bench/me`. The page reads the existing owner
+list API with status filtering and cursor pagination, and links only published
+runs to public detail. It never submits a run. Pending and rejected runs remain
+visible only to their owner. No moderation or deletion controls are added here.
+
+Private requests start only after browser sign-in. The list unmounts on logout
+and is recreated on a session change; late responses are discarded. A direct
+guest visit offers sign-in with a fixed return destination of My Bench. External
+return destinations are ignored. BENCH still restores the remembered browse URL.

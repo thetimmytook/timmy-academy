@@ -102,7 +102,11 @@ export function SessionControls(): JSX.Element {
           {(status === 'signed-out' || status === 'unavailable') && (
             <>
               <p>My Bench requires sign-in</p>
-              <Button href="/sign-in" variant="ghost" onClick={() => setOpen(false)}>
+              <Button
+                href="/sign-in?returnTo=/bench/me"
+                variant="ghost"
+                onClick={() => setOpen(false)}
+              >
                 Sign in with email →
               </Button>
             </>
@@ -110,6 +114,9 @@ export function SessionControls(): JSX.Element {
           {status === 'signed-in' && (
             <>
               <p className={css({ fontWeight: 'semibold' })}>Your account</p>
+              <Button href="/bench/me" variant="ghost" onClick={() => setOpen(false)}>
+                My Bench
+              </Button>
               <Button variant="ghost" disabled={pending} onClick={() => void logOut()}>
                 {pending ? 'Signing out…' : 'Sign out'}
               </Button>

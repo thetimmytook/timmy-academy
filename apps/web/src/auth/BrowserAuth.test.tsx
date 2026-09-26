@@ -262,3 +262,21 @@ describe('browser authentication in the main app', () => {
     expect(document.body.textContent).not.toContain('private_browser_session');
   });
 });
+
+it('returns a My Bench sign-in to the owner page and ignores external destinations', () => {
+  start('/sign-in?returnTo=/bench/me');
+  expect(clerk.provider).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      signInForceRedirectUrl: '/bench/me',
+      signUpForceRedirectUrl: '/bench/me',
+    }),
+  );
+  expect(clerk.signIn).toHaveBeenLastCalledWith(
+    expect.objectContaining({ signUpUrl: '/sign-up?returnTo=/bench/me' }),
+  );
+  cleanup();
+  start('/sign-in?returnTo=https://untrusted.example');
+  expect(clerk.provider).toHaveBeenLastCalledWith(
+    expect.objectContaining({ signInForceRedirectUrl: '/bench/' }),
+  );
+});

@@ -7,6 +7,7 @@ import { SessionControls } from './auth/SessionControls';
 import { lastBrowse } from './bench/navigation';
 import { Button } from './elements/Button';
 import BenchPage from './pages/BenchPage';
+import MyBenchPage from './pages/MyBenchPage';
 import NotFoundPage from './pages/NotFoundPage';
 import RunPage from './pages/RunPage';
 import SignInPage from './pages/SignInPage';
@@ -93,6 +94,14 @@ export default function App(): JSX.Element {
         })}
       >
         <Routes>
+          <Route
+            path="/bench/me"
+            element={
+              <PageTitle title="My Bench">
+                <MyBenchPage />
+              </PageTitle>
+            }
+          />
           <Route path="/" element={<Navigate to={'/bench/' + search} replace />} />
           <Route
             path="/bench"

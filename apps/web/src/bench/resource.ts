@@ -5,6 +5,8 @@ type Parser<T> = { parse: (value: unknown) => T };
 type Result<T> = { url: string; data?: T; error?: string };
 const unavailable = 'Unable to load benchmark data. Please retry.';
 const errorMessages = new Map([
+  ['authentication_required', 'Your session has expired. Please sign in again.'],
+  ['email_verification_required', 'Verify your email to view your submissions.'],
   ['not_found', 'This public run is unavailable. It may have been removed.'],
   ['invalid_input', 'These search parameters are invalid. Clear the filters to start again.'],
   ['invalid_cursor', 'This page link is no longer valid. Return to the first page.'],
