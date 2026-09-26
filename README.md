@@ -59,7 +59,7 @@ is not a production hardware normalizer. Unknown game version/resolution stay `n
 `missing_conditions` in Position. Graphics settings never become default equality conditions.
 Derived render scale/upscaling remain `null`; quality notes stay empty until their codes are approved.
 
-Pagination uses opaque persisted navigation tokens with a fixed 30-minute lifetime. New publications
+Pagination uses client-held, HMAC-signed navigation tokens with a fixed 30-minute lifetime. New publications
 are excluded from existing snapshots; updates/deletions invalidate them with 409. Cursors bind
 filters, sort, view, group and limit, and use keyset continuation. See the [D1 policy, setup commands
 and staging acceptance table](infrastructure/README.md#d1-persistence-and-migrations). All API
@@ -128,6 +128,11 @@ contrast over the original draft; `fg.faint` is reserved for decorative or disab
 
 The root npm overrides keep Panda's pinned PostCSS, selector parser and Browserslist dependencies
 on patched releases. Revisit these overrides when Panda updates its dependency pins.
+
+## Planned error reporting
+
+Windows error reports will go through the Academy API into GitHub Issues.
+This is deferred work; see [the recorded direction](design/error-reporting.md).
 
 ## Checks
 

@@ -1,5 +1,6 @@
-import { runSearchQuerySchema } from '@timmy/contracts';
+import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, runSearchQuerySchema } from '@timmy/contracts';
 import { useEffect } from 'react';
+import { useNavigate } from 'react-router';
 
 import { css } from '../../styled-system/css';
 import { FilterDropdown } from '../bench/FilterDropdown';
@@ -7,11 +8,11 @@ import { Filters } from '../bench/Filters';
 import { browseUrl, rememberBrowse, resetPage, searchParameters } from '../bench/navigation';
 import { SearchResults } from '../bench/SearchResults';
 import { muted, stack } from '../bench/styles';
-import { navigate } from '../routing';
 
 import type { JSX } from 'react';
 
 export default function BenchPage({ url }: Readonly<{ url: string }>): JSX.Element {
+  const navigate = useNavigate();
   const params = new URL(url, window.location.origin).searchParams;
   const parsed = runSearchQuerySchema.safeParse(Object.fromEntries(searchParameters(params)));
   const valid =
@@ -46,18 +47,21 @@ export default function BenchPage({ url }: Readonly<{ url: string }>): JSX.Eleme
           onChange={value => {
             const next = resetPage(params);
             next.set('sort', value || 'captured_desc');
-            navigate(browseUrl(next));
+            void navigate(browseUrl(next));
           }}
         />
         <FilterDropdown
           label="Configurations per page"
           allowAny={false}
-          value={params.get('limit') ?? '20'}
-          options={[2, 10, 20, 50].map(value => ({ value: String(value), label: String(value) }))}
+          value={params.get('limit') ?? String(DEFAULT_PAGE_SIZE)}
+          options={[2, 10, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE].map(value => ({
+            value: String(value),
+            label: String(value),
+          }))}
           onChange={value => {
             const next = resetPage(params);
-            next.set('limit', value || '20');
-            navigate(browseUrl(next));
+            next.set('limit', value || String(DEFAULT_PAGE_SIZE));
+            void navigate(browseUrl(next));
           }}
         />
       </div>

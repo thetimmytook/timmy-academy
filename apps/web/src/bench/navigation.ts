@@ -39,7 +39,7 @@ export function browseUrl(params: URLSearchParams): string {
 export function resetPage(params: URLSearchParams): URLSearchParams {
   const next = new URLSearchParams(params);
 
-  for (const key of ['cursor', 'expanded', 'item_cursor']) {
+  for (const key of ['cursor', 'expanded', 'item_cursor', 'snapshot']) {
     next.delete(key);
   }
 
@@ -48,6 +48,12 @@ export function resetPage(params: URLSearchParams): URLSearchParams {
 
 export function searchParameters(params: URLSearchParams): URLSearchParams {
   const next = new URLSearchParams(params);
+  const expanded = next.get('expanded');
+
+  if (expanded) {
+    next.set('snapshot', expanded);
+  }
+
   next.delete('expanded');
   next.delete('item_cursor');
 

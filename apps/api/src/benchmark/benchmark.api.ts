@@ -1,5 +1,4 @@
 import {
-  COHORT_QUERY_MAX_BODY_BYTES,
   cohortQuerySchema,
   cohortResponseSchema,
   healthResponseSchema,
@@ -10,6 +9,9 @@ import {
   runSearchResponseSchema,
 } from '@timmy/contracts';
 
+import { COHORT_QUERY_MAX_BODY_BYTES } from '../config';
+
+import { readJsonBody } from './json-body';
 import { BenchmarkRequestError } from './repository';
 
 import type { BenchmarkRepository } from './repository';
@@ -73,58 +75,11 @@ export function registerBenchmarkApi(
   });
 
   app.post('/api/bench/v1/cohorts/query', async context => {
-    const mediaType = context.req.header('Content-Type')?.split(';', 1)[0]?.trim().toLowerCase();
-
-    if (mediaType !== 'application/json') {
-      throw new BenchmarkRequestError('unsupported_media_type');
-    }
-
     if (new URL(context.req.url).search) {
       throw new BenchmarkRequestError('invalid_input');
     }
 
-    // Enforce a small streaming limit, including chunked requests without Content-Length.
-    const reader = context.req.raw.body?.getReader();
-
-    if (!reader) {
-      throw new BenchmarkRequestError('invalid_input');
-    }
-
-    const chunks: Uint8Array[] = [];
-    let length = 0;
-
-    while (true) {
-      const chunk = await reader.read();
-
-      if (chunk.done) {
-        break;
-      }
-
-      length += chunk.value.byteLength;
-
-      if (length > COHORT_QUERY_MAX_BODY_BYTES) {
-        await reader.cancel();
-        throw new BenchmarkRequestError('payload_too_large');
-      }
-
-      chunks.push(chunk.value);
-    }
-
-    const bytes = new Uint8Array(length);
-    let offset = 0;
-
-    for (const chunk of chunks) {
-      bytes.set(chunk, offset);
-      offset += chunk.byteLength;
-    }
-
-    let body: unknown;
-
-    try {
-      body = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
-    } catch {
-      throw new BenchmarkRequestError('invalid_input');
-    }
+    const body = await readJsonBody(context.req.raw, COHORT_QUERY_MAX_BODY_BYTES);
 
     const parsed = cohortQuerySchema.safeParse(body);
 

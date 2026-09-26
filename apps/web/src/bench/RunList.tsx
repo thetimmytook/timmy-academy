@@ -29,6 +29,7 @@ export function RunList({ runs }: Readonly<{ runs: PublicRunSummary[] }>): JSX.E
         >
           <div>
             <strong>{run.map.name}</strong>
+            {run.is_synthetic && <p className={muted}>Demo data</p>}
             <p className={muted}>{run.captured_day}</p>
           </div>
           <div className={muted}>

@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { BrowserRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AuthPocPage } from '../pages/AuthPocPage';
@@ -52,7 +53,11 @@ describe('isolated browser auth harness with stubbed Clerk components', () => {
     'does not start Clerk for an unavailable or non-development key: %s',
     key => {
       vi.stubEnv('VITE_CLERK_PUBLISHABLE_KEY', key);
-      render(<AuthPocPage />);
+      render(
+        <BrowserRouter>
+          <AuthPocPage />
+        </BrowserRouter>,
+      );
       expect(screen.getByRole('status').textContent).toContain('Configure');
       expect(clerk.provider).not.toHaveBeenCalled();
     },
@@ -60,19 +65,31 @@ describe('isolated browser auth harness with stubbed Clerk components', () => {
 
   it('shows only loading status until the browser session is known', () => {
     clerk.loaded = false;
-    render(<AuthPocPage />);
+    render(
+      <BrowserRouter>
+        <AuthPocPage />
+      </BrowserRouter>,
+    );
     expect(screen.getByRole('status').textContent).toContain('Loading');
     expect(screen.queryByRole('button')).toBeNull();
     expect(screen.queryByRole('link')).toBeNull();
   });
 
   it('links a signed-out browser to the isolated sign-in route', () => {
-    render(<AuthPocPage />);
+    render(
+      <BrowserRouter>
+        <AuthPocPage />
+      </BrowserRouter>,
+    );
     expect(screen.getByRole('link', { name: signInLabel }).getAttribute('href')).toBe('/sign-in');
   });
 
   it('opens the sign-in form after clicking the shared navigation link', () => {
-    render(<AuthPocPage />);
+    render(
+      <BrowserRouter>
+        <AuthPocPage />
+      </BrowserRouter>,
+    );
     fireEvent.click(screen.getByRole('link', { name: signInLabel }));
     expect(window.location.pathname).toBe('/sign-in');
     expect(screen.getByText('Email sign-in widget')).toBeTruthy();
@@ -81,7 +98,11 @@ describe('isolated browser auth harness with stubbed Clerk components', () => {
 
   it('logs out only the current browser session without exposing its ID', async () => {
     clerk.session = { id: sessionId };
-    render(<AuthPocPage />);
+    render(
+      <BrowserRouter>
+        <AuthPocPage />
+      </BrowserRouter>,
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Sign out of this browser' }));
     await waitFor(() =>
       expect(clerk.signOut).toHaveBeenCalledExactlyOnceWith({ sessionId: clerk.session?.id }),
@@ -92,7 +113,11 @@ describe('isolated browser auth harness with stubbed Clerk components', () => {
   it('sanitizes logout errors and allows retry', async () => {
     clerk.session = { id: sessionId };
     clerk.signOut.mockRejectedValue(new Error('sensitive provider detail'));
-    render(<AuthPocPage />);
+    render(
+      <BrowserRouter>
+        <AuthPocPage />
+      </BrowserRouter>,
+    );
     fireEvent.click(screen.getByRole('button'));
     expect((await screen.findByRole('alert')).textContent).toBe(
       'Browser sign-out failed. Try again.',
@@ -105,7 +130,11 @@ describe('isolated browser auth harness with stubbed Clerk components', () => {
     clerk.session = { id: sessionId };
     const consentPath = '/oauth/consent?state=fixture&code_challenge=fixture';
     window.history.replaceState(null, '', consentPath);
-    render(<AuthPocPage />);
+    render(
+      <BrowserRouter>
+        <AuthPocPage />
+      </BrowserRouter>,
+    );
     expect(screen.getByText('Provider consent widget')).toBeTruthy();
     expect(window.location.pathname + window.location.search).toBe(consentPath);
     expect(screen.queryByRole('button')).toBeNull();
@@ -114,7 +143,11 @@ describe('isolated browser auth harness with stubbed Clerk components', () => {
 
   it('requires sign-in for a direct signed-out consent visit', () => {
     window.history.replaceState(null, '', '/oauth/consent');
-    render(<AuthPocPage />);
+    render(
+      <BrowserRouter>
+        <AuthPocPage />
+      </BrowserRouter>,
+    );
     expect(screen.getByText('Redirect to provider sign-in')).toBeTruthy();
     expect(screen.queryByText('Provider consent widget')).toBeNull();
   });
@@ -124,7 +157,11 @@ describe('isolated browser auth harness with stubbed Clerk components', () => {
     ['/sign-up/verify-email-address', 'Sign-up widget'],
   ])('supports provider subroutes: %s', (path, widget) => {
     window.history.replaceState(null, '', path);
-    render(<AuthPocPage />);
+    render(
+      <BrowserRouter>
+        <AuthPocPage />
+      </BrowserRouter>,
+    );
     expect(screen.getByText(widget)).toBeTruthy();
     expect(screen.queryByRole('button')).toBeNull();
   });

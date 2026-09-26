@@ -1,10 +1,7 @@
-import {
-  benchmarkErrorSchema,
-  COHORT_QUERY_MAX_BODY_BYTES,
-  cohortResponseSchema,
-} from '@timmy/contracts';
+import { benchmarkErrorSchema, cohortResponseSchema } from '@timmy/contracts';
 import { describe, expect, it } from 'vitest';
 
+import { COHORT_QUERY_MAX_BODY_BYTES } from '../config';
 import { createApp } from '../index';
 
 import { InMemoryBenchmarkRepository } from './in-memory-repository';

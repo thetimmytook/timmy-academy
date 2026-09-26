@@ -1,0 +1,13 @@
+# Browser auth for the main API. Use separate Clerk instances/keys per environment.
+APP_ORIGIN=http://localhost:5173
+CLERK_ISSUER=https://REPLACE.clerk.accounts.dev
+CLERK_PUBLISHABLE_KEY=pk_test_REPLACE
+CLERK_SECRET_KEY=sk_test_REPLACE
+# Public OAuth client shared by Benchmark and Toolkit in this same Clerk instance.
+# Required only for desktop requests; use opaque access tokens, email + offline_access.
+CLERK_DESKTOP_CLIENT_ID=REPLACE
+# Optional PEM public key for networkless JWT verification; otherwise Clerk JWKS is used.
+# CLERK_JWT_KEY="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
+
+# Server-only random signing secret for benchmark navigation (separate per environment).
+BENCHMARK_CURSOR_SECRET=

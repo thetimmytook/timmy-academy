@@ -1,9 +1,9 @@
-import { filterOptionsSchema, namedModelSchema } from '@timmy/contracts';
+import { COHORT_RUNS_LIMIT, filterOptionsSchema, namedModelSchema } from '@timmy/contracts';
 import { and, eq, isNotNull, sql } from 'drizzle-orm';
 
 import { runs } from '../db/schema';
 
-import { hardwareCatalog, mapCatalog } from './catalog';
+import { mapCatalog } from './catalog';
 import {
   countFields,
   predicate,
@@ -13,32 +13,27 @@ import {
   type BenchmarkDatabase,
 } from './d1-query';
 import { namedOptions } from './filter-options';
+import { normalizeHardware } from './hardware-normalization';
 import { projectSummary } from './projection';
 import { BenchmarkRequestError } from './repository';
 
 import type { FilterOptions, CohortQuery, CohortResponse } from '@timmy/contracts';
-
-const normalize = (value: string): string => value.trim().toLowerCase().replace(/\s+/g, ' ');
 
 export async function queryCohort(
   db: BenchmarkDatabase,
   query: CohortQuery,
   watermark: number,
 ): Promise<CohortResponse> {
-  const cpu = hardwareCatalog
-    .map(item => item.cpu)
-    .find(item => normalize(item.name) === normalize(query.hardware.cpu_name));
-  const gpu = hardwareCatalog
-    .map(item => item.gpu)
-    .find(item => normalize(item.name) === normalize(query.hardware.gpu_name));
+  const hardware = await normalizeHardware(query.hardware);
+  const { cpu, gpu } = hardware;
   const map = mapCatalog.find(item => item.id === query.map);
 
-  if (!cpu || !gpu || !map) {
+  if (!map) {
     throw new BenchmarkRequestError('invalid_input');
   }
 
   const criteria = {
-    hardware: { cpu, gpu, ram_gb: query.hardware.ram_gb },
+    hardware,
     map,
     execution: query.execution,
     game_resolution: query.game_resolution,
@@ -102,7 +97,7 @@ export async function queryCohort(
     .from(runs)
     .where(where)
     .orderBy(...runOrder(false))
-    .limit(20)
+    .limit(COHORT_RUNS_LIMIT)
     .all();
 
   return {
@@ -110,7 +105,7 @@ export async function queryCohort(
     criteria: exact,
     counts,
     runs: rows.map(row => projectSummary(stored(row))),
-    truncated: counts.run_count > 20,
+    truncated: counts.run_count > COHORT_RUNS_LIMIT,
     reason_codes: [],
   };
 }

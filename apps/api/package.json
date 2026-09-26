@@ -13,6 +13,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@clerk/backend": "^3.18.1",
     "@timmy/contracts": "*",
     "drizzle-orm": "^0.45.3",
     "hono": "^4.13.8",

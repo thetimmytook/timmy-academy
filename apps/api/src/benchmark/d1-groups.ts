@@ -1,3 +1,4 @@
+import { GROUP_PREVIEW_RUNS_LIMIT } from '@timmy/contracts';
 import { and, count, countDistinct, eq, sql } from 'drizzle-orm';
 
 import { runs } from '../db/schema';
@@ -18,7 +19,7 @@ import { searchFilters } from './search-filters';
 import type { Anchor, BenchmarkDatabase, RunRow } from './d1-query';
 import type { GroupSearchResponse, PublicRunDetail, RunSearchQuery } from '@timmy/contracts';
 
-// A single SQLite statement: filtered rows, windows, counts and <= 3 preview
+// A single SQLite statement: filtered rows, windows, counts and bounded preview
 // documents/group stay in the database. No per-group queries or JS table scan.
 export async function groupPage(
   db: BenchmarkDatabase,
@@ -85,7 +86,7 @@ export async function groupPage(
       .limit(query.limit + 1),
   );
   const preview = db
-    .select({ detail: maps.detail })
+    .select({ detail: maps.detail, isSynthetic: maps.isSynthetic })
     .from(maps)
     .where(
       and(
@@ -96,12 +97,12 @@ export async function groupPage(
       ),
     )
     .orderBy(...runOrder(ascending, maps))
-    .limit(3)
+    .limit(GROUP_PREVIEW_RUNS_LIMIT)
     .as('preview');
 
   // The ordered/limited correlated subquery must be aggregated as a whole, not
   // before LIMIT. This small SQLite JSON aggregate is expressed with Drizzle sql.
-  const previews = sql<string>`(select json_group_array(json(${preview.detail})) from ${preview})`;
+  const previews = sql<string>`(select json_group_array(json_object('detail', json(${preview.detail}), 'isSynthetic', ${preview.isSynthetic})) from ${preview})`;
   const rows = await db
     .with(filtered, ranked, facts, maps, heads)
     .select({
@@ -123,7 +124,10 @@ export async function groupPage(
     selected.map(row => ({ snapshot, binding: groupBinding(query), hardware: tuple(row) })),
   );
   const groups: GroupSearchResponse['groups'] = selected.map((row, index) => {
-    const documents = JSON.parse(row.previews) as PublicRunDetail[];
+    const documents = JSON.parse(row.previews) as {
+      detail: PublicRunDetail;
+      isSynthetic: number;
+    }[];
     const key = keys.at(index);
 
     if (!key) {
@@ -137,7 +141,13 @@ export async function groupPage(
       contributor_count: row.contributor_count,
       group_key: key,
       preview_runs: documents.map(document =>
-        projectSummary(stored({ ...row, detail: JSON.stringify(document) })),
+        projectSummary(
+          stored({
+            ...row,
+            detail: JSON.stringify(document.detail),
+            isSynthetic: Boolean(document.isSynthetic),
+          }),
+        ),
       ),
       remaining_run_count: row.run_count - documents.length,
     };

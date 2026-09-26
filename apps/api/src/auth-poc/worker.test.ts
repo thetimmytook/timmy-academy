@@ -56,6 +56,9 @@ beforeAll(async () => {
     convertV4MiniflareOptions({
       modules: true,
       scriptPath: `${root}/${output}/worker.js`,
+
+      // Workspace test commands change cwd; keep the bundle inside the module root.
+      modulesRoot: `${root}/${output}`,
       compatibilityDate: '2026-09-19',
       bindings: config,
       outboundService: async request => {

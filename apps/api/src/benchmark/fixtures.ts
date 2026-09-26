@@ -1,8 +1,16 @@
-import { hardwareCatalog as syntheticHardware, mapCatalog as syntheticMaps } from './catalog';
+import { syntheticHardware } from './fixture-hardware';
 
 import type { StoredRun } from './stored-run';
-export { hardwareCatalog as syntheticHardware, mapCatalog as syntheticMaps } from './catalog';
+export { syntheticHardware } from './fixture-hardware';
 export type { StoredRun } from './stored-run';
+
+// Keep existing seed measurements independent of the supported map catalog.
+const syntheticMaps = [
+  { id: 'lighthouse', name: 'Lighthouse' },
+  { id: 'customs', name: 'Customs' },
+  { id: 'streets', name: 'Streets of Tarkov' },
+  { id: 'woods', name: 'Woods' },
+];
 
 const ids = [
   '8N4qP2vK',
@@ -33,6 +41,7 @@ export function createSyntheticRuns(): StoredRun[] {
         contributor: `fictional-contributor-${groupIndex}-${index % 2}`,
         publishedAt: `2026-09-20T10:0${index}:00Z`,
         detail: {
+          is_synthetic: true,
           public_run_id: `br_${id}${['a', 'b', 'c'].at(groupIndex) ?? 'x'}`,
           url: `/bench/runs/br_${id}${['a', 'b', 'c'].at(groupIndex) ?? 'x'}`,
           captured_day: `2026-09-${String(19 - Math.floor(index / 2)).padStart(2, '0')}`,

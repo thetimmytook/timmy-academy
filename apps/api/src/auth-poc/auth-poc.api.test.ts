@@ -70,6 +70,7 @@ describe('isolated Clerk adapter (mock provider, not live authentication)', () =
     expect(await adapter.authenticate(authorization)).toEqual({
       accountId,
       emailVerified: true,
+      canModerate: false,
       session: { kind: 'desktop', expiresAt: now + 60_000 },
     });
     expect(accounts.findAccount).toHaveBeenCalledWith(config.issuer, validToken.subject);
@@ -250,6 +251,7 @@ describe('isolated Clerk adapter (mock provider, not live authentication)', () =
     expect(await adapter.authenticate(authorization)).toEqual({
       accountId,
       emailVerified: true,
+      canModerate: false,
       session: { kind: 'desktop', expiresAt: now + 60_000 },
     });
   });

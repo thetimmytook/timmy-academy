@@ -1,10 +1,10 @@
 import { filterOptionsSchema } from '@timmy/contracts';
+import { useNavigate } from 'react-router';
 
 import { css } from '../../styled-system/css';
 import { panel } from '../../styled-system/recipes';
 import { Button } from '../elements/Button';
 import { ErrorMessage } from '../elements/ErrorMessage';
-import { navigate } from '../routing';
 
 import { FilterDropdown } from './FilterDropdown';
 import { resolution } from './format';
@@ -16,6 +16,7 @@ import type { Option } from './FilterDropdown';
 import type { JSX } from 'react';
 
 export function Filters({ params }: Readonly<{ params: URLSearchParams }>): JSX.Element {
+  const navigate = useNavigate();
   const { data, error, retry } = useResource('/api/bench/v1/filter-options', filterOptionsSchema);
 
   function change(key: string, value: string): void {
@@ -27,7 +28,7 @@ export function Filters({ params }: Readonly<{ params: URLSearchParams }>): JSX.
       next.delete(key);
     }
 
-    navigate(browseUrl(next));
+    void navigate(browseUrl(next));
   }
 
   const named = (values: { id: string; name: string }[] = []): Option[] =>
@@ -113,7 +114,7 @@ export function Filters({ params }: Readonly<{ params: URLSearchParams }>): JSX.
                 next.set('game_height', height);
               }
 
-              navigate(browseUrl(next));
+              void navigate(browseUrl(next));
             }}
           />
           {select(

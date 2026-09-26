@@ -1,28 +1,44 @@
 import { benchmarkErrorSchema } from '@timmy/contracts';
 import { Hono } from 'hono';
 
+import { createAdminRouter } from './admin/admin.api';
+import { AuthenticationDenied } from './auth/application-principal';
+import { requestPrincipal } from './auth/request-principal';
 import { registerBenchmarkApi } from './benchmark/benchmark.api';
 import { D1BenchmarkRepository } from './benchmark/d1-repository';
+import { createOwnerRunsRouter } from './benchmark/owner-runs.api';
 import { BenchmarkRequestError, type BenchmarkRepository } from './benchmark/repository';
+import { readConfig } from './read-config';
 
-import type { D1Database } from '@cloudflare/workers-types';
+import type { AppBindings } from './config-types';
 
 export function createApp(repository?: BenchmarkRepository): Hono {
   const app = new Hono();
   app.use('*', async (context, next) => {
+    const config = readConfig(context.env as AppBindings | undefined);
+    context.set('config', config);
     await next();
-    const bindings = context.env as { DISABLE_INDEXING?: string } | undefined;
 
-    if (bindings?.DISABLE_INDEXING === 'true') {
+    if (config.disableIndexing) {
       context.header('X-Robots-Tag', 'noindex');
     }
   });
+  app.use('/api/*', requestPrincipal());
+  app.route('/api/bench/v1/me', createOwnerRunsRouter());
+  app.route('/api/admin/v1', createAdminRouter());
   registerBenchmarkApi(
     app,
     repository
       ? (): BenchmarkRepository => repository
-      : (context): BenchmarkRepository =>
-          new D1BenchmarkRepository((context.env as { BENCHMARK_DB: D1Database }).BENCHMARK_DB),
+      : (context): BenchmarkRepository => {
+          const { database, cursorSecret } = context.get('config');
+
+          if (!database) {
+            throw new Error('Database is not configured.');
+          }
+
+          return new D1BenchmarkRepository(database, cursorSecret);
+        },
   );
 
   app.notFound(context =>
@@ -37,12 +53,33 @@ export function createApp(repository?: BenchmarkRepository): Hono {
   );
 
   app.onError((error, context) => {
+    if (error instanceof AuthenticationDenied) {
+      context.header('Cache-Control', 'no-store');
+
+      return context.json(
+        benchmarkErrorSchema.parse({
+          code: 'authentication_required',
+          message: 'Authentication required.',
+          request_id: `req_${crypto.randomUUID()}`,
+        }),
+        401,
+      );
+    }
+
     const known = error instanceof BenchmarkRequestError;
+
+    if (known && error.retryAfterSeconds !== undefined) {
+      context.header('Retry-After', String(error.retryAfterSeconds));
+      context.header('Cache-Control', 'no-store');
+    }
 
     return context.json(
       benchmarkErrorSchema.parse({
         code: known ? error.code : 'internal_error',
         message: known ? error.message : 'The benchmark request could not be completed.',
+        ...(known && error.retryAfterSeconds !== undefined
+          ? { retry_after_seconds: error.retryAfterSeconds }
+          : {}),
         request_id: `req_${crypto.randomUUID()}`,
       }),
       known ? error.status : 500,

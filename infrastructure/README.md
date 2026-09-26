@@ -36,11 +36,27 @@ token with a narrower Workers Editor token and revoke the original token. Keep W
 for the zone if future deployments change custom-domain bindings. Never put a token value in this
 repository or a workflow log.
 
+Under **Settings → Secrets and variables → Actions → Variables**, configure these
+Repository variables before deploying:
+
+| Variable                           | Value                                             |
+| ---------------------------------- | ------------------------------------------------- |
+| `STAGING_CLERK_PUBLISHABLE_KEY`    | Publishable key for the staging Clerk instance    |
+| `PRODUCTION_CLERK_PUBLISHABLE_KEY` | Publishable key for the production Clerk instance |
+
+Each deployment job passes its own value as `VITE_CLERK_PUBLISHABLE_KEY` during
+the Vite build. Missing values stop the job before build, migrations or deployment.
+These are public frontend keys; never place a Clerk secret key in either variable.
+The selected key must match that environment's Worker Clerk configuration described
+in [browser-auth.md](browser-auth.md). The check job's build is not deployed and
+does not require Clerk keys. Ignored local `.env.local` files are not used by CI.
+
 `.github/workflows/deploy.yml` checks pull requests to `master`. A push to `master` runs the same
 checks and deploys staging on success. To deploy production, open **Actions → Check and deploy →
 Run workflow**, select `master`, and run it. The manual run checks the selected commit before
 deployment. The workflow uses Repository secrets and does not depend on GitHub Environments, which
-may be unavailable for a private repository on the current GitHub plan.
+may be unavailable for a private repository on the current GitHub plan. Clerk
+publishable keys use Repository variables as described above.
 
 The first deployment creates the Worker and attaches its custom domain. Cloudflare manages the DNS
 record and TLS certificate for the custom domain. Before the production run, confirm that
@@ -83,7 +99,7 @@ record acquires private properties. The private contributor key is used only for
 There is no account model, publication endpoint or new public profile source in this change.
 
 Runtime access uses `drizzle-orm/d1` on the primary binding. Detail, observed options, exact
-Position, counts, item pages and navigation-token reads/writes use the typed query builder and
+Position, counts, item pages and navigation snapshot reads use the typed query builder and
 columns from `schema.ts`. Filter predicates explicitly map each contract field to its column;
 row types come from the schema. Grouped search remains one statement built with Drizzle CTEs,
 with narrow parameterized `sql` expressions for window functions and ordered JSON preview
@@ -102,13 +118,20 @@ No FPS aggregate is stored or computed.
 
 ### Navigation lifetime and removal policy
 
-- A new dataset snapshot fixes an ingestion watermark, a dataset revision and an absolute expiry
-  **30 minutes** later. Fresh searches reuse that snapshot while the dataset is unchanged and the
-  snapshot is live; they do not extend its lifetime. Later inserts are excluded even if their capture/publication dates are old.
-- Opaque cursor/group tokens are persisted in D1. Cursors are random; group keys are hashes of
-  their bound navigation state, stable on replay of the same snapshot for browser Back/reload. They survive Worker restarts and
-  deployments. Cursors bind normalized filters, sort, view, group key and page limit. Group keys
-  bind filters/sort and the hardware tuple; item limits may differ from the groups page limit.
+- A new search snapshot fixes an ingestion watermark, dataset revision and absolute expiry
+  **30 minutes** later. Continuing a cursor or passing a group token as `snapshot` reuses
+  that exact snapshot without extending its lifetime. The browser sends its expanded group
+  as `snapshot` when reloading the group list. Later inserts are excluded even if dated earlier.
+- Versioned cursor/group tokens carry their state in the client URL and use HMAC-SHA-256.
+  There is no navigation registry, persistence or expiry cleanup. Tokens bind normalized
+  filters/sort; cursors additionally bind view, group key and limit. Group tokens contain the
+  hardware tuple. Their values are deterministic for the same snapshot and binding.
+- Configure `BENCHMARK_CURSOR_SECRET` in local `.dev.vars` and as a Worker secret separately
+  for staging and production. Generate it with a cryptographically secure random generator
+  (at least 32 random bytes). Keep it stable across restarts/deployments; rotation invalidates
+  existing links. It must never be a Vite variable or reuse a Clerk secret.
+  Migration `0004_stateless-navigation.sql` removes the obsolete token table. Previously
+  issued database tokens return a stale-link error; start from page one.
 - Continuation uses the last returned run's `(captured_day, published_at, public_id)` key, never
   an offset. Groups use their first matching run's total order; the unique public ID resolves ties.
 - Every UPDATE or DELETE of a run increments the global revision through database triggers.
@@ -123,9 +146,8 @@ No FPS aggregate is stored or computed.
 - Changed cursor bindings/malformed cursors return `400 invalid_cursor`. Expired, removed or
   unavailable cursor snapshots return `409 cursor_stale`; group equivalents return
   `409 group_key_stale`. Restart from page one. Expiry never slides on continuation.
-- Expired token rows are removed in indexed batches of up to 500 on fresh searches. A quiet
-  database may retain expired rows, but they are unusable. Tokens contain navigation state only,
-  never stored run sets, account IDs or contributor keys. API responses remain `no-store`.
+- Tokens are signed, not encrypted: they contain only navigation state, never stored run sets,
+  account IDs, provider identities or contributor keys. API responses remain `no-store`.
 
 See [Cloudflare primary/replica semantics](https://developers.cloudflare.com/d1/best-practices/read-replication/)
 and [Wrangler migration support](https://developers.cloudflare.com/d1/reference/migrations/).
@@ -136,12 +158,12 @@ and [Wrangler migration support](https://developers.cloudflare.com/d1/reference/
 | ------------------------------- | -------------------------------------------------------------------------------- |
 | `npm run db:migrate:local`      | Apply migrations to the local Wrangler database                                  |
 | `npm run db:seed:local`         | Apply local migrations, then idempotently insert fictional fixtures              |
-| `npm run db:reset:local`        | Clear local Benchmark runs and tokens; keep schema and migration history         |
+| `npm run db:reset:local`        | Clear local Benchmark submissions and runs; keep schema and migration history    |
 | `npm run db:prepare:staging`    | Explicit remote staging migrations → seed; requires credentials on that executor |
 | `npm run db:migrate:production` | Explicit production schema migration only; never seed                            |
 
 Normal `npm run dev` preserves whatever local data is present and never seeds automatically.
-`db:reset:local` deletes local Benchmark runs and navigation tokens, including manually added
+`db:reset:local` deletes local Benchmark submissions and runs, including manually added
 local runs. It keeps tables, migration history and the ingestion sequence. Stop the local API
 before resetting; run `db:seed:local` afterwards to restore fictional scenarios. The reset
 command has no remote target and never accesses staging or production.

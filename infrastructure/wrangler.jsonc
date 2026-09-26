@@ -17,9 +17,19 @@
       "migrations_dir": "migrations",
     },
   ],
+  "ratelimits": [
+    { "name": "AUTH_RATE_LIMIT", "namespace_id": "1001", "simple": { "limit": 30, "period": 60 } },
+  ],
   "env": {
     "staging": {
       "name": "timmy-academy-staging",
+      "ratelimits": [
+        {
+          "name": "AUTH_RATE_LIMIT",
+          "namespace_id": "1002",
+          "simple": { "limit": 30, "period": 60 },
+        },
+      ],
       "d1_databases": [
         {
           "binding": "BENCHMARK_DB",
@@ -33,6 +43,13 @@
     },
     "production": {
       "name": "timmy-academy-production",
+      "ratelimits": [
+        {
+          "name": "AUTH_RATE_LIMIT",
+          "namespace_id": "1003",
+          "simple": { "limit": 30, "period": 60 },
+        },
+      ],
       "d1_databases": [
         {
           "binding": "BENCHMARK_DB",

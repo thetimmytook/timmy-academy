@@ -10,6 +10,20 @@ Timmy Academy is currently in the design stage. The Windows Benchmark applicatio
 - Keep deployment and environment configuration separate under `infrastructure/` when implementation begins. Use distinct test/staging and production environments.
 - Respect the privacy boundary in `design/benchmark-backend-draft.md`: public benchmark records use an explicit allowlist, and raw captures or private identifiers are never published.
 
+## Implementation and review approach
+
+- Name boolean-returning predicates with an `is` or `are` prefix, as grammatically appropriate (for example, `isConsistentCapture`), so their return type is clear at call sites.
+
+- When the user says to discuss, agree, or record a decision without implementing it, do not edit application code or tests. Record the decision and wait for an explicit instruction to implement it.
+- Implement only the agreed current step. Do not add behavior for future workflows or tests that manually simulate those workflows before they are implemented. Keep existing data safe without implementing speculative lifecycle branches.
+- Keep fixture data separate from production rules. Do not use hardcoded test models or preserve demo IDs as exceptions in production normalization.
+- Use Drizzle for repository queries and D1 batch transactions, following existing repository patterns. Use small parameterized `sql` fragments where the query builder needs them; do not default to handwritten `.prepare().bind()` queries in application repositories.
+- Do not add production constructor parameters or abstractions solely to support tests. Use `Date.now()` directly for cursor expiry and `vi.spyOn(Date, 'now')` with cleanup in tests.
+- Validate untrusted input at its boundary. Avoid redundant guards for internal values already guaranteed by the authenticated principal, types, or database constraints. Keep required parameters required.
+- Choose consistency guarantees according to the product need. Owner pagination is a live keyset list without a watermark; do not reintroduce snapshot machinery for new inserts without an agreed requirement.
+- Keep runtime configuration centralized and simple. Do not add regex/schema validation for our own configuration without a concrete need; retain required-setting checks.
+- Use explicit Hono route modules and grouped routers with shared middleware. Do not introduce folder-based routing or other infrastructure before it has a real need. Name modules for their current responsibility, such as `benchmark-cursor`.
+
 ## API file naming
 
 - Put HTTP route registrations and request/response validation in `apps/api/src/<feature>/<feature>.api.ts` (for example, `benchmark/benchmark.api.ts`). Use the `.api.ts` suffix consistently, including when a feature is split into smaller route modules; do not introduce a competing `.endpoint.ts` convention.

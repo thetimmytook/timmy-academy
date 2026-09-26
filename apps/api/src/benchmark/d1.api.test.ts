@@ -11,14 +11,16 @@ import {
 import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { TOKEN_LIFETIME_MS } from '../config';
 import { runs } from '../db/schema';
 import { createApp } from '../index';
 
-import { TOKEN_LIFETIME_MS } from './d1-navigation';
 import { predicate } from './d1-query';
 import { D1BenchmarkRepository } from './d1-repository';
+import { syntheticHardware } from './fixtures';
+import { normalizeHardware } from './hardware-normalization';
 import { InMemoryBenchmarkRepository } from './in-memory-repository';
 import { seedRows, seedStatements } from './seed';
 
@@ -26,13 +28,18 @@ import type { StoredRun } from './stored-run';
 import type { GroupSearchResponse, GroupRunsResponse, CohortResponse } from '@timmy/contracts';
 import type { Hono } from 'hono';
 
+const fixtureCpuId = syntheticHardware[0]!.cpu.id;
+const fixtureGpuId = syntheticHardware[0]!.gpu.id;
+const otherCpuId = syntheticHardware[2]!.cpu.id;
+const otherGpuId = syntheticHardware[2]!.gpu.id;
+const signingSecret = 'test-signing-secret';
 const base = '/api/bench/v1';
 const firstSeedRunPath = '/runs/br_test_01';
 const filterOptionsPath = '/filter-options';
 let mf: Miniflare;
 let db: D1Database;
 let now = 1000000;
-const app = (): Hono => createApp(new D1BenchmarkRepository(db, () => now));
+const app = (): Hono => createApp(new D1BenchmarkRepository(db, signingSecret));
 const request = (path: string): Response | Promise<Response> => app().request(base + path);
 
 const groups = async (query = ''): Promise<GroupSearchResponse> => {
@@ -113,16 +120,43 @@ beforeAll(async () => {
 afterAll(async () => {
   await mf?.dispose();
 });
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 beforeEach(async () => {
+  vi.spyOn(Date, 'now').mockImplementation(() => now);
   now = 1000000;
-  await db.batch([
-    db.prepare('DELETE FROM benchmark_runs'),
-    db.prepare('DELETE FROM benchmark_tokens'),
-  ]);
+  await db.batch([db.prepare('DELETE FROM benchmark_runs')]);
   await seed();
 });
 
 describe('real local D1 public HTTP integration', { timeout: 30000 }, () => {
+  it('resumes the client snapshot after reload and new publications without a token table', async () => {
+    const first = await groups('limit=1');
+    const key = first.groups[0]!.group_key;
+    now += 1000;
+    await insert(seedRows()[0]!, 'br_after_snapshot');
+    const resumed = await groups(`limit=1&snapshot=${key}`);
+    expect(resumed).toEqual(first);
+    expect((await groups('limit=1')).summary.run_count).toBe(25);
+    expect((await request(`/runs?map=woods&snapshot=${key}`)).status).toBe(409);
+    const tables = await db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'benchmark_tokens'")
+      .all();
+    expect(tables.results).toEqual([]);
+  });
+
+  it('rejects a tampered client cursor and cannot issue one without the signing secret', async () => {
+    const first = await groups('limit=1');
+    const cursor = first.next_cursor!;
+    const forged = cursor.slice(0, 20) + (cursor[20] === 'A' ? 'B' : 'A') + cursor.slice(21);
+    expect((await request(`/runs?limit=1&cursor=${forged}`)).status).toBe(400);
+    const response = await createApp().request(`${base}/runs`, {}, { BENCHMARK_DB: db });
+    expect(response.status).toBe(500);
+    expect(await response.text()).not.toContain(signingSecret);
+  });
+
   it('matches fixture search semantics, filters, ordering, counts and previews', async () => {
     const memory = new InMemoryBenchmarkRepository(
       seedRows().filter(row => row.visibility === 'published'),
@@ -131,8 +165,8 @@ describe('real local D1 public HTTP integration', { timeout: 30000 }, () => {
     for (const raw of [
       {},
       { sort: 'captured_asc' },
-      { cpu: 'ryzen-7-7800x3d' },
-      { gpu: 'geforce-rtx-3060-ti', ram_gb: '16' },
+      { cpu: fixtureCpuId },
+      { gpu: otherGpuId, ram_gb: '16' },
       { map: 'woods' },
       { execution: 'local' },
       { game_width: '1920', game_height: '1080' },
@@ -248,10 +282,10 @@ describe('real local D1 public HTTP integration', { timeout: 30000 }, () => {
       expect((await groups()).summary.run_count).toBe(23);
       expect((await position()).runs.map(run => run.public_run_id)).toEqual(['br_test_05']);
       await db
-        .prepare("UPDATE benchmark_runs SET visibility = 'hidden' WHERE cpu = 'core-i5-12400f'")
+        .prepare(`UPDATE benchmark_runs SET visibility = 'hidden' WHERE cpu = '${otherCpuId}'`)
         .run();
       const options = filterOptionsSchema.parse(await (await request(filterOptionsPath)).json());
-      expect(options.cpus.map(cpu => cpu.id)).not.toContain('core-i5-12400f');
+      expect(options.cpus.map(cpu => cpu.id)).not.toContain(otherCpuId);
       expect(options.ram_gb).toEqual([32, 64]);
     },
   );
@@ -288,6 +322,24 @@ describe('real local D1 public HTTP integration', { timeout: 30000 }, () => {
       expect((await request(`/runs/${id}`)).status).toBe(404);
     }
   });
+  it('compares unfamiliar hardware using the same IDs as submission normalization', async () => {
+    const input = { cpu_name: 'New CPU 123', gpu_name: 'New GPU 456 Laptop', ram_gb: 32 };
+    expect((await position({ ...exact, hardware: input })).status).toBe('no_data');
+    const source = seedRows()[0]!;
+    await insert(
+      { ...source, detail: { ...source.detail, hardware: await normalizeHardware(input) } },
+      'br_new_hardware',
+    );
+    const result = await position({
+      ...exact,
+      hardware: { ...input, cpu_name: ' NEW  cpu 123 ', gpu_name: 'new gpu 456 LAPTOP' },
+    });
+    expect(result.status).toBe('matches');
+    expect(result.runs.map(run => run.public_run_id)).toEqual(['br_new_hardware']);
+    expect(
+      (await position({ ...exact, hardware: { ...input, gpu_name: 'New GPU 456' } })).status,
+    ).toBe('no_data');
+  });
   it('bounds Position examples without averaging and counts distinct contributors', async () => {
     for (let index = 0; index < 22; index++) {
       await insert(seedRows()[0]!, `br_test_extra_${index}`);
@@ -310,6 +362,29 @@ describe('real local D1 public HTTP integration', { timeout: 30000 }, () => {
     expect((await request('/runs/br_unrelated')).status).toBe(200);
     expect((await request(firstSeedRunPath)).status).toBe(404);
     await groups(`limit=1&cursor=${first.next_cursor}`);
+  });
+  it('uses each row synthetic flag in mixed previews, items, details and Position', async () => {
+    const source = seedRows()[0]!;
+    await insert(
+      { ...source, detail: { ...source.detail, captured_day: '2026-09-26' } },
+      'br_real',
+    );
+
+    // The inserted document says synthetic, but the database default is real.
+    const result = await groups('ram_gb=32');
+    const previews = result.groups[0]!.preview_runs;
+    expect(previews.find(run => run.public_run_id === 'br_real')?.is_synthetic).toBe(false);
+    expect(previews.some(run => run.is_synthetic)).toBe(true);
+    const page = await items(result.groups[0]!.group_key, '&ram_gb=32');
+    expect(page.items.find(run => run.public_run_id === 'br_real')?.is_synthetic).toBe(false);
+    expect(
+      page.items.filter(run => run.public_run_id !== 'br_real').every(run => run.is_synthetic),
+    ).toBe(true);
+    expect(await (await request('/runs/br_real')).json()).toMatchObject({ is_synthetic: false });
+    expect(await (await request(firstSeedRunPath)).json()).toMatchObject({ is_synthetic: true });
+    const cohort = await position();
+    expect(cohort.runs.find(run => run.public_run_id === 'br_real')?.is_synthetic).toBe(false);
+    expect(cohort.runs.some(run => run.is_synthetic)).toBe(true);
   });
   it('uses explicit projections even when stored documents contain future private fields', async () => {
     await db
@@ -357,8 +432,8 @@ describe('real local D1 public HTTP integration', { timeout: 30000 }, () => {
       .where(
         predicate(
           {
-            cpu: 'ryzen-7-7800x3d',
-            gpu: 'geforce-rtx-4070-super',
+            cpu: fixtureCpuId,
+            gpu: fixtureGpuId,
             ram_gb: 32,
             map: 'lighthouse',
             execution: 'bsg_servers',
@@ -400,7 +475,7 @@ describe('real local D1 public HTTP integration', { timeout: 30000 }, () => {
     const memory = new InMemoryBenchmarkRepository(
       seedRows().filter(row => row.visibility === 'published'),
     );
-    expect(await new D1BenchmarkRepository(db).filterOptions()).toEqual(
+    expect(await new D1BenchmarkRepository(db, signingSecret).filterOptions()).toEqual(
       await memory.filterOptions(),
     );
     await db
@@ -410,14 +485,18 @@ describe('real local D1 public HTTP integration', { timeout: 30000 }, () => {
       '$.conditions.game_resolution.height', 888) WHERE visibility <> 'published'`,
       )
       .run();
-    const options = await new D1BenchmarkRepository(db).filterOptions();
+    const options = await new D1BenchmarkRepository(db, signingSecret).filterOptions();
     expect(options.game_versions).not.toContain('hidden-only');
     expect(options.game_resolutions).not.toContainEqual({ width: 999, height: 888 });
   });
   it('serves empty production data and fails closed without the D1 binding', async () => {
     await db.prepare('DELETE FROM benchmark_runs').run();
     const live = createApp();
-    const response = await live.request(`${base}/runs`, {}, { BENCHMARK_DB: db });
+    const response = await live.request(
+      `${base}/runs`,
+      {},
+      { BENCHMARK_DB: db, BENCHMARK_CURSOR_SECRET: signingSecret },
+    );
     expect(groupSearchResponseSchema.parse(await response.json()).summary.run_count).toBe(0);
     expect((await groups('map=woods')).groups).toEqual([]);
     expect((await position()).status).toBe('no_data');
@@ -426,9 +505,23 @@ describe('real local D1 public HTTP integration', { timeout: 30000 }, () => {
     );
     expect((await live.request(`${base}/runs`)).status).toBe(500);
     await db.prepare('DROP TABLE benchmark_runs').run();
-    expect((await live.request(`${base}/runs`, {}, { BENCHMARK_DB: db })).status).toBe(500);
-    expect((await live.request(`${base}/filter-options`, {}, { BENCHMARK_DB: db })).status).toBe(
-      500,
-    );
+    expect(
+      (
+        await live.request(
+          `${base}/runs`,
+          {},
+          { BENCHMARK_DB: db, BENCHMARK_CURSOR_SECRET: signingSecret },
+        )
+      ).status,
+    ).toBe(500);
+    expect(
+      (
+        await live.request(
+          `${base}/filter-options`,
+          {},
+          { BENCHMARK_DB: db, BENCHMARK_CURSOR_SECRET: signingSecret },
+        )
+      ).status,
+    ).toBe(500);
   });
 });

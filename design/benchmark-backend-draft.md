@@ -307,6 +307,16 @@ Content-Type: application/json
 
 A retry with the same account, `client_run_id` and identical validated payload returns the existing result (`200` if published; `202` if pending) without creating another run. The same key with changed payload returns `409 idempotency_conflict`; a new client ID with an already accepted run fingerprint returns `409 duplicate_run`. Retrying a deleted publication returns `409 publication_deleted`, never republishes it. Invalid captures return `422 invalid_input`; an uncertain network response is recovered using the same client ID or the owner lookup below. Published measurements are immutable.
 
+Duplicate detection is per account and compares the canonical normalized measurement
+already stored for pending, published or rejected submissions. Publication identifiers
+and the synthetic marker are excluded; hardware uses normalized model IDs rather
+than display names. Client IDs and app versions are not part of
+the normalized measurement. The comparison and inserts share one D1 transaction.
+The full request fingerprint remains separate for exact idempotent retries. Deletion
+removes the measurement and its request fingerprint; its existing client-ID tombstone
+still prevents retrying that deleted publication. No new fingerprint is retained to
+link a deleted measurement to the anonymous archive.
+
 ### `GET /me/runs` and `GET /me/runs/by-client-id/{clientRunId}` — owner reads
 
 Both require verified account ownership. `GET /me/runs` accepts `status=all|published|pending_review|rejected` (default `all`), `limit` (default 20, maximum 50) and opaque `cursor`; it orders by server `submitted_at` descending with a stable private tie-breaker. It lists server submissions, not the Windows app's complete local history. Deleted publications are excluded. Its cursor binds status, limit and a stable result snapshot; changed parameters return `400 invalid_cursor`, and a no-longer-safe snapshot returns `409 cursor_stale`.
@@ -343,7 +353,7 @@ Example deleted acknowledgement recovery:
 
 ### `DELETE /me/runs/{publicRunId}` — remove publication
 
-Only the verified owner may remove a `published` run. A successful `200` response is returned after it has disappeared from search, detail, Position and public caches; local Windows history is unchanged. The retained internal measurement is anonymized under the policy below or discarded if that cannot be done safely. An owner retry returns the same deletion acknowledgement without recreating the run.
+Only the verified owner may remove a `published` run. A successful `200` response is returned after it has disappeared from search, detail, Position and public caches; local Windows history is unchanged. The measurement is retained only in the closed archive described below, with dates, source IDs and user links removed. An owner retry returns the same deletion acknowledgement without recreating the run.
 
 ```http
 DELETE /api/bench/v1/me/runs/br_8N4qP2vK
@@ -388,6 +398,7 @@ Use `400 invalid_cursor`, `409 cursor_stale` or `409 group_key_stale` for paging
 - Enforce uniqueness of `(account, client_run_id)` and compare a request fingerprint, without choosing the physical database design yet. Same key and same payload returns the original accepted or pending result; same key and different payload returns `409 idempotency_conflict`. A second distinct client ID with the same run fingerprint can return `409 duplicate_run`. An accepted response includes `public_run_id`, canonical URL and `publication_status: published`. A quarantined result returns `202` with `publication_status: pending_review`; the desktop app must not call that published.
 - Standard JSON error shape: `code`, `message`, `request_id`, optional `field_errors` and `retry_after_seconds`. Use the exact status/code matrix above: `415 unsupported_media_type` and `413 payload_too_large` for Position transport, `422 invalid_input` for malformed field values, `400 invalid_cursor` for mismatched cursors, `409 cursor_stale`/`group_key_stale` for expired search snapshots, `401 authentication_required`, `403 email_verification_required`/`not_owner`, `409 duplicate_run`/`idempotency_conflict`/`publication_deleted`, and `429 rate_limited`. Position `no_data`/`missing_conditions` are successful `200` responses. The desktop handles network failure separately and retries with the same client run ID.
 - Use approximate endpoint protection at the Worker edge, auth challenge throttling, and an exact per-account submission quota in authoritative server state. A nickname cannot be a limit key. Moderation changes visibility, not ownership. Turnstile can be added after abuse evidence.
+- Current limits: 30 protected API authentication attempts per 60 seconds per connecting IP through Cloudflare (approximate, per location), and 50 accepted submissions per account over the rolling last 24 hours, checked atomically in D1. Deleted and rejected submissions still count; retries and rejected requests do not consume another slot. Both limits return `429 rate_limited` with `Retry-After` and `retry_after_seconds`.
 
 ## Data separation and exceptional removal
 
@@ -395,7 +406,7 @@ Keep email, sessions and ownership metadata private and separate from the public
 
 Ordinary product flow does not edit published measurements. The authenticated owner can delete an individual publication in `My Bench`; ownership is checked against the private account ID, never a nickname. A successful deletion removes the run from anonymous search, cohorts, detail responses and caches; public detail then returns 404. The local capture in the Benchmark app is unaffected. Submission retries with the same `(account, client_run_id)` must not recreate a deleted publication; define the minimal private deletion marker and its retention before launch. This marker must not point to the retained measurement. The exact API response and behavior for pending-review submissions remain to be specified.
 
-After deletion, retain a measurement in a separate internal pool for the Tarkov skill's benchmark analysis only after anonymization. Remove the owner/account link, public and client run IDs, public author name/avatar and any other direct or reasonably linkable identifiers. The source records contain no hardware machine ID, but still assess whether a rare combination of hardware, settings, context, metrics and captured day could reconnect the measurement to a prior public page or contributor. Merely clearing `account_id` is insufficient. Generalize or remove fields as needed; if the measurement cannot be made anonymous with reasonable confidence, discard it instead. The retained pool does not restore the deleted publication or supply individual public run examples. State this purpose and deletion behavior clearly before publication; update the privacy policy before launch. The retention period and desired quantity of anonymous measurements remain to be set later.
+Agreed on 2026-09-26: after deletion, keep individual measurements in a closed internal archive for later Tarkov skill analysis. Retain hardware, conditions, capture duration/sample count, metrics and selected settings. Remove captured/submitted/published dates, owner/account/contributor identifiers, public and client run IDs, public author name/avatar, request fingerprints and other source metadata. Give each archive record a new independent random ID; keep no mapping from the original run, submission or deletion marker to that record. The archive is not queried by public search, detail or Position, and does not restore a deleted publication. Keep the minimum owner/client/public-ID deletion acknowledgement separately for retry handling, without any archive link or measurement payload. The archive's retention period and future analysis remain to be agreed; this step does not introduce an expiry job or a public archive endpoint. Describe this storage behavior before publication and in the privacy policy before launch.
 
 This control does not replace other data-subject rights: before launch, choose and document a lawful basis for public publication, provide an accessible process for withdrawal/erasure or objection as applicable, and handle valid requests without undue delay. Do not impose a blanket one-year wait before requests can be made. If publication relies on GDPR consent, withdrawal must be possible at any time and as easily as consent was given. A private account link to a public run means that simply hiding the email or using an opaque run ID does not make the stored record anonymous. Moderation must also be able to quarantine or remove fraudulent, erroneous or privacy-sensitive material. Finalize account-deletion behavior and operational retention before launch and update `PRIVACY.md`. Keep auth and submission logs minimal and time-limited.
 
@@ -416,9 +427,19 @@ Test public allowlists by snapshotting search, detail, Position and error respon
 
 The public read implementation now uses persistent D1 with Drizzle schema and generated Wrangler
 migrations. Navigation snapshots have a fixed 30-minute lifetime, exclude later ingestion sequences,
-and conservatively become stale after any run UPDATE or DELETE. Opaque server-stored tokens bind
+and conservatively become stale after any run UPDATE or DELETE. Client-held signed tokens bind
 filters/sort/view/group/page limit and use keyset continuation. Reads go to primary D1; removed runs
 are never read from historic documents. Production has no fixture fallback or seed. See
 [infrastructure/README.md](../infrastructure/README.md#d1-persistence-and-migrations) for the precise
 expiry/removal rules, schema organization, query costs, safe deployment order and staging cases.
 This resolves navigation expiry in open question 4; publication/auth/ownership remain out of scope.
+
+
+### Client-held navigation implementation
+
+Public D1 search uses versioned HMAC-signed cursors/group tokens carried by the client.
+The API stores no navigation tokens. A groups request may send a previously issued group
+token as `snapshot` to preserve expansion across Back/reload. Its filters/sort and snapshot
+are validated; supplying conflicting cursor/group snapshots is rejected. The fixed 30-minute
+expiry and dataset-revision invalidation still apply. The server signing secret is configured
+per environment. Old database-backed links expire when the token table is removed.

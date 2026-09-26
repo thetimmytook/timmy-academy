@@ -1,51 +1,43 @@
 import { useEffect } from 'react';
+import { Navigate, Route, Routes, useLocation, useMatch } from 'react-router';
 
 import { css } from '../styled-system/css';
 
+import { SessionControls } from './auth/SessionControls';
 import { lastBrowse } from './bench/navigation';
 import { Button } from './elements/Button';
+import AdminPage from './pages/AdminPage';
 import BenchPage from './pages/BenchPage';
+import MyBenchPage from './pages/MyBenchPage';
 import NotFoundPage from './pages/NotFoundPage';
 import RunPage from './pages/RunPage';
-import { navigate, useUrl } from './routing';
+import SignInPage from './pages/SignInPage';
+import SignUpPage from './pages/SignUpPage';
 
-import type { JSX } from 'react';
+import type { JSX, ReactNode } from 'react';
 
-export default function App(): JSX.Element | null {
-  const url = useUrl();
-  const path = url.split('?')[0] ?? '/';
-  const browse = path === '/bench/' || path === '/bench';
-  const search = new URL(url, window.location.origin).search;
+function PageTitle({
+  title,
+  children,
+}: Readonly<{ title: string; children: ReactNode }>): JSX.Element {
+  useEffect(() => {
+    document.title = title + ' · Timmy Academy';
+  }, [title]);
+
+  return <>{children}</>;
+}
+
+export default function App(): JSX.Element {
+  const { pathname, search } = useLocation();
+  const browse = useMatch('/bench');
+  const detail = useMatch('/bench/runs/:id');
+  const id = detail?.params.id;
+  const validRun = id !== undefined && /^br_[A-Za-z0-9_-]+$/.test(id);
   const back = browse ? '/bench/' + search : lastBrowse();
-  const detail = /^\/bench\/runs\/(br_[A-Za-z0-9_-]+)\/?$/.exec(path);
-  let content = <NotFoundPage back={back} />;
-  let title = 'Page not found · Timmy Academy';
 
-  if (browse) {
-    content = <BenchPage url={back} />;
-    title = 'Benchmark · Timmy Academy';
-  } else if (detail?.[1]) {
-    content = <RunPage id={detail[1]} back={back} />;
-    title = 'Public run · Timmy Academy';
-  }
-
-  useEffect(() => {
-    if (path === '/') {
-      navigate('/bench/' + search, { replace: true });
-    }
-  }, [path, search]);
-  useEffect(() => {
-    if (path !== '/') {
-      document.title = title;
-    }
-  }, [path, title]);
   useEffect(() => {
     document.getElementById('main')?.focus();
-  }, [path]);
-
-  if (path === '/') {
-    return null;
-  }
+  }, [pathname]);
 
   return (
     <>
@@ -89,16 +81,7 @@ export default function App(): JSX.Element | null {
               BENCH
             </Button>
           </nav>
-          <span
-            aria-label="Profile unavailable"
-            title="Profiles are not available yet"
-            className={css({ ml: 'auto', color: 'fg.muted' })}
-          >
-            <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-              <circle cx="12" cy="7" r="4" />
-              <path d="M4 22v-4a8 8 0 0 1 16 0v4z" />
-            </svg>
-          </span>
+          <SessionControls key={pathname} />
         </div>
       </header>
       <main
@@ -111,7 +94,71 @@ export default function App(): JSX.Element | null {
           py: { base: '6', tablet: '10' },
         })}
       >
-        {content}
+        <Routes>
+          <Route
+            path="/admin"
+            element={
+              <PageTitle title="Admin">
+                <AdminPage />
+              </PageTitle>
+            }
+          />
+          <Route
+            path="/bench/me"
+            element={
+              <PageTitle title="My Bench">
+                <MyBenchPage />
+              </PageTitle>
+            }
+          />
+          <Route path="/" element={<Navigate to={'/bench/' + search} replace />} />
+          <Route
+            path="/bench"
+            element={
+              <PageTitle title="Benchmark">
+                <BenchPage url={back} />
+              </PageTitle>
+            }
+          />
+          <Route
+            path="/bench/runs/:id"
+            element={
+              validRun ? (
+                <PageTitle title="Public run">
+                  <RunPage id={id} back={back} />
+                </PageTitle>
+              ) : (
+                <PageTitle title="Page not found">
+                  <NotFoundPage back={back} />
+                </PageTitle>
+              )
+            }
+          />
+          <Route
+            path="/sign-in/*"
+            element={
+              <PageTitle title="Sign in">
+                <SignInPage />
+              </PageTitle>
+            }
+          />
+          <Route
+            path="/sign-up/*"
+            element={
+              <PageTitle title="Create account">
+                <SignUpPage />
+              </PageTitle>
+            }
+          />
+          <Route
+            path="*"
+            element={
+              <PageTitle title="Page not found">
+                <NotFoundPage back={back} />
+              </PageTitle>
+            }
+          />
+        </Routes>
       </main>
     </>
   );
