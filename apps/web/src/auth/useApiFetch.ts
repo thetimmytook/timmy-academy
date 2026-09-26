@@ -14,7 +14,12 @@ export function useApiFetch(): (url: string, init?: RequestInit) => Promise<Resp
 
       if (response.status === 401 && !init?.signal?.aborted) {
         // Clear Clerk's stale local session so sign-in displays the login form.
-        await signOut();
+        try {
+          await signOut();
+        } catch {
+          // Clerk may be unavailable; cleanup must not prevent reaching sign-in.
+        }
+
         await navigate(
           '/sign-in?' + new URLSearchParams({ returnTo: pathname + search + hash }).toString(),
           {

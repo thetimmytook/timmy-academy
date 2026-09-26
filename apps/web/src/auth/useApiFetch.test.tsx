@@ -82,3 +82,20 @@ it.each([200, 403, 500])('does not sign out or redirect on HTTP %s', async statu
   expect(signOut).not.toHaveBeenCalled();
   expect(screen.getByText('Refresh')).toBeTruthy();
 });
+
+it('redirects to sign-in even when session cleanup fails', async () => {
+  signOut.mockRejectedValueOnce(new Error('Clerk unavailable'));
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 401 })));
+  const path = '/bench/me?status=rejected#runs';
+  render(
+    <MemoryRouter initialEntries={[path]}>
+      <Routes>
+        <Route path="/sign-in" element={<SignIn />} />
+        <Route path="*" element={<Page />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+  fireEvent.click(screen.getByText('Refresh'));
+  await screen.findByText('Return to: ' + path);
+  expect(signOut).toHaveBeenCalledOnce();
+});
