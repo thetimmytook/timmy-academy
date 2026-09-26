@@ -68,6 +68,7 @@ describe('private D1 account repository', () => {
           {
             ...identity,
             emailVerified: true,
+            canModerate: false,
             session: { kind, expiresAt: now + 60_000 },
           },
           repository(),
@@ -80,6 +81,7 @@ describe('private D1 account repository', () => {
       ['browser', 'desktop'].map(kind => ({
         accountId,
         emailVerified: true,
+        canModerate: false,
         session: { kind, expiresAt: now + 60_000 },
       })),
     );

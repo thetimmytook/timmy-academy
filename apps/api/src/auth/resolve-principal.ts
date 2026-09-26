@@ -8,6 +8,7 @@ import type { D1AccountRepository, VerifiedIdentity } from './d1-account-reposit
 /** Only trusted verifier output, after credential, issuer, audience and revocation checks. */
 export interface VerifiedSessionIdentity extends VerifiedIdentity {
   emailVerified: boolean;
+  canModerate?: boolean;
   session: ApplicationPrincipal['session'];
 }
 
@@ -15,6 +16,7 @@ const verifiedSessionSchema = z.object({
   issuer: z.string().min(1),
   subject: z.string().min(1),
   emailVerified: z.literal(true),
+  canModerate: z.boolean().default(false),
   session: z.object({
     kind: z.enum(['browser', 'desktop']),
 
@@ -36,7 +38,7 @@ export async function resolveApplicationPrincipal(
     throw new AuthenticationDenied();
   }
 
-  const { issuer, subject, session } = result.data;
+  const { issuer, subject, session, canModerate } = result.data;
   const accountId = await accounts.findOrCreateAccount({ issuer, subject });
 
   // A valid identity mapping may persist, but an expired session gets no principal.
@@ -44,5 +46,5 @@ export async function resolveApplicationPrincipal(
     throw new AuthenticationDenied();
   }
 
-  return { accountId, emailVerified: true, session };
+  return { accountId, emailVerified: true, canModerate, session };
 }

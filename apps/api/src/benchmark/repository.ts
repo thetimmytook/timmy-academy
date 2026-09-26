@@ -15,6 +15,7 @@ export interface BenchmarkRepository {
 }
 
 const errors = {
+  forbidden: { status: 403, message: 'Moderator access is required.' },
   not_owner: { status: 403, message: 'This publication belongs to another account.' },
   publication_deleted: {
     status: 409,

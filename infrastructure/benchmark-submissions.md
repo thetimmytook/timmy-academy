@@ -277,6 +277,8 @@ Admin remains the last feature step: a role-protected `/admin` page, an Admin
 entry in the profile menu for moderators, and a left menu with Approvals selected
 by default. Role assignment stays in Clerk Dashboard. Archive retention remains
 an open product decision.
+The protected pending queue and Clerk role mapping are implemented as described in
+[admin.md](admin.md); the admin page and decision endpoints follow separately.
 
 ## Atomic owner deletion
 

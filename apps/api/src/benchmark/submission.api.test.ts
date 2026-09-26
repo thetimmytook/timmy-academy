@@ -110,6 +110,7 @@ beforeEach(async () => {
   authenticate.mockReset().mockResolvedValue({
     accountId: owner,
     emailVerified: true,
+    canModerate: false,
     session: { kind: 'browser', expiresAt: Date.now() + 60000 },
   });
   await db.batch([
@@ -208,6 +209,7 @@ describe('protected submission upload', () => {
     authenticate.mockResolvedValue({
       accountId: stranger,
       emailVerified: true,
+      canModerate: false,
       session: { kind: 'browser', expiresAt: Date.now() + 60000 },
     });
     expect((await request()).status).toBe(202);

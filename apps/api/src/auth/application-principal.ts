@@ -2,6 +2,7 @@
 export interface ApplicationPrincipal {
   accountId: string;
   emailVerified: true;
+  canModerate: boolean;
   session: { kind: 'browser' | 'desktop'; expiresAt: number };
 }
 

@@ -1,6 +1,7 @@
 import { benchmarkErrorSchema } from '@timmy/contracts';
 import { Hono } from 'hono';
 
+import { createAdminRouter } from './admin/admin.api';
 import { AuthenticationDenied } from './auth/application-principal';
 import { requestPrincipal } from './auth/request-principal';
 import { registerBenchmarkApi } from './benchmark/benchmark.api';
@@ -24,6 +25,7 @@ export function createApp(repository?: BenchmarkRepository): Hono {
   });
   app.use('/api/*', requestPrincipal());
   app.route('/api/bench/v1/me', createOwnerRunsRouter());
+  app.route('/api/admin/v1', createAdminRouter());
   registerBenchmarkApi(
     app,
     repository

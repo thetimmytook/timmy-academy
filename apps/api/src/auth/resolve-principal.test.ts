@@ -10,10 +10,29 @@ const proof: VerifiedSessionIdentity = {
   issuer: 'https://auth.example',
   subject: 'provider_user',
   emailVerified: true,
+  canModerate: false,
   session: { kind: 'browser', expiresAt: now + 60_000 },
 };
 
 describe('application principal resolution', () => {
+  it('defaults to no moderation permission and snapshots verified permissions', async () => {
+    const identity = { ...proof, canModerate: true };
+    const accounts = {
+      findOrCreateAccount: vi.fn(() => {
+        identity.canModerate = false;
+
+        return Promise.resolve('account_1');
+      }),
+    };
+    expect((await resolveApplicationPrincipal(identity, accounts, () => now)).canModerate).toBe(
+      true,
+    );
+    const withoutPermission = { ...proof };
+    delete withoutPermission.canModerate;
+    expect(
+      (await resolveApplicationPrincipal(withoutPermission, accounts, () => now)).canModerate,
+    ).toBe(false);
+  });
   it.each(['browser', 'desktop'] as const)(
     'projects only private application fields for %s',
     async kind => {
@@ -28,6 +47,7 @@ describe('application principal resolution', () => {
       expect(await resolveApplicationPrincipal(identity, accounts, () => now)).toEqual({
         accountId: 'account_1',
         emailVerified: true,
+        canModerate: false,
         session: { kind, expiresAt: proof.session.expiresAt },
       });
       expect(accounts.findOrCreateAccount).toHaveBeenCalledExactlyOnceWith({

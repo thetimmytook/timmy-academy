@@ -85,6 +85,32 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('Clerk browser session adapter with real JWT signatures', () => {
+  it.each(['admin', 'Admin', 'moderator', '', null, true, ['admin']])(
+    'maps only the exact server-managed admin role: %j',
+    async role => {
+      transport
+        .mockReset()
+        .mockResolvedValueOnce(Response.json(activeSession))
+        .mockResolvedValueOnce(Response.json({ ...verifiedUser, public_metadata: { role } }));
+      const principal = await createClerkBrowserAdapter(config, accounts).authenticate(request());
+      expect(principal.canModerate).toBe(role === 'admin');
+    },
+  );
+
+  it('ignores client-editable metadata and stale role claims, and rechecks role removal', async () => {
+    transport
+      .mockReset()
+      .mockResolvedValueOnce(Response.json(activeSession))
+      .mockResolvedValueOnce(Response.json({ ...verifiedUser, public_metadata: { role: 'admin' } }))
+      .mockResolvedValueOnce(Response.json(activeSession))
+      .mockResolvedValueOnce(
+        Response.json({ ...verifiedUser, public_metadata: {}, unsafe_metadata: { role: 'admin' } }),
+      );
+    const adapter = createClerkBrowserAdapter(config, accounts);
+    const jwt = token({ metadata: { role: 'admin' }, role: 'admin' });
+    expect((await adapter.authenticate(request(jwt))).canModerate).toBe(true);
+    expect((await adapter.authenticate(request(jwt))).canModerate).toBe(false);
+  });
   it('persists the same account across verified browser sign-ins through real D1', async () => {
     const mf = new Miniflare(
       convertV4MiniflareOptions({
@@ -145,6 +171,7 @@ describe('Clerk browser session adapter with real JWT signatures', () => {
       expect(principal).toEqual({
         accountId: 'account_persistent',
         emailVerified: true,
+        canModerate: false,
         session: { kind: 'browser', expiresAt: claims.exp * 1000 },
       });
       expect(accounts.findOrCreateAccount).toHaveBeenCalledExactlyOnceWith({

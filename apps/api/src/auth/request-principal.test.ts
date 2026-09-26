@@ -22,6 +22,7 @@ const config = {
 const principal: ApplicationPrincipal = {
   accountId: 'private_account',
   emailVerified: true,
+  canModerate: false,
   session: { kind: 'browser', expiresAt: Date.now() + 60_000 },
 };
 const privatePath = '/api/test-private';

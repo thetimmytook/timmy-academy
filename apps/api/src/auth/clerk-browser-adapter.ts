@@ -81,6 +81,7 @@ export function createClerkBrowserAdapter(
       issuer: config.issuer,
       subject: auth.userId,
       emailVerified: true,
+      canModerate: user.publicMetadata?.role === 'admin',
       session: {
         kind: 'browser',
         expiresAt: Math.min(auth.sessionClaims.exp * 1000, session.expireAt),

@@ -99,6 +99,7 @@ beforeEach(async () => {
   authenticate.mockReset().mockResolvedValue({
     accountId: owner,
     emailVerified: true,
+    canModerate: false,
     session: { kind: 'browser', expiresAt: Date.now() + 60000 },
   });
   await db.batch([
@@ -150,6 +151,7 @@ describe('owner publication deletion API', () => {
     authenticate.mockResolvedValue({
       accountId: stranger,
       emailVerified: true,
+      canModerate: false,
       session: { kind: 'browser', expiresAt: Date.now() + 60000 },
     });
     const response = await remove(id);

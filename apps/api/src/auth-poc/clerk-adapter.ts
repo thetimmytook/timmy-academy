@@ -127,6 +127,7 @@ export function createClerkTestAdapter(
     return {
       accountId,
       emailVerified: true,
+      canModerate: false,
       session: { kind: 'desktop', expiresAt },
     };
   }
