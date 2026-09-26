@@ -7,17 +7,11 @@ import { runs, submissions } from '../db/schema';
 import { BenchmarkRequestError } from './repository';
 
 import type { D1Database } from '@cloudflare/workers-types';
-import type { PublicRunDetail } from '@timmy/contracts';
+import type { PublicRunDetail, SubmissionResponse } from '@timmy/contracts';
 
 // Internal storage input after normalization and capture validation; not an HTTP payload.
 const submissionDataSchema = publicRunDetailSchema.omit({ public_run_id: true, url: true });
 export type SubmissionData = Omit<PublicRunDetail, 'public_run_id' | 'url'>;
-export interface SubmissionReceipt {
-  client_run_id: string;
-  publication_status: 'pending_review';
-  public_run_id: null;
-  url: null;
-}
 export class D1SubmissionWriter {
   private readonly db;
 
@@ -30,7 +24,7 @@ export class D1SubmissionWriter {
     clientRunId: string,
     data: SubmissionData,
     requestFingerprint: string,
-  ): Promise<SubmissionReceipt> {
+  ): Promise<SubmissionResponse> {
     const clientId = clientRunIdSchema.parse(clientRunId);
 
     // Strict schemas rebuild nested objects in schema order, so JSON key order is irrelevant.
@@ -64,6 +58,7 @@ export class D1SubmissionWriter {
           detail: runs.detail,
           publicId: runs.publicId,
           visibility: runs.visibility,
+          publishedAt: runs.publishedAt,
         })
         .from(submissions)
         .leftJoin(runs, eq(runs.sequence, submissions.runSequence))
@@ -75,8 +70,8 @@ export class D1SubmissionWriter {
       throw new Error('Submission is missing after its transaction.');
     }
 
-    if (stored.status !== 'pending_review') {
-      throw new Error('Only pending submissions are supported by this writer.');
+    if (stored.status !== 'pending_review' && stored.status !== 'published') {
+      throw new Error('This submission status is not supported by the writer.');
     }
 
     if (stored.detail === null) {
@@ -94,8 +89,22 @@ export class D1SubmissionWriter {
       throw new BenchmarkRequestError('idempotency_conflict');
     }
 
-    if (stored.publicId !== existingId || stored.visibility !== 'hidden') {
+    if (
+      stored.publicId !== existingId ||
+      (stored.status === 'published'
+        ? stored.visibility !== 'published' || stored.publishedAt === null
+        : stored.visibility !== 'hidden')
+    ) {
       throw new Error('Submission publication state is inconsistent.');
+    }
+
+    if (stored.status === 'published') {
+      return {
+        client_run_id: clientId,
+        publication_status: 'published',
+        public_run_id: existingId,
+        url: existing.url,
+      };
     }
 
     return {

@@ -19,8 +19,9 @@ All non-deleted submissions require a run; a deleted marker has no run link.
 
 Approval updates the existing run's visibility and publication timestamp and the
 submission status in one transaction. It does not copy or recreate the detail.
-Rejection keeps the run hidden. The future write repository must enforce these
-cross-table transitions; schema foreign keys do not synchronize the two states.
+Rejection keeps the run hidden. Approval is implemented by the private repository
+described below; rejection remains a separate step. Schema foreign keys do not
+synchronize the two states.
 Public readers continue to select only `visibility = published` and use explicit
 allowlist projections. SQL requires a publication timestamp for visible runs.
 
@@ -102,19 +103,20 @@ New runs remain invisible to public queries until a separate approval operation.
 
 For an existing account/client pair, the writer compares both the request fingerprint
 and the normalized document against stored values, excluding generated ID/URL.
-An identical retry returns the existing pending result without changing data, IDs
-or submission time. Changed validated content returns `idempotency_conflict`.
-This writer currently supports only pending submissions. An existing non-pending
-record fails closed and is never replaced. Retry responses after moderation or
-deletion will be implemented alongside those workflows.
+An identical retry returns the existing pending or published result without changing
+data, IDs or submission time. Changed validated content returns `idempotency_conflict`.
+The writer supports pending and published submissions. Other statuses fail closed
+and are never replaced; their retry behavior will be implemented alongside the
+corresponding workflows.
 
 ## Protected submission upload
 
 `POST /api/bench/v1/me/runs` authenticates through the shared owner middleware,
 then requires JSON with a streaming 32 KiB limit. It validates the strict DTO,
 normalizes the run and atomically stores it as pending. New submissions and exact
-retries return 202 with `publication_status: pending_review`, null public ID and
-URL, and `Cache-Control: no-store`. No run is automatically published.
+pending retries return 202 with `publication_status: pending_review`, null public ID
+and URL. An exact retry after approval returns 200 with the existing public ID and
+URL. Both responses use `Cache-Control: no-store`. No upload automatically publishes.
 
 The route rejects unauthenticated requests with 401, unsupported media with 415,
 oversized bodies with 413, malformed/invalid input or query parameters with 422,
@@ -128,7 +130,7 @@ retry identity. The fingerprint is not exposed in owner or public responses.
 No second request document is stored. Historical rows have null fingerprints;
 a retry cannot establish their full original payload and fails with 409.
 
-Cross-client-ID duplicate detection, quotas, moderation and deletion are not
+Cross-client-ID duplicate detection, quotas, rejection and deletion are not
 implemented in this step. Apply the migration before using the POST endpoint.
 
 ## Submission transport contract
@@ -215,3 +217,22 @@ Private requests start only after browser sign-in. The list unmounts on logout
 and is recreated on a session change; late responses are discarded. A direct
 guest visit offers sign-in with a fixed return destination of My Bench. External
 return destinations are ignored. BENCH still restores the remembered browse URL.
+
+## Private approval
+
+`D1SubmissionApproval.approve(submissionId)` accepts the internal submission
+sequence. One D1 batch changes the linked hidden run to published, sets its
+publication time, and changes the pending submission to published. The second
+update is conditional on the first update changing one row. Any statement failure
+rolls back both records and revision changes. The run document, IDs, ownership,
+request fingerprint and original submission timestamp stay unchanged.
+
+Repeating approval of a published submission returns the same ID/time without
+writes or revision changes. A missing submission returns undefined. Other states
+fail closed. Concurrent approval and upload retry are serialized by D1 batches;
+a retry may observe pending before approval or published after it.
+
+This is a private repository operation with tests, not an HTTP endpoint or an
+owner capability. No moderator UI, role policy, rejection or deletion operation
+is introduced. A moderator entry point and its authorization must be implemented
+separately before approval can be used through the application.

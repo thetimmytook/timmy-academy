@@ -8,6 +8,8 @@ import { createClerkBrowserAdapter } from '../auth/clerk-browser-adapter';
 import { SUBMISSION_MAX_BODY_BYTES } from '../config';
 import { createApp } from '../index';
 
+import { D1SubmissionApproval } from './d1-submission-approval';
+
 import type { ApplicationPrincipal } from '../auth/application-principal';
 vi.mock('../auth/clerk-browser-adapter', () => ({ createClerkBrowserAdapter: vi.fn() }));
 const authenticate = vi.fn<() => Promise<ApplicationPrincipal>>();
@@ -233,4 +235,30 @@ describe('protected submission upload', () => {
     expect((await request(body.padEnd(SUBMISSION_MAX_BODY_BYTES))).status).toBe(202);
     await counts(1);
   });
+});
+
+it('returns 200 for an exact retry after approval and keeps changed requests conflicting', async () => {
+  expect((await request()).status).toBe(202);
+  const id = await db
+    .prepare('SELECT sequence FROM benchmark_submissions')
+    .first<number>('sequence');
+  const approved = await new D1SubmissionApproval(db).approve(id!);
+  const response = await request();
+  expect(response.status).toBe(200);
+  expect(response.headers.get('Cache-Control')).toBe('no-store');
+  expect(await response.json()).toEqual({
+    client_run_id: dto.client_run_id,
+    publication_status: 'published',
+    public_run_id: approved!.publicRunId,
+    url: '/bench/runs/' + approved!.publicRunId,
+  });
+  expect((await request(JSON.stringify({ ...dto, app_version: 'changed' }))).status).toBe(409);
+  const published = await createApp().request(
+    '/api/bench/v1/runs/' + approved!.publicRunId,
+    {},
+    { BENCHMARK_DB: db },
+  );
+  expect(published.status).toBe(200);
+  expect(await published.text()).not.toContain(dto.client_run_id);
+  await counts(1);
 });

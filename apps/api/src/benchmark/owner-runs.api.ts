@@ -74,7 +74,10 @@ export function createOwnerRunsRouter(): Hono<OwnerEnv> {
       fingerprint,
     );
 
-    return context.json(submissionResponseSchema.parse(receipt), 202);
+    return context.json(
+      submissionResponseSchema.parse(receipt),
+      receipt.publication_status === 'published' ? 200 : 202,
+    );
   });
 
   app.get('/runs', async context => {
