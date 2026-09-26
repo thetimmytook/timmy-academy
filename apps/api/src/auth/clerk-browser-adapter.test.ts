@@ -8,6 +8,7 @@ import { AuthenticationDenied } from './application-principal';
 import { createClerkBrowserAdapter } from './clerk-browser-adapter';
 import { D1AccountRepository } from './d1-account-repository';
 
+const foreignOrigin = 'https://attacker.example';
 const keys = generateKeyPairSync('rsa', { modulusLength: 2048 });
 const config = {
   origin: 'https://timmy.example',
@@ -160,7 +161,7 @@ describe('Clerk browser session adapter with real JWT signatures', () => {
 
   it.each([
     { iss: 'https://other.clerk.accounts.dev' },
-    { azp: 'https://attacker.example' },
+    { azp: foreignOrigin },
     { azp: undefined },
     { exp: now - 1 },
     { nbf: now + 600 },
@@ -193,7 +194,9 @@ describe('Clerk browser session adapter with real JWT signatures', () => {
 
   it.each([
     { method: 'POST' },
-    { method: 'POST', headers: { Origin: 'https://attacker.example' } },
+    { method: 'DELETE' },
+    { method: 'DELETE', headers: { Origin: foreignOrigin } },
+    { method: 'POST', headers: { Origin: foreignOrigin } },
     { headers: { Origin: 'null' } },
   ])('rejects unsafe request origins before provider access: %j', async init => {
     await expect(
@@ -202,11 +205,11 @@ describe('Clerk browser session adapter with real JWT signatures', () => {
     expect(transport).not.toHaveBeenCalled();
   });
 
-  it('accepts mutations from the configured browser origin', async () => {
+  it.each(['POST', 'DELETE'])('accepts %s from the configured browser origin', async method => {
     await expect(
       createClerkBrowserAdapter(config, accounts).authenticate(
         request(token(), {
-          method: 'POST',
+          method,
           headers: { Origin: config.origin },
         }),
       ),

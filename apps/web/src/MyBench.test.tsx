@@ -31,6 +31,14 @@ const item = {
   metrics: { average_fps: 100, one_percent_low_fps: 80 },
   status_reason: null,
 };
+const publishedItem = {
+  ...item,
+  publication_status: 'published',
+  public_run_id: 'br_test',
+  url: '/bench/runs/br_test',
+};
+const deleteLabel = 'Delete publication';
+const confirmLabel = 'Yes, delete publication';
 
 function response(items: unknown[] = [item], cursor: string | null = null): Response {
   return Response.json({ status_filter: 'all', limit: 20, items, next_cursor: cursor });
@@ -62,6 +70,104 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe(pageTitle, () => {
+  it('confirms deletion, prevents duplicate requests and refreshes the first filtered page', async () => {
+    let finish!: (value: Response) => void;
+    request.mockResolvedValueOnce(response([publishedItem]));
+    request.mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          finish = resolve;
+        }),
+    );
+    request.mockImplementation(() => Promise.resolve(response([])));
+    start('/bench/me?status=published&limit=10&cursor=own_page');
+    fireEvent.click(await screen.findByRole('button', { name: deleteLabel }));
+    const cancel = screen.getByRole('button', { name: 'No, keep it' });
+    expect(document.activeElement).toBe(cancel);
+    fireEvent.click(cancel);
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: deleteLabel }));
+    fireEvent.click(screen.getByRole('button', { name: deleteLabel }));
+    fireEvent.click(screen.getByRole('button', { name: confirmLabel }));
+    fireEvent.click(screen.getByRole('button', { name: confirmLabel }));
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(request.mock.calls[1]?.[0]).toBe('/api/bench/v1/me/runs/br_test');
+    expect(request.mock.calls[1]?.[1]?.method).toBe('DELETE');
+    expect(screen.getByRole('button', { name: confirmLabel }).hasAttribute('disabled')).toBe(true);
+    await act(async () => {
+      finish(Response.json({ publication_status: 'deleted', public_run_id: 'br_test' }));
+      await Promise.resolve();
+    });
+    await screen.findByText(emptyMessage);
+    expect(window.location.search).toBe('?status=published&limit=10');
+    expect(request).toHaveBeenCalledTimes(3);
+    expect(request.mock.calls.at(-1)?.[0]).toBe('/api/bench/v1/me/runs?status=published&limit=10');
+  });
+
+  it.each(['network', 'invalid receipt', 'wrong ID', 'forbidden'])(
+    'keeps the row and permits an idempotent retry after %s',
+    async failure => {
+      request.mockResolvedValueOnce(response([publishedItem]));
+
+      if (failure === 'network') {
+        request.mockRejectedValueOnce(new Error('private server information'));
+      } else {
+        request.mockResolvedValueOnce(
+          Response.json(
+            failure === 'invalid receipt'
+              ? {}
+              : { publication_status: 'deleted', public_run_id: 'br_other' },
+            { status: failure === 'forbidden' ? 403 : 200 },
+          ),
+        );
+      }
+
+      request.mockResolvedValueOnce(
+        Response.json({ publication_status: 'deleted', public_run_id: 'br_test' }),
+      );
+      request.mockImplementation(() => Promise.resolve(response([])));
+      start();
+      fireEvent.click(await screen.findByRole('button', { name: deleteLabel }));
+      fireEvent.click(screen.getByRole('button', { name: confirmLabel }));
+      expect((await screen.findByRole('alert')).textContent).toBe(
+        'Unable to confirm deletion. Please retry.',
+      );
+      expect(screen.getByRole('article')).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: confirmLabel }));
+      await screen.findByText(emptyMessage);
+      expect(request.mock.calls.filter(([, init]) => init?.method === 'DELETE')).toHaveLength(2);
+    },
+  );
+
+  it('aborts deletion on logout and ignores a late acknowledgement', async () => {
+    let finish!: (value: Response) => void;
+    request.mockResolvedValueOnce(response([publishedItem]));
+    request.mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          finish = resolve;
+        }),
+    );
+    const view = start();
+    fireEvent.click(await screen.findByRole('button', { name: deleteLabel }));
+    fireEvent.click(screen.getByRole('button', { name: confirmLabel }));
+    const signal = request.mock.calls[1]?.[1]?.signal;
+    session.status = signedOut;
+    view.rerender(tree());
+    expect(signal?.aborted).toBe(true);
+    await act(async () => {
+      finish(Response.json({ publication_status: 'deleted', public_run_id: 'br_test' }));
+      await Promise.resolve();
+    });
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('article')).toBeNull();
+  });
+
+  it('does not offer deletion for an unpublished submission', async () => {
+    start();
+    await screen.findByRole('article');
+    expect(screen.queryByRole('button', { name: deleteLabel })).toBeNull();
+  });
   it.each([signedOut, 'loading', 'unavailable'])(
     'does not request private data while %s',
     status => {

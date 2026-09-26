@@ -10,6 +10,10 @@ import {
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from './limits.js';
 
 export const clientRunIdSchema = z.uuid();
+export const deletePublicationResponseSchema = z.strictObject({
+  publication_status: z.literal('deleted'),
+  public_run_id: publicRunIdSchema,
+});
 export const ownerRunsQuerySchema = z.strictObject({
   status: z.enum(['all', 'published', 'pending_review', 'rejected']).default('all'),
   limit: z

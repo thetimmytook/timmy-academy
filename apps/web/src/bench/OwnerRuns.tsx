@@ -9,6 +9,7 @@ import { ErrorMessage } from '../elements/ErrorMessage';
 import { Field } from '../elements/Field';
 import { Message } from '../elements/Message';
 
+import { DeletePublication } from './DeletePublication';
 import { execution, number, resolution, words } from './format';
 import { useResource } from './resource';
 import { muted, stack } from './styles';
@@ -94,9 +95,21 @@ function OwnerRunList({ query }: Readonly<{ query: OwnerRunsQuery }>): JSX.Eleme
             {number(item.metrics.one_percent_low_fps)}
           </p>
           {item.publication_status === 'published' && (
-            <Button href={item.url} variant="link">
-              Open public run →
-            </Button>
+            <>
+              <Button href={item.url} variant="link">
+                Open public run →
+              </Button>
+              <DeletePublication
+                publicRunId={item.public_run_id}
+                onDeleted={() => {
+                  page();
+
+                  if (!query.cursor) {
+                    retry();
+                  }
+                }}
+              />
+            </>
           )}
         </article>
       ))}

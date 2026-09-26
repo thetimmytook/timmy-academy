@@ -253,8 +253,7 @@ No archive ID is stored in submissions. Existing submissions retain their data a
 receive null in the new field. The submission INSERT is extended with that null.
 
 The migration defines storage and the archive allowlist; it does not move existing
-data. The private deletion operation below uses this storage. API and confirmation
-UI follow separately.
+data. The private deletion operation below uses this storage.
 
 Admin remains the last feature step: a role-protected `/admin` page, an Admin
 entry in the profile menu for moderators, and a left menu with Approvals selected
@@ -281,5 +280,16 @@ hardware, conditions, capture and performance fields and selected settings. The 
 no longer find it, owner lists omit it, and lookup by client ID returns the minimal
 deleted marker. Resubmitting that client ID returns 409 `publication_deleted`.
 
-Only repository behavior and submission retry handling are connected in this
-substep. The owner DELETE route and its confirmation UI are still to be added.
+`DELETE /api/bench/v1/me/runs/:publicRunId` uses the browser authentication boundary
+and requires a verified owner. Authentication runs before input validation. The route
+accepts a public run ID with no query or body and returns only the validated deletion
+receipt with `Cache-Control: no-store`. Unsafe browser origins are rejected by the
+auth adapter.
+
+My Bench offers deletion only for published rows, with an inline confirmation and
+an explanation that local captures remain on the computer. The row stays visible
+until the server acknowledges deletion. Errors permit an idempotent retry; duplicate
+clicks while a request is pending are disabled. Success reloads the first page while
+preserving the status filter and page size. Leaving the page or changing the session
+aborts the browser request and ignores late responses; this does not undo a deletion
+already accepted by the server.
