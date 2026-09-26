@@ -234,6 +234,14 @@ export const theme = {
             _hover: { bg: 'bg.elevated', color: 'fg.default' },
             _active: { bg: 'bg.surfaceSubtle' },
           },
+          menu: {
+            justifyContent: 'flex-start',
+            textAlign: 'left',
+            fontWeight: 'normal',
+            color: 'fg.muted',
+            _hover: { bg: 'bg.elevated', color: 'fg.default' },
+            _active: { bg: 'bg.surfaceSubtle' },
+          },
           danger: {
             bg: 'danger.fg',
             color: 'fg.onAccent',

@@ -88,23 +88,27 @@ export function SessionControls(): JSX.Element {
               top: '100%',
               mt: '2',
               zIndex: 3,
-              width: '16rem',
+              width: '12rem',
+              p: '2',
               maxWidth: 'calc(100vw - 2rem)',
               boxShadow: 'overlay',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'stretch',
-              gap: '3',
+              gap: '0',
             })
           }
         >
           {status === 'loading' && <p role="status">Loading account…</p>}
           {(status === 'signed-out' || status === 'unavailable') && (
             <>
-              <p>My Bench requires sign-in</p>
+              <p className={css({ textStyle: 'caption', color: 'fg.muted', px: '3', py: '2' })}>
+                My Bench requires sign-in
+              </p>
               <Button
                 href="/sign-in?returnTo=/bench/me"
-                variant="ghost"
+                variant="menu"
+                size="sm"
                 onClick={() => setOpen(false)}
               >
                 Sign in with email →
@@ -113,16 +117,15 @@ export function SessionControls(): JSX.Element {
           )}
           {status === 'signed-in' && (
             <>
-              <p className={css({ fontWeight: 'semibold' })}>Your account</p>
-              <Button href="/bench/me" variant="ghost" onClick={() => setOpen(false)}>
+              <Button href="/bench/me" variant="menu" size="sm" onClick={() => setOpen(false)}>
                 My Bench
               </Button>
               {canModerate && (
-                <Button href="/admin" variant="ghost" onClick={() => setOpen(false)}>
+                <Button href="/admin" variant="menu" size="sm" onClick={() => setOpen(false)}>
                   Admin
                 </Button>
               )}
-              <Button variant="ghost" disabled={pending} onClick={() => void logOut()}>
+              <Button variant="menu" size="sm" disabled={pending} onClick={() => void logOut()}>
                 {pending ? 'Signing out…' : 'Sign out'}
               </Button>
               {failed && (
