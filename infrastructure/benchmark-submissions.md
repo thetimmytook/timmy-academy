@@ -40,7 +40,7 @@ sequences and publication dates are preserved. The new submissions table starts
 empty; fixture contributors are not silently converted into account owners.
 
 Deletion must hide or remove the run and clear the submission link atomically.
-Transport-payload fingerprinting, retention and anonymization remain separate steps. This schema does not implement the
+Retention and anonymization remain separate steps. This schema does not implement the
 publication or deletion workflows.
 
 ## Private read repository
@@ -85,13 +85,13 @@ requests return 409 `cursor_stale` and must restart at the first page. Invalid,
 altered or differently bound owner cursors return 400 `invalid_cursor`.
 
 Apply local migrations before using these endpoints. This step adds no My Bench UI,
-submission upload, moderation or deletion endpoint.
+moderation or deletion endpoint. Submission upload is described below.
 
 ## Atomic submission storage
 
-`D1SubmissionWriter.submit(accountId, clientRunId, data)` accepts an authenticated
+`D1SubmissionWriter.submit(accountId, clientRunId, data, requestFingerprint)` accepts an authenticated
 internal account ID, a UUID client ID, and an already normalized public-safe run
-document without public ID/URL. This is a private storage boundary, not an upload
+document without public ID/URL, plus the validated request fingerprint. This is a private storage boundary, not an upload
 contract: capture-quality checks and transport validation belong before it.
 The writer still validates the strict document allowlist before any SQL writes.
 
@@ -101,19 +101,36 @@ concurrent retries cannot leave unused run records. Public IDs and submission ti
 are server-generated. The private contributor key uses the stable account ID.
 New runs remain invisible to public queries until a separate approval operation.
 
-For an existing account/client pair, the writer compares the normalized document
-against the stored detail, excluding the generated ID/URL. Schema parsing fixes
-JSON object-key order before comparison; no second document or hash column is
-stored. An identical retry returns the existing pending result without changing
-data, IDs or submission time. A changed document returns `idempotency_conflict`.
+For an existing account/client pair, the writer compares both the request fingerprint
+and the normalized document against stored values, excluding generated ID/URL.
+An identical retry returns the existing pending result without changing data, IDs
+or submission time. Changed validated content returns `idempotency_conflict`.
 This writer currently supports only pending submissions. An existing non-pending
 record fails closed and is never replaced. Retry responses after moderation or
 deletion will be implemented alongside those workflows.
 
-This compares normalized storage data, not a future raw upload envelope. When the
-upload contract is introduced, any additional fields relevant to retry identity
-must be accounted for explicitly. Cross-client-ID duplicate detection, quotas,
-moderation writes and the POST endpoint are not implemented by this step.
+## Protected submission upload
+
+`POST /api/bench/v1/me/runs` authenticates through the shared owner middleware,
+then requires JSON with a streaming 32 KiB limit. It validates the strict DTO,
+normalizes the run and atomically stores it as pending. New submissions and exact
+retries return 202 with `publication_status: pending_review`, null public ID and
+URL, and `Cache-Control: no-store`. No run is automatically published.
+
+The route rejects unauthenticated requests with 401, unsupported media with 415,
+oversized bodies with 413, malformed/invalid input or query parameters with 422,
+and changed content for an existing account/client ID with 409. Owner identity
+comes exclusively from the authenticated principal.
+
+Migration `0006_submission-fingerprint.sql` adds a private SHA-256 fingerprint of
+the complete validated DTO, including `app_version`. Schema parsing fixes nested
+object-key order before hashing; insignificant JSON formatting does not change
+retry identity. The fingerprint is not exposed in owner or public responses.
+No second request document is stored. Historical rows have null fingerprints;
+a retry cannot establish their full original payload and fails with 409.
+
+Cross-client-ID duplicate detection, quotas, moderation and deletion are not
+implemented in this step. Apply the migration before using the POST endpoint.
 
 ## Submission transport contract
 
@@ -127,10 +144,8 @@ reviewed settings are available.
 
 The structural contract requires at least 110 measured seconds and 120 frame
 samples. A settings resolution, when provided, must match `game_resolution`.
-The contract also checks metric consistency as described below. Normalization,
-intake metadata/idempotency handling and request body limits still need
-implementation before connecting the POST route. This schema adds no route
-or automatic publication behavior.
+The contract also checks metric consistency as described below. The POST route
+uses this contract before normalization and storage; it never publishes automatically.
 
 ## Selected settings projection
 
@@ -187,5 +202,5 @@ same IDs and the selected-settings projection. Metrics are preserved; author is
 null, quality notes are empty, and render scale/upscaling effects are not inferred.
 Client ID, app version and raw settings keys are not copied into public run data.
 Map IDs still use the existing reviewed map list; this step does not add maps.
-The POST endpoint and preservation of intake metadata for retry identity remain
-separate work before this transformation is connected to HTTP submission.
+The POST endpoint uses this transformation after validation and fingerprints the
+validated input separately to retain complete retry identity.

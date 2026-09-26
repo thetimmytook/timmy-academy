@@ -29,6 +29,7 @@ export class D1SubmissionWriter {
     accountId: string,
     clientRunId: string,
     data: SubmissionData,
+    requestFingerprint: string,
   ): Promise<SubmissionReceipt> {
     const clientId = clientRunIdSchema.parse(clientRunId);
 
@@ -54,11 +55,12 @@ export class D1SubmissionWriter {
         .select(sql`SELECT NULL, ${publicId}, ${accountId}, NULL, 'hidden', ${JSON.stringify(detail)}
         WHERE ${notExists(existingSubmission)}`),
       this.db.insert(submissions)
-        .select(sql`SELECT NULL, ${accountId}, ${clientId}, ${submittedAt}, 'pending_review', ${runs.sequence}, NULL
+        .select(sql`SELECT NULL, ${accountId}, ${clientId}, ${submittedAt}, 'pending_review', ${runs.sequence}, NULL, ${requestFingerprint}
         FROM ${runs} WHERE ${and(eq(runs.publicId, publicId), notExists(existingSubmission))}`),
       this.db
         .select({
           status: submissions.status,
+          requestFingerprint: submissions.requestFingerprint,
           detail: runs.detail,
           publicId: runs.publicId,
           visibility: runs.visibility,
@@ -85,7 +87,10 @@ export class D1SubmissionWriter {
     const existingId = existing.public_run_id;
     const existingData = submissionDataSchema.strip().parse(existing);
 
-    if (JSON.stringify(existingData) !== JSON.stringify(normalized)) {
+    if (
+      stored.requestFingerprint !== requestFingerprint ||
+      JSON.stringify(existingData) !== JSON.stringify(normalized)
+    ) {
       throw new BenchmarkRequestError('idempotency_conflict');
     }
 

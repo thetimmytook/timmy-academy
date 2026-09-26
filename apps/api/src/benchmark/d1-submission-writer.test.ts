@@ -11,6 +11,7 @@ import { normalizeHardware } from './hardware-normalization';
 let mf: Miniflare;
 let db: D1Database;
 let writer: D1SubmissionWriter;
+const requestFingerprint = 'test-request-fingerprint';
 const owner = 'acc_owner';
 const stranger = 'acc_stranger';
 const client = '00000000-0000-4000-8000-000000000001';
@@ -67,7 +68,7 @@ afterAll(async () => {
 
 describe('atomic submission writes', () => {
   it('stores one hidden run and pending submission without exposing private IDs', async () => {
-    const receipt = await writer.submit(owner, client, data);
+    const receipt = await writer.submit(owner, client, data, requestFingerprint);
     expect(receipt).toEqual({
       client_run_id: client,
       publication_status: 'pending_review',
@@ -90,14 +91,14 @@ describe('atomic submission writes', () => {
     expect(await new D1BenchmarkRepository(db, 'secret').detail(row!.public_id)).toBeUndefined();
   });
   it('replays without changing IDs, timestamps, revision or creating orphan runs', async () => {
-    await writer.submit(owner, client, data);
+    await writer.submit(owner, client, data, requestFingerprint);
     const before = await db.prepare('SELECT * FROM benchmark_submissions').all();
     const revision = await db.prepare('SELECT revision FROM benchmark_state').first('revision');
     const reordered = {
       ...data,
       metrics: Object.fromEntries(Object.entries(data.metrics).reverse()) as typeof data.metrics,
     };
-    await writer.submit(owner, client, reordered);
+    await writer.submit(owner, client, reordered, requestFingerprint);
     expect((await db.prepare('SELECT * FROM benchmark_submissions').all()).results).toEqual(
       before.results,
     );
@@ -108,7 +109,9 @@ describe('atomic submission writes', () => {
   });
   it('serializes simultaneous identical retries from independent repositories', async () => {
     const receipts = await Promise.all(
-      Array.from({ length: 8 }, () => new D1SubmissionWriter(db).submit(owner, client, data)),
+      Array.from({ length: 8 }, () =>
+        new D1SubmissionWriter(db).submit(owner, client, data, requestFingerprint),
+      ),
     );
     expect(receipts.every(receipt => JSON.stringify(receipt) === JSON.stringify(receipts[0]))).toBe(
       true,
@@ -117,12 +120,17 @@ describe('atomic submission writes', () => {
     expect(await countSubmissions()).toBe(1);
   });
   it('rejects changed content without replacing the original', async () => {
-    await writer.submit(owner, client, data);
+    await writer.submit(owner, client, data, requestFingerprint);
     await expect(
-      writer.submit(owner, client, {
-        ...data,
-        metrics: { ...data.metrics, average_fps: data.metrics.average_fps + 1 },
-      }),
+      writer.submit(
+        owner,
+        client,
+        {
+          ...data,
+          metrics: { ...data.metrics, average_fps: data.metrics.average_fps + 1 },
+        },
+        requestFingerprint,
+      ),
     ).rejects.toMatchObject({ code: 'idempotency_conflict', status: 409 });
     expect(await countRuns()).toBe(1);
     const stored = await db.prepare('SELECT detail FROM benchmark_runs').first<string>('detail');
@@ -130,8 +138,13 @@ describe('atomic submission writes', () => {
   });
   it('keeps one winner when different payloads race for the same client ID', async () => {
     const results = await Promise.allSettled([
-      writer.submit(owner, client, data),
-      new D1SubmissionWriter(db).submit(owner, client, { ...data, captured_day: '2026-01-01' }),
+      writer.submit(owner, client, data, requestFingerprint),
+      new D1SubmissionWriter(db).submit(
+        owner,
+        client,
+        { ...data, captured_day: '2026-01-01' },
+        requestFingerprint,
+      ),
     ]);
     expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
     expect(results.find(result => result.status === 'rejected')).toMatchObject({
@@ -141,12 +154,17 @@ describe('atomic submission writes', () => {
     expect(await countSubmissions()).toBe(1);
   });
   it('scopes client IDs to accounts', async () => {
-    await Promise.all([writer.submit(owner, client, data), writer.submit(stranger, client, data)]);
+    await Promise.all([
+      writer.submit(owner, client, data, requestFingerprint),
+      writer.submit(stranger, client, data, requestFingerprint),
+    ]);
     expect(await countRuns()).toBe(2);
     expect(await countSubmissions()).toBe(2);
   });
   it('rolls back the run when the submission insert fails', async () => {
-    await expect(writer.submit('missing_account', client, data)).rejects.toThrow();
+    await expect(
+      writer.submit('missing_account', client, data, requestFingerprint),
+    ).rejects.toThrow();
     expect(await countRuns()).toBe(0);
     expect(await countSubmissions()).toBe(0);
   });
@@ -156,7 +174,9 @@ describe('atomic submission writes', () => {
       gpu_name: 'New GPU 456',
       ram_gb: 32,
     });
-    expect(await writer.submit(owner, client, { ...data, hardware })).toMatchObject({
+    expect(
+      await writer.submit(owner, client, { ...data, hardware }, requestFingerprint),
+    ).toMatchObject({
       publication_status: 'pending_review',
       public_run_id: null,
       url: null,
@@ -165,9 +185,14 @@ describe('atomic submission writes', () => {
   });
   it('rejects extra private fields before writing', async () => {
     await expect(
-      writer.submit(owner, client, { ...data, email: 'private' } as typeof data),
+      writer.submit(
+        owner,
+        client,
+        { ...data, email: 'private' } as typeof data,
+        requestFingerprint,
+      ),
     ).rejects.toThrow();
-    await expect(writer.submit(owner, 'invalid', data)).rejects.toThrow();
+    await expect(writer.submit(owner, 'invalid', data, requestFingerprint)).rejects.toThrow();
     expect(await countRuns()).toBe(0);
   });
 });

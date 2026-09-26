@@ -43,6 +43,13 @@
       "when": 1790190865246,
       "tag": "0005_submission-revision",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1790365998871,
+      "tag": "0006_submission-fingerprint",
+      "breakpoints": true
     }
   ]
 }

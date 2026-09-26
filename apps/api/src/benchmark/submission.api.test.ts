@@ -1,0 +1,236 @@
+import { readFile, readdir } from 'node:fs/promises';
+
+import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { AuthenticationDenied } from '../auth/application-principal';
+import { createClerkBrowserAdapter } from '../auth/clerk-browser-adapter';
+import { SUBMISSION_MAX_BODY_BYTES } from '../config';
+import { createApp } from '../index';
+
+import type { ApplicationPrincipal } from '../auth/application-principal';
+vi.mock('../auth/clerk-browser-adapter', () => ({ createClerkBrowserAdapter: vi.fn() }));
+const authenticate = vi.fn<() => Promise<ApplicationPrincipal>>();
+let mf: Miniflare;
+let db: D1Database;
+const owner = 'acc_owner';
+const stranger = 'acc_stranger';
+const path = '/api/bench/v1/me/runs';
+const contentType = 'application/json';
+const dto = {
+  schema_version: 1,
+  client_run_id: '00000000-0000-4000-8000-000000000001',
+  captured_day: '2026-09-25',
+  app_version: '1.0.0',
+  hardware: { cpu_name: 'New CPU 123', gpu_name: 'New GPU 456', ram_gb: 32 },
+  map: 'lighthouse',
+  execution: 'bsg_servers',
+  game_resolution: null,
+  game_version: null,
+  context: { weather: 'unknown', time_of_day: 'day' },
+  settings_snapshot: null,
+  capture: { duration_sec: 120, sample_count: 12000 },
+  metrics: {
+    average_fps: 100,
+    one_percent_low_fps: 100,
+    zero_point_one_percent_low_fps: 100,
+    average_frametime_ms: 10,
+    p95_frametime_ms: 10,
+    p99_frametime_ms: 10,
+  },
+};
+
+async function request(
+  body = JSON.stringify(dto),
+  type = contentType,
+  suffix = '',
+  method = 'POST',
+): Promise<Response> {
+  return createApp().request(
+    path + suffix,
+    { method, body: method === 'POST' ? body : null, headers: { 'Content-Type': type } },
+    {
+      BENCHMARK_DB: db,
+      APP_ORIGIN: 'https://timmy.example',
+      CLERK_ISSUER: 'https://browser.clerk.accounts.dev',
+      CLERK_PUBLISHABLE_KEY: 'pk_test_fixture',
+      CLERK_SECRET_KEY: 'sk_test_fixture',
+    },
+  );
+}
+
+async function counts(expected: number): Promise<void> {
+  expect(await db.prepare('SELECT COUNT(*) AS count FROM benchmark_runs').first('count')).toBe(
+    expected,
+  );
+  expect(
+    await db.prepare('SELECT COUNT(*) AS count FROM benchmark_submissions').first('count'),
+  ).toBe(expected);
+}
+
+beforeAll(async () => {
+  mf = new Miniflare(
+    convertV4MiniflareOptions({
+      modules: true,
+      script: 'export default { fetch() { return new Response("test"); } }',
+      compatibilityDate: '2026-09-19',
+      d1Databases: ['BENCHMARK_DB'],
+    }),
+  );
+  db = await mf.getD1Database('BENCHMARK_DB');
+  const directory = new URL('../../../../infrastructure/migrations/', import.meta.url);
+
+  // Repository-owned migration directory.
+  // eslint-disable-next-line security/detect-non-literal-fs-filename
+  const files = (await readdir(directory))
+    .filter(file => file.endsWith('.sql'))
+    .sort((a, b) => a.localeCompare(b));
+
+  for (const file of files) {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    const migration = await readFile(new URL(file, directory), 'utf8');
+
+    for (const statement of migration.split('--> statement-breakpoint')) {
+      if (statement.trim()) {
+        await db.prepare(statement).run();
+      }
+    }
+  }
+}, 30000);
+
+beforeEach(async () => {
+  vi.mocked(createClerkBrowserAdapter).mockReturnValue({ authenticate });
+  authenticate.mockReset().mockResolvedValue({
+    accountId: owner,
+    emailVerified: true,
+    session: { kind: 'browser', expiresAt: Date.now() + 60000 },
+  });
+  await db.batch([
+    db.prepare('DELETE FROM benchmark_submissions'),
+    db.prepare('DELETE FROM benchmark_runs'),
+    db.prepare('DELETE FROM accounts'),
+    db.prepare('INSERT INTO accounts(id) VALUES (?), (?)').bind(owner, stranger),
+  ]);
+});
+afterAll(async () => {
+  await mf?.dispose();
+});
+
+describe('protected submission upload', () => {
+  it('stores one hidden run and returns only a pending receipt', async () => {
+    const response = await request();
+    expect(response.status).toBe(202);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(await response.json()).toEqual({
+      client_run_id: dto.client_run_id,
+      publication_status: 'pending_review',
+      public_run_id: null,
+      url: null,
+    });
+    await counts(1);
+    const run = await db
+      .prepare('SELECT public_id, visibility, published_at, contributor_key FROM benchmark_runs')
+      .first();
+    expect(run).toMatchObject({ visibility: 'hidden', published_at: null, contributor_key: owner });
+    const publicResponse = await createApp().request(
+      '/api/bench/v1/runs/' + String(run?.public_id),
+      {},
+      { BENCHMARK_DB: db },
+    );
+    expect(publicResponse.status).toBe(404);
+    const lookup = await request('', contentType, '/by-client-id/' + dto.client_run_id, 'GET');
+    expect(lookup.status).toBe(200);
+    expect(await lookup.json()).toMatchObject({
+      item: {
+        client_run_id: dto.client_run_id,
+        publication_status: 'pending_review',
+        public_run_id: null,
+        url: null,
+      },
+    });
+    const options = await createApp().request(
+      '/api/bench/v1/filter-options',
+      {},
+      { BENCHMARK_DB: db },
+    );
+    expect(options.status).toBe(200);
+    expect(await options.text()).not.toContain(dto.hardware.cpu_name);
+  });
+  it('ignores JSON key order on an exact retry and preserves the stored record', async () => {
+    expect((await request()).status).toBe(202);
+    const before = await db.prepare('SELECT * FROM benchmark_submissions').first();
+    const reordered = {
+      ...dto,
+      hardware: { ram_gb: 32, gpu_name: dto.hardware.gpu_name, cpu_name: dto.hardware.cpu_name },
+    };
+    expect(
+      (await request(JSON.stringify(Object.fromEntries(Object.entries(reordered).reverse()))))
+        .status,
+    ).toBe(202);
+    expect(await db.prepare('SELECT * FROM benchmark_submissions').first()).toEqual(before);
+    expect(before?.request_fingerprint).toMatch(/^[a-f0-9]{64}$/);
+    await counts(1);
+  });
+  it.each([
+    { ...dto, app_version: '1.0.1' },
+    { ...dto, hardware: { ...dto.hardware, cpu_name: 'new cpu 123' } },
+    { ...dto, captured_day: '2026-09-24' },
+  ])('rejects changed validated content for the same client ID', async changed => {
+    expect((await request()).status).toBe(202);
+    const response = await request(JSON.stringify(changed));
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'idempotency_conflict' });
+    await counts(1);
+  });
+  it('serializes simultaneous exact retries without orphan runs', async () => {
+    const responses = await Promise.all([request(), request(), request()]);
+    expect(responses.map(response => response.status)).toEqual([202, 202, 202]);
+    await counts(1);
+  });
+  it('allows only one winner for simultaneous conflicting requests', async () => {
+    const responses = await Promise.all([
+      request(),
+      request(JSON.stringify({ ...dto, app_version: '2.0' })),
+    ]);
+    expect(responses.map(response => response.status).sort((a, b) => a - b)).toEqual([202, 409]);
+    await counts(1);
+  });
+  it('scopes client IDs to the authenticated account', async () => {
+    expect((await request()).status).toBe(202);
+    authenticate.mockResolvedValue({
+      accountId: stranger,
+      emailVerified: true,
+      session: { kind: 'browser', expiresAt: Date.now() + 60000 },
+    });
+    expect((await request()).status).toBe(202);
+    await counts(2);
+  });
+  it('authenticates before reading or validating the request', async () => {
+    authenticate.mockRejectedValue(new AuthenticationDenied());
+    expect((await request('invalid', 'text/plain')).status).toBe(401);
+    await counts(0);
+  });
+  it.each([
+    ['invalid', contentType, '', 422],
+    [JSON.stringify(dto), 'text/plain', '', 415],
+    [JSON.stringify(dto), contentType, '?accountId=other', 422],
+    [JSON.stringify({ ...dto, accountId: stranger }), contentType, '', 422],
+    [
+      JSON.stringify({ ...dto, capture: { duration_sec: 120, sample_count: 1000 } }),
+      contentType,
+      '',
+      422,
+    ],
+    [JSON.stringify({ ...dto, map: 'unknown-map' }), contentType, '', 422],
+  ])('rejects invalid transport or payload without writes', async (body, type, suffix, status) => {
+    expect((await request(body, type, suffix)).status).toBe(status);
+    await counts(0);
+  });
+  it('enforces the 32 KiB body boundary', async () => {
+    const body = JSON.stringify(dto);
+    expect((await request(body.padEnd(SUBMISSION_MAX_BODY_BYTES + 1))).status).toBe(413);
+    await counts(0);
+    expect((await request(body.padEnd(SUBMISSION_MAX_BODY_BYTES))).status).toBe(202);
+    await counts(1);
+  });
+});

@@ -110,6 +110,7 @@ export const submissions = sqliteTable(
       .default('pending_review'),
     runSequence: integer('run_sequence').references(() => runs.sequence),
     statusReason: text('status_reason'),
+    requestFingerprint: text('request_fingerprint'),
   },
   table => [
     uniqueIndex('submissions_account_client').on(table.accountId, table.clientRunId),

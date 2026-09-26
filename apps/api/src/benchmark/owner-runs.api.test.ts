@@ -315,12 +315,6 @@ describe('protected owner submission HTTP API', () => {
       spy.mockRestore();
     }
   });
-  it('does not accept submission writes, even from an authenticated owner', async () => {
-    const response = await request('', secret, 'POST');
-    expect(response.status).toBe(404);
-    expect(authenticate).toHaveBeenCalledOnce();
-    expect((await page()).items).toEqual([]);
-  });
   it('sanitizes configuration failures', async () => {
     const response = await request('', '');
     expect(response.status).toBe(500);

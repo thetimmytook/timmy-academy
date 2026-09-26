@@ -107,3 +107,10 @@ export const submissionRequestSchema = z
   });
 
 export type SubmissionRequest = z.infer<typeof submissionRequestSchema>;
+
+export const submissionResponseSchema = z.strictObject({
+  client_run_id: clientRunIdSchema,
+  publication_status: z.literal('pending_review'),
+  public_run_id: z.null(),
+  url: z.null(),
+});

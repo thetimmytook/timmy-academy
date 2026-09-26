@@ -1,0 +1,1 @@
+ALTER TABLE `benchmark_submissions` ADD `request_fingerprint` text;

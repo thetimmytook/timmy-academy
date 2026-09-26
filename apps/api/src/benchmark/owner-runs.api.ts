@@ -1,14 +1,22 @@
 import {
   clientRunIdSchema,
+  submissionRequestSchema,
+  submissionResponseSchema,
   ownerRunLookupSchema,
   ownerRunsQuerySchema,
   ownerRunsResponseSchema,
 } from '@timmy/contracts';
 import { Hono } from 'hono';
 
+import { SUBMISSION_MAX_BODY_BYTES } from '../config';
+
 import { D1SubmissionRepository } from './d1-submission-repository';
+import { D1SubmissionWriter } from './d1-submission-writer';
+import { readJsonBody } from './json-body';
 import { OwnerSubmissionReader } from './owner-submission-reader';
 import { BenchmarkRequestError } from './repository';
+import { submissionFingerprint } from './submission-fingerprint';
+import { normalizeSubmission } from './submission-normalization';
 
 import type { OwnerSubmission, DeletedSubmission } from './d1-submission-repository';
 import type { ApplicationPrincipal } from '../auth/application-principal';
@@ -37,6 +45,36 @@ export function createOwnerRunsRouter(): Hono<OwnerEnv> {
     context.header('Cache-Control', 'no-store');
     context.set('principal', await context.get('requirePrincipal')());
     await next();
+  });
+
+  app.post('/runs', async context => {
+    if (new URL(context.req.url).search) {
+      throw new BenchmarkRequestError('invalid_input');
+    }
+
+    const body = await readJsonBody(context.req.raw, SUBMISSION_MAX_BODY_BYTES);
+    const parsed = submissionRequestSchema.safeParse(body);
+
+    if (!parsed.success) {
+      throw new BenchmarkRequestError('invalid_input');
+    }
+
+    const { database } = context.get('config');
+
+    if (!database) {
+      throw new Error('Database is not configured.');
+    }
+
+    const data = await normalizeSubmission(parsed.data);
+    const fingerprint = await submissionFingerprint(parsed.data);
+    const receipt = await new D1SubmissionWriter(database).submit(
+      context.get('principal').accountId,
+      parsed.data.client_run_id,
+      data,
+      fingerprint,
+    );
+
+    return context.json(submissionResponseSchema.parse(receipt), 202);
   });
 
   app.get('/runs', async context => {
