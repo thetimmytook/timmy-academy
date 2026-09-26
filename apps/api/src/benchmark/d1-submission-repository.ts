@@ -1,4 +1,4 @@
-import { publicRunDetailSchema } from '@timmy/contracts';
+import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, publicRunDetailSchema } from '@timmy/contracts';
 import { and, desc, eq, ne, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 
@@ -146,9 +146,9 @@ export class D1SubmissionRepository {
   }
 
   async list(accountId: string, query: SubmissionPageQuery = {}): Promise<SubmissionPage> {
-    const limit = query.limit ?? 20;
+    const limit = query.limit ?? DEFAULT_PAGE_SIZE;
 
-    if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
+    if (!Number.isInteger(limit) || limit < 1 || limit > MAX_PAGE_SIZE) {
       throw new Error('Invalid submission page size.');
     }
 

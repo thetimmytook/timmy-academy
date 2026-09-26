@@ -6,9 +6,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 
 import { AuthenticationDenied } from '../auth/application-principal';
 import { createClerkBrowserAdapter } from '../auth/clerk-browser-adapter';
+import { TOKEN_LIFETIME_MS } from '../config';
 import { createApp } from '../index';
 
-import { TOKEN_LIFETIME_MS } from './d1-navigation';
 import { D1SubmissionRepository } from './d1-submission-repository';
 import { createSyntheticRuns } from './fixtures';
 import { OwnerSubmissionReader } from './owner-submission-reader';

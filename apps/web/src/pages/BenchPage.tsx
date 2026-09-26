@@ -1,4 +1,4 @@
-import { runSearchQuerySchema } from '@timmy/contracts';
+import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, runSearchQuerySchema } from '@timmy/contracts';
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router';
 
@@ -53,11 +53,14 @@ export default function BenchPage({ url }: Readonly<{ url: string }>): JSX.Eleme
         <FilterDropdown
           label="Configurations per page"
           allowAny={false}
-          value={params.get('limit') ?? '20'}
-          options={[2, 10, 20, 50].map(value => ({ value: String(value), label: String(value) }))}
+          value={params.get('limit') ?? String(DEFAULT_PAGE_SIZE)}
+          options={[2, 10, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE].map(value => ({
+            value: String(value),
+            label: String(value),
+          }))}
           onChange={value => {
             const next = resetPage(params);
-            next.set('limit', value || '20');
+            next.set('limit', value || String(DEFAULT_PAGE_SIZE));
             void navigate(browseUrl(next));
           }}
         />

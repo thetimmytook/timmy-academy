@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { AUTH_POC_REQUEST_TIMEOUT_MS } from '../config';
+
 import { AuthenticationDenied } from './auth-adapter';
 
 import type { AccountDirectory, ApplicationPrincipal, AuthAdapter } from './auth-adapter';
@@ -61,7 +63,7 @@ export function createClerkTestAdapter(
 
       // Workers supports manual/follow only. The non-2xx check below rejects redirects.
       redirect: 'manual',
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(AUTH_POC_REQUEST_TIMEOUT_MS),
       headers: {
         Authorization: `Bearer ${config.secretKey}`,
         'Content-Type': 'application/json',

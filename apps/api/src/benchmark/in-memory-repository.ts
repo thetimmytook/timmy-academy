@@ -1,3 +1,4 @@
+import { COHORT_RUNS_LIMIT, GROUP_PREVIEW_RUNS_LIMIT } from '@timmy/contracts';
 import {
   cursorSchema,
   type BenchmarkFilters,
@@ -172,7 +173,7 @@ export class InMemoryBenchmarkRepository implements BenchmarkRepository {
         const previews = group.members.filter(run => {
           const map = run.detail.conditions.map.id;
 
-          if (seen.has(map) || seen.size === 3) {
+          if (seen.has(map) || seen.size === GROUP_PREVIEW_RUNS_LIMIT) {
             return false;
           }
 
@@ -335,8 +336,8 @@ export class InMemoryBenchmarkRepository implements BenchmarkRepository {
       status: 'matches',
       criteria: exactCriteria,
       counts: counts(exact),
-      runs: exact.slice(0, 20).map(projectSummary),
-      truncated: exact.length > 20,
+      runs: exact.slice(0, COHORT_RUNS_LIMIT).map(projectSummary),
+      truncated: exact.length > COHORT_RUNS_LIMIT,
       reason_codes: [],
     };
   }

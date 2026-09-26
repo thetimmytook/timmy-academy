@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-import { TOKEN_LIFETIME_MS } from './d1-navigation';
+import { TOKEN_LIFETIME_MS } from '../config';
+
 import { BenchmarkRequestError } from './repository';
 import { SignedToken, encodeTokenBytes } from './signed-token';
 

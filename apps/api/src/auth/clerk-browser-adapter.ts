@@ -4,7 +4,7 @@ import { AuthenticationDenied } from './application-principal';
 import { resolveApplicationPrincipal } from './resolve-principal';
 
 import type { ApplicationPrincipal } from './application-principal';
-import type { AuthConfig } from '../config';
+import type { AuthConfig } from '../config-types';
 import type { D1AccountRepository } from './d1-account-repository';
 import type { VerifiedSessionIdentity } from './resolve-principal';
 

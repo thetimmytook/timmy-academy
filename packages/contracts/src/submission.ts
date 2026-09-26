@@ -8,6 +8,7 @@ import {
   publicRunDetailSchema,
   resolutionSchema,
 } from './benchmark.js';
+import { MIN_CAPTURE_DURATION_SEC, MIN_CAPTURE_SAMPLE_COUNT } from './limits.js';
 import { clientRunIdSchema } from './owner-runs.js';
 import { settingsSnapshotSchema } from './settings-snapshot.js';
 
@@ -55,8 +56,8 @@ export const submissionRequestSchema = z
     }),
     settings_snapshot: settingsSnapshotSchema.nullable(),
     capture: z.strictObject({
-      duration_sec: z.number().min(110),
-      sample_count: z.number().int().min(120),
+      duration_sec: z.number().min(MIN_CAPTURE_DURATION_SEC),
+      sample_count: z.number().int().min(MIN_CAPTURE_SAMPLE_COUNT),
     }),
     metrics: metricsSchema,
   })

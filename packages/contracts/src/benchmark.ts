@@ -1,6 +1,11 @@
 import { z } from 'zod';
 
-export const COHORT_QUERY_MAX_BODY_BYTES = 4096;
+import {
+  DEFAULT_PAGE_SIZE,
+  MAX_PAGE_SIZE,
+  GROUP_PREVIEW_RUNS_LIMIT,
+  COHORT_RUNS_LIMIT,
+} from './limits.js';
 
 const positiveInteger = z.number().int().positive();
 const count = z.number().int().nonnegative();
@@ -59,7 +64,7 @@ export const runSearchQuerySchema = z
     game_height: queryInteger.pipe(positiveInteger.max(16384)).optional(),
     game_version: label.optional(),
     sort: sortSchema.default('captured_desc'),
-    limit: queryInteger.pipe(positiveInteger.max(50)).default(20),
+    limit: queryInteger.pipe(positiveInteger.max(MAX_PAGE_SIZE)).default(DEFAULT_PAGE_SIZE),
 
     // Token validation belongs to the repository so malformed cursors return 400 invalid_cursor.
     cursor: z.string().optional(),
@@ -182,27 +187,27 @@ const countsSchema = z.strictObject({ run_count: count, contributor_count: count
 const groupSchema = countsSchema.extend({ hardware: hardwareSchema, map_count: count });
 export const hardwareGroupSchema = groupSchema.extend({
   group_key: groupKeySchema,
-  preview_runs: z.array(publicRunSummarySchema).max(3),
+  preview_runs: z.array(publicRunSummarySchema).max(GROUP_PREVIEW_RUNS_LIMIT),
   remaining_run_count: count,
 });
 const searchResponseFields = {
   filters: benchmarkFiltersSchema,
   sort: sortSchema,
-  limit: positiveInteger.max(50),
+  limit: positiveInteger.max(MAX_PAGE_SIZE),
   next_cursor: cursorSchema.nullable(),
 };
 export const groupSearchResponseSchema = z.strictObject({
   ...searchResponseFields,
   view: z.literal('groups'),
   summary: countsSchema.extend({ group_count: count }),
-  groups: z.array(hardwareGroupSchema).max(50),
+  groups: z.array(hardwareGroupSchema).max(MAX_PAGE_SIZE),
 });
 export const groupRunsResponseSchema = z.strictObject({
   ...searchResponseFields,
   view: z.literal('items'),
   group_key: groupKeySchema,
   group: groupSchema,
-  items: z.array(publicRunSummarySchema).max(50),
+  items: z.array(publicRunSummarySchema).max(MAX_PAGE_SIZE),
 });
 export const runSearchResponseSchema = z.discriminatedUnion('view', [
   groupSearchResponseSchema,
@@ -224,7 +229,7 @@ export const cohortCriteriaSchema = z.strictObject({
 });
 const cohortFields = {
   criteria: cohortCriteriaSchema,
-  runs: z.array(publicRunSummarySchema).max(20),
+  runs: z.array(publicRunSummarySchema).max(COHORT_RUNS_LIMIT),
   truncated: z.boolean(),
 };
 const exactCriteriaSchema = cohortCriteriaSchema.extend({
@@ -237,7 +242,7 @@ export const cohortResponseSchema = z.discriminatedUnion('status', [
     status: z.literal('matches'),
     criteria: exactCriteriaSchema,
     counts: z.strictObject({ run_count: positiveInteger, contributor_count: positiveInteger }),
-    runs: z.array(publicRunSummarySchema).min(1).max(20),
+    runs: z.array(publicRunSummarySchema).min(1).max(COHORT_RUNS_LIMIT),
     reason_codes: z.array(z.never()),
   }),
   z.strictObject({

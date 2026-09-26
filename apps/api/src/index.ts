@@ -7,9 +7,9 @@ import { registerBenchmarkApi } from './benchmark/benchmark.api';
 import { D1BenchmarkRepository } from './benchmark/d1-repository';
 import { createOwnerRunsRouter } from './benchmark/owner-runs.api';
 import { BenchmarkRequestError, type BenchmarkRepository } from './benchmark/repository';
-import { readConfig } from './config';
+import { readConfig } from './read-config';
 
-import type { AppBindings } from './config';
+import type { AppBindings } from './config-types';
 
 export function createApp(repository?: BenchmarkRepository): Hono {
   const app = new Hono();

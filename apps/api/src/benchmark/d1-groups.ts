@@ -1,3 +1,4 @@
+import { GROUP_PREVIEW_RUNS_LIMIT } from '@timmy/contracts';
 import { and, count, countDistinct, eq, sql } from 'drizzle-orm';
 
 import { runs } from '../db/schema';
@@ -18,7 +19,7 @@ import { searchFilters } from './search-filters';
 import type { Anchor, BenchmarkDatabase, RunRow } from './d1-query';
 import type { GroupSearchResponse, PublicRunDetail, RunSearchQuery } from '@timmy/contracts';
 
-// A single SQLite statement: filtered rows, windows, counts and <= 3 preview
+// A single SQLite statement: filtered rows, windows, counts and bounded preview
 // documents/group stay in the database. No per-group queries or JS table scan.
 export async function groupPage(
   db: BenchmarkDatabase,
@@ -96,7 +97,7 @@ export async function groupPage(
       ),
     )
     .orderBy(...runOrder(ascending, maps))
-    .limit(3)
+    .limit(GROUP_PREVIEW_RUNS_LIMIT)
     .as('preview');
 
   // The ordered/limited correlated subquery must be aggregated as a whole, not

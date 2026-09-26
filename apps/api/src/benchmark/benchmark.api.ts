@@ -1,5 +1,4 @@
 import {
-  COHORT_QUERY_MAX_BODY_BYTES,
   cohortQuerySchema,
   cohortResponseSchema,
   healthResponseSchema,
@@ -9,6 +8,8 @@ import {
   runSearchQuerySchema,
   runSearchResponseSchema,
 } from '@timmy/contracts';
+
+import { COHORT_QUERY_MAX_BODY_BYTES } from '../config';
 
 import { BenchmarkRequestError } from './repository';
 

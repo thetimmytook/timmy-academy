@@ -7,6 +7,7 @@ import {
   resolutionSchema,
   summaryMetricsSchema,
 } from './benchmark.js';
+import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from './limits.js';
 
 export const clientRunIdSchema = z.uuid();
 export const ownerRunsQuerySchema = z.strictObject({
@@ -15,8 +16,8 @@ export const ownerRunsQuerySchema = z.strictObject({
     .string()
     .regex(/^\d+$/)
     .transform(Number)
-    .pipe(z.number().int().min(1).max(50))
-    .default(20),
+    .pipe(z.number().int().min(1).max(MAX_PAGE_SIZE))
+    .default(DEFAULT_PAGE_SIZE),
   cursor: z.string().optional(),
 });
 const fields = {
@@ -64,7 +65,7 @@ export const deletedOwnerRunSchema = z.strictObject({
 });
 export const ownerRunsResponseSchema = z.strictObject({
   status_filter: z.enum(['all', 'published', 'pending_review', 'rejected']),
-  limit: z.number().int().min(1).max(50),
+  limit: z.number().int().min(1).max(MAX_PAGE_SIZE),
   items: z.array(ownerRunSchema),
   next_cursor: z
     .string()

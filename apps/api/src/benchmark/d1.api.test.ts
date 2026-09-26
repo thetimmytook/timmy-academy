@@ -13,10 +13,10 @@ import { drizzle } from 'drizzle-orm/d1';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { TOKEN_LIFETIME_MS } from '../config';
 import { runs } from '../db/schema';
 import { createApp } from '../index';
 
-import { TOKEN_LIFETIME_MS } from './d1-navigation';
 import { predicate } from './d1-query';
 import { D1BenchmarkRepository } from './d1-repository';
 import { syntheticHardware } from './fixtures';

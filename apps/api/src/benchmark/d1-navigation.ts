@@ -1,5 +1,6 @@
 import { eq, max, sql } from 'drizzle-orm';
 
+import { TOKEN_LIFETIME_MS } from '../config';
 import { runs, state } from '../db/schema';
 
 import { BenchmarkCursor } from './benchmark-cursor';
@@ -9,7 +10,6 @@ import { searchFilters } from './search-filters';
 import type { Anchor, BenchmarkDatabase, Tuple } from './d1-query';
 import type { RunSearchQuery } from '@timmy/contracts';
 
-export const TOKEN_LIFETIME_MS = 30 * 60 * 1000;
 export interface Snapshot {
   watermark: number;
   revision: number;

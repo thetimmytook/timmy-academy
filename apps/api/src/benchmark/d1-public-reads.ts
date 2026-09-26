@@ -1,4 +1,4 @@
-import { filterOptionsSchema, namedModelSchema } from '@timmy/contracts';
+import { COHORT_RUNS_LIMIT, filterOptionsSchema, namedModelSchema } from '@timmy/contracts';
 import { and, eq, isNotNull, sql } from 'drizzle-orm';
 
 import { runs } from '../db/schema';
@@ -97,7 +97,7 @@ export async function queryCohort(
     .from(runs)
     .where(where)
     .orderBy(...runOrder(false))
-    .limit(20)
+    .limit(COHORT_RUNS_LIMIT)
     .all();
 
   return {
@@ -105,7 +105,7 @@ export async function queryCohort(
     criteria: exact,
     counts,
     runs: rows.map(row => projectSummary(stored(row))),
-    truncated: counts.run_count > 20,
+    truncated: counts.run_count > COHORT_RUNS_LIMIT,
     reason_codes: [],
   };
 }
