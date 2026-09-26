@@ -105,9 +105,9 @@ For an existing account/client pair, the writer compares both the request finger
 and the normalized document against stored values, excluding generated ID/URL.
 An identical retry returns the existing pending or published result without changing
 data, IDs or submission time. Changed validated content returns `idempotency_conflict`.
-The writer supports pending and published submissions. Other statuses fail closed
-and are never replaced; their retry behavior will be implemented alongside the
-corresponding workflows.
+The writer supports pending and published submissions. A deleted client ID returns
+409 `publication_deleted` before document/fingerprint comparison and never creates
+a new run. Rejected retry behavior remains a separate step.
 
 ## Protected submission upload
 
@@ -130,8 +130,8 @@ retry identity. The fingerprint is not exposed in owner or public responses.
 No second request document is stored. Historical rows have null fingerprints;
 a retry cannot establish their full original payload and fails with 409.
 
-Cross-client-ID duplicate detection, quotas, rejection and deletion are not
-implemented in this step. Apply the migration before using the POST endpoint.
+Cross-client-ID duplicate detection, quotas and rejection remain separate steps.
+The private deletion repository is described below; its HTTP route is not yet wired. Apply the migration before using the POST endpoint.
 
 ## Submission transport contract
 
@@ -244,8 +244,7 @@ with an independent text ID and a measurement document. The explicit archive
 projection keeps only hardware, conditions, capture duration/sample count, metrics
 and selected settings. It removes dates, author data, source IDs and request
 fingerprints. The table has no owner/source foreign keys, timestamps or mapping
-back to submissions. Archive IDs will be newly generated random UUIDs when deletion
-is implemented. Public repositories do not read the archive.
+back to submissions. Archive IDs are newly generated random UUIDs. Public repositories do not read the archive.
 
 The nullable unique `benchmark_submissions.deleted_public_id` field reserves the
 old public ID for idempotent DELETE acknowledgements after the original run is
@@ -253,12 +252,34 @@ removed. It belongs to the private deletion marker, not the archived measurement
 No archive ID is stored in submissions. Existing submissions retain their data and
 receive null in the new field. The submission INSERT is extended with that null.
 
-This substep only defines storage and the archive allowlist. It does not delete
-or archive existing runs. The next substep must atomically archive the projection,
-clear the submission's run link and request fingerprint, mark it deleted, and
-remove the original public run. API and confirmation UI follow separately.
+The migration defines storage and the archive allowlist; it does not move existing
+data. The private deletion operation below uses this storage. API and confirmation
+UI follow separately.
 
 Admin remains the last feature step: a role-protected `/admin` page, an Admin
 entry in the profile menu for moderators, and a left menu with Approvals selected
 by default. Role assignment stays in Clerk Dashboard. Archive retention remains
 an open product decision.
+
+## Atomic owner deletion
+
+`D1SubmissionDeletion.delete(accountId, publicRunId)` allows deletion only of an
+owned published submission. Missing and unpublished records return 404; another
+owner receives 403 `not_owner`, including on a deleted-ID retry. The repository
+reads the immutable published document and validates its archive projection before
+writing. A single Drizzle D1 batch rechecks ownership and publication state,
+conditionally inserts the archive, clears the submission's run link and request
+fingerprint while setting its deletion marker, and deletes the original run.
+Each mutation depends on the preceding mutation changing exactly one row. Failure
+at any stage rolls back the archive, marker, run removal and revision changes.
+
+The receipt contains `publication_status: deleted` and the former public run ID.
+Repeated or concurrent deletion returns that acknowledgement with one archived
+measurement; a completed retry performs no writes. The marker has no archive ID.
+Author, dates and source identifiers are absent from the archive; it retains only
+hardware, conditions, capture and performance fields and selected settings. The original run row is physically removed. Public reads
+no longer find it, owner lists omit it, and lookup by client ID returns the minimal
+deleted marker. Resubmitting that client ID returns 409 `publication_deleted`.
+
+Only repository behavior and submission retry handling are connected in this
+substep. The owner DELETE route and its confirmation UI are still to be added.

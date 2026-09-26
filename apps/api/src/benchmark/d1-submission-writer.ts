@@ -70,6 +70,10 @@ export class D1SubmissionWriter {
       throw new Error('Submission is missing after its transaction.');
     }
 
+    if (stored.status === 'deleted') {
+      throw new BenchmarkRequestError('publication_deleted');
+    }
+
     if (stored.status !== 'pending_review' && stored.status !== 'published') {
       throw new Error('This submission status is not supported by the writer.');
     }

@@ -15,6 +15,11 @@ export interface BenchmarkRepository {
 }
 
 const errors = {
+  not_owner: { status: 403, message: 'This publication belongs to another account.' },
+  publication_deleted: {
+    status: 409,
+    message: 'This publication was deleted and cannot be resubmitted with the same client run ID.',
+  },
   idempotency_conflict: {
     status: 409,
     message: 'This local run ID was already submitted with different data.',

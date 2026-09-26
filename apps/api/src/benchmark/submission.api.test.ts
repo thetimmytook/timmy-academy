@@ -9,6 +9,7 @@ import { SUBMISSION_MAX_BODY_BYTES } from '../config';
 import { createApp } from '../index';
 
 import { D1SubmissionApproval } from './d1-submission-approval';
+import { D1SubmissionDeletion } from './d1-submission-deletion';
 
 import type { ApplicationPrincipal } from '../auth/application-principal';
 vi.mock('../auth/clerk-browser-adapter', () => ({ createClerkBrowserAdapter: vi.fn() }));
@@ -108,6 +109,7 @@ beforeEach(async () => {
     session: { kind: 'browser', expiresAt: Date.now() + 60000 },
   });
   await db.batch([
+    db.prepare('DELETE FROM benchmark_measurement_archive'),
     db.prepare('DELETE FROM benchmark_submissions'),
     db.prepare('DELETE FROM benchmark_runs'),
     db.prepare('DELETE FROM accounts'),
@@ -261,4 +263,17 @@ it('returns 200 for an exact retry after approval and keeps changed requests con
   expect(published.status).toBe(200);
   expect(await published.text()).not.toContain(dto.client_run_id);
   await counts(1);
+});
+
+it('returns publication_deleted instead of recreating a deleted submission', async () => {
+  expect((await request()).status).toBe(202);
+  const id = (await db
+    .prepare('SELECT sequence FROM benchmark_submissions')
+    .first<number>('sequence'))!;
+  const approved = (await new D1SubmissionApproval(db).approve(id))!;
+  await new D1SubmissionDeletion(db).delete(owner, approved.publicRunId);
+  const replay = await request();
+  expect(replay.status).toBe(409);
+  expect(await replay.json()).toMatchObject({ code: 'publication_deleted' });
+  expect(await db.prepare('SELECT count(*) AS count FROM benchmark_runs').first('count')).toBe(0);
 });
