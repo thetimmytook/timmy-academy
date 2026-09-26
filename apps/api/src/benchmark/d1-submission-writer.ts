@@ -49,7 +49,7 @@ export class D1SubmissionWriter {
         .select(sql`SELECT NULL, ${publicId}, ${accountId}, NULL, 'hidden', ${JSON.stringify(detail)}
         WHERE ${notExists(existingSubmission)}`),
       this.db.insert(submissions)
-        .select(sql`SELECT NULL, ${accountId}, ${clientId}, ${submittedAt}, 'pending_review', ${runs.sequence}, NULL, ${requestFingerprint}
+        .select(sql`SELECT NULL, ${accountId}, ${clientId}, ${submittedAt}, 'pending_review', ${runs.sequence}, NULL, ${requestFingerprint}, NULL
         FROM ${runs} WHERE ${and(eq(runs.publicId, publicId), notExists(existingSubmission))}`),
       this.db
         .select({

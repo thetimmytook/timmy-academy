@@ -9,6 +9,7 @@ import {
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core';
 
+import type { ArchivedMeasurement } from '../benchmark/archived-measurement';
 import type { HasGenerated } from 'drizzle-orm';
 import type {
   SQLiteIntegerBuilderInitial,
@@ -111,9 +112,11 @@ export const submissions = sqliteTable(
     runSequence: integer('run_sequence').references(() => runs.sequence),
     statusReason: text('status_reason'),
     requestFingerprint: text('request_fingerprint'),
+    deletedPublicId: text('deleted_public_id'),
   },
   table => [
     uniqueIndex('submissions_account_client').on(table.accountId, table.clientRunId),
+    uniqueIndex('submissions_deleted_public_id').on(table.deletedPublicId),
     uniqueIndex('submissions_run').on(table.runSequence),
     index('submissions_owner_order').on(table.accountId, table.submittedAt, table.sequence),
     index('submissions_owner_status_order').on(
@@ -141,3 +144,13 @@ export const state = sqliteTable('benchmark_state', {
   id: integer('id').primaryKey(),
   revision: integer('revision').notNull().default(0),
 });
+
+// Closed analysis archive. No dates, source IDs, ownership links or archive-to-submission mapping.
+export const measurementArchive = sqliteTable(
+  'benchmark_measurement_archive',
+  {
+    id: text('id').primaryKey().notNull(),
+    detail: text('detail', { mode: 'json' }).$type<ArchivedMeasurement>().notNull(),
+  },
+  table => [check('valid_archived_measurement', sql`json_valid(${table.detail})`)],
+);

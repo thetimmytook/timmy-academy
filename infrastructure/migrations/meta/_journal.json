@@ -50,6 +50,13 @@
       "when": 1790365998871,
       "tag": "0006_submission-fingerprint",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1790412347590,
+      "tag": "0007_measurement-archive",
+      "breakpoints": true
     }
   ]
 }

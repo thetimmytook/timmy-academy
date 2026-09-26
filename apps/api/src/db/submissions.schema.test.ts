@@ -1,14 +1,19 @@
 import { readFile, readdir } from 'node:fs/promises';
 
 import { cohortQuerySchema, runSearchQuerySchema } from '@timmy/contracts';
+import { drizzle } from 'drizzle-orm/d1';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { projectArchivedMeasurement } from '../benchmark/archived-measurement';
 import { D1BenchmarkRepository } from '../benchmark/d1-repository';
 import { createSyntheticRuns } from '../benchmark/fixtures';
 
+import { measurementArchive } from './schema';
+
 let mf: Miniflare;
 let db: D1Database;
+const signingSecret = 'test-signing-secret';
 const run = createSyntheticRuns()[0]!;
 const owner = 'acc_owner';
 const otherOwner = 'acc_other';
@@ -17,6 +22,7 @@ const revisionQuery = 'SELECT revision FROM benchmark_state WHERE id = 1';
 const deleteRun = 'DELETE FROM benchmark_runs WHERE sequence = ?';
 const countSubmissions = 'SELECT count(*) AS count FROM benchmark_submissions';
 const submittedAt = '2026-09-23T10:00:00Z';
+let migratedSubmission: Record<string, unknown> | null;
 let firstRun: number;
 let secondRun: number;
 
@@ -95,6 +101,17 @@ beforeAll(async () => {
       }
     }
 
+    if (file.startsWith('0006_')) {
+      await db.prepare('INSERT INTO accounts(id) VALUES (?)').bind(owner).run();
+      const sequence = await createRun('br_before_archive');
+      await db
+        .prepare(
+          "INSERT INTO benchmark_submissions(account_id, client_run_id, submitted_at, status, run_sequence, request_fingerprint) VALUES (?, ?, ?, 'pending_review', ?, ?)",
+        )
+        .bind(owner, clientId, submittedAt, sequence, 'migration-fingerprint')
+        .run();
+    }
+
     if (file.startsWith('0000_')) {
       await db
         .prepare(
@@ -109,9 +126,16 @@ beforeAll(async () => {
         .run();
     }
   }
+
+  migratedSubmission = await db
+    .prepare(
+      'SELECT account_id, client_run_id, status, request_fingerprint, deleted_public_id FROM benchmark_submissions',
+    )
+    .first();
 });
 
 beforeEach(async () => {
+  await db.prepare('DELETE FROM benchmark_measurement_archive').run();
   await db.prepare('DELETE FROM benchmark_submissions').run();
   await db.prepare('DELETE FROM accounts').run();
   await db
@@ -121,6 +145,10 @@ beforeEach(async () => {
   firstRun = await createRun('br_pending');
   secondRun = await createRun('br_other');
   await db.prepare('INSERT INTO accounts(id) VALUES (?), (?)').bind(owner, otherOwner).run();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 afterAll(async () => {
@@ -179,7 +207,7 @@ describe('private benchmark submission schema', () => {
     'keeps full %s run data private across public reads',
     async status => {
       await insert({ status, reason: status === 'rejected' ? 'fixture_reason' : null });
-      const repository = new D1BenchmarkRepository(db, 'test-signing-secret');
+      const repository = new D1BenchmarkRepository(db, signingSecret);
       expect(await repository.detail('br_pending')).toBeUndefined();
       const search = await repository.search(runSearchQuerySchema.parse({}));
       expect(JSON.stringify(search)).not.toContain('br_pending');
@@ -226,7 +254,7 @@ describe('private benchmark submission schema', () => {
         .prepare("UPDATE benchmark_submissions SET status = 'published' WHERE run_sequence = ?")
         .bind(firstRun),
     ]);
-    const repository = new D1BenchmarkRepository(db, 'test-signing-secret');
+    const repository = new D1BenchmarkRepository(db, signingSecret);
     expect((await repository.detail('br_pending'))?.settings).toEqual(run.detail.settings);
     expect(
       await db
@@ -273,5 +301,65 @@ describe('private benchmark submission schema', () => {
       .bind(owner)
       .all<{ client_run_id: string }>();
     expect(result.results.map(row => row.client_run_id)).toEqual(['client_run_2', clientId]);
+  });
+});
+
+describe('measurement archive storage', () => {
+  it('preserves submissions when adding deletion acknowledgement storage', () => {
+    expect(migratedSubmission).toEqual({
+      account_id: owner,
+      client_run_id: clientId,
+      status: 'pending_review',
+      request_fingerprint: 'migration-fingerprint',
+      deleted_public_id: null,
+    });
+  });
+  it('stores only an independent ID and measurement and never exposes archived rows publicly', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now());
+    const repository = new D1BenchmarkRepository(db, signingSecret);
+    const query = runSearchQuerySchema.parse({});
+    const before = await repository.search(query);
+    const options = await repository.filterOptions();
+    const comparison = cohortQuerySchema.parse({
+      hardware: {
+        cpu_name: run.detail.hardware.cpu.name,
+        gpu_name: run.detail.hardware.gpu.name,
+        ram_gb: run.detail.hardware.ram_gb,
+      },
+      map: run.detail.conditions.map.id,
+      execution: run.detail.conditions.execution,
+      game_resolution: run.detail.conditions.game_resolution,
+      game_version: run.detail.conditions.game_version,
+    });
+    const cohort = await repository.cohort(comparison);
+    const archived = { id: crypto.randomUUID(), detail: projectArchivedMeasurement(run.detail) };
+    await drizzle(db).insert(measurementArchive).values(archived);
+    expect(await drizzle(db).select().from(measurementArchive)).toEqual([archived]);
+    expect(
+      (
+        await db.prepare('PRAGMA table_info(benchmark_measurement_archive)').all<{ name: string }>()
+      ).results.map(column => column.name),
+    ).toEqual(['id', 'detail']);
+    expect(
+      (await db.prepare('PRAGMA foreign_key_list(benchmark_measurement_archive)').all()).results,
+    ).toEqual([]);
+    expect(await repository.search(query)).toEqual(before);
+    expect(await repository.filterOptions()).toEqual(options);
+    expect(await repository.cohort(comparison)).toEqual(cohort);
+    expect(await repository.detail(archived.id)).toBeUndefined();
+  });
+  it('requires a unique public ID for each deletion acknowledgement', async () => {
+    await insert({ status: 'deleted', runSequence: null });
+    await db
+      .prepare('UPDATE benchmark_submissions SET deleted_public_id = ? WHERE account_id = ?')
+      .bind('br_removed', owner)
+      .run();
+    await insert({ accountId: otherOwner, status: 'deleted', runSequence: null });
+    await expect(
+      db
+        .prepare('UPDATE benchmark_submissions SET deleted_public_id = ? WHERE account_id = ?')
+        .bind('br_removed', otherOwner)
+        .run(),
+    ).rejects.toThrow();
   });
 });

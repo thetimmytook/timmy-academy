@@ -236,3 +236,29 @@ This is a private repository operation with tests, not an HTTP endpoint or an
 owner capability. No moderator UI, role policy, rejection or deletion operation
 is introduced. A moderator entry point and its authorization must be implemented
 separately before approval can be used through the application.
+
+## Deletion storage foundation
+
+Migration `0007_measurement-archive.sql` adds `benchmark_measurement_archive`
+with an independent text ID and a measurement document. The explicit archive
+projection keeps only hardware, conditions, capture duration/sample count, metrics
+and selected settings. It removes dates, author data, source IDs and request
+fingerprints. The table has no owner/source foreign keys, timestamps or mapping
+back to submissions. Archive IDs will be newly generated random UUIDs when deletion
+is implemented. Public repositories do not read the archive.
+
+The nullable unique `benchmark_submissions.deleted_public_id` field reserves the
+old public ID for idempotent DELETE acknowledgements after the original run is
+removed. It belongs to the private deletion marker, not the archived measurement.
+No archive ID is stored in submissions. Existing submissions retain their data and
+receive null in the new field. The submission INSERT is extended with that null.
+
+This substep only defines storage and the archive allowlist. It does not delete
+or archive existing runs. The next substep must atomically archive the projection,
+clear the submission's run link and request fingerprint, mark it deleted, and
+remove the original public run. API and confirmation UI follow separately.
+
+Admin remains the last feature step: a role-protected `/admin` page, an Admin
+entry in the profile menu for moderators, and a left menu with Approvals selected
+by default. Role assignment stays in Clerk Dashboard. Archive retention remains
+an open product decision.
