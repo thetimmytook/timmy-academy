@@ -38,7 +38,15 @@ vi.mock('@clerk/react', () => ({
     isLoaded: clerk.loaded,
     session: clerk.session ? { ...clerk.session, user: { publicMetadata: clerk.metadata } } : null,
   }),
-  useClerk: (): { signOut: typeof clerk.signOut } => ({ signOut: clerk.signOut }),
+  useClerk: (): {
+    signOut: typeof clerk.signOut;
+    frontendApi: string;
+    buildUserProfileUrl: () => string;
+  } => ({
+    signOut: clerk.signOut,
+    frontendApi: 'fixture.clerk.accounts.dev',
+    buildUserProfileUrl: () => 'https://fixture.accounts.dev/user',
+  }),
   SignIn: (props: unknown): JSX.Element => {
     clerk.signIn(props);
 
@@ -76,6 +84,60 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+});
+
+const continuation =
+  'https://fixture.accounts.dev/oauth-consent?client_id=fixture&state=fixture&code_challenge=fixture&redirect_uri=http%3A%2F%2F127.0.0.1%3A50000%2Fcallback';
+
+it.each(['/sign-in', '/sign-up'])('preserves OAuth continuation in %s', path => {
+  const search = '?' + new URLSearchParams({ redirect_url: continuation }).toString();
+  start(path + search);
+  const widget = path === '/sign-in' ? clerk.signIn : clerk.signUp;
+  expect(widget).toHaveBeenLastCalledWith(
+    expect.objectContaining({ forceRedirectUrl: continuation }),
+  );
+  expect(widget.mock.lastCall?.[0]).toEqual(
+    expect.objectContaining(
+      path === '/sign-in'
+        ? { signUpUrl: '/sign-up' + search, signUpForceRedirectUrl: continuation }
+        : { signInUrl: '/sign-in' + search, signInForceRedirectUrl: continuation },
+    ),
+  );
+});
+
+it.each(['/sign-in', '/sign-up'])('resumes OAuth from an existing session on %s', path => {
+  const replace = vi.fn();
+  window.history.replaceState(
+    null,
+    '',
+    path + '?' + new URLSearchParams({ redirect_url: continuation }).toString(),
+  );
+  const originalLocation = window.location;
+  vi.stubGlobal('location', { ...originalLocation, replace });
+  clerk.session = { id: 'private_browser_session' };
+  render(
+    <BrowserRouter>
+      <BrowserAuthProvider>
+        <App />
+      </BrowserAuthProvider>
+    </BrowserRouter>,
+  );
+  expect(replace).toHaveBeenCalledExactlyOnceWith(continuation);
+  expect(screen.getByRole('status').textContent).toBe('Continuing desktop sign-in…');
+  expect(screen.queryByText('You are signed in.')).toBeNull();
+});
+
+it('does not use an external redirect as an OAuth continuation', () => {
+  start('/sign-in?redirect_url=https://untrusted.example/oauth/authorize-with-immediate-redirect');
+  expect(clerk.signIn).toHaveBeenLastCalledWith({
+    routing: 'path',
+    path: '/sign-in',
+    signUpUrl: '/sign-up',
+  });
+  expect(clerk.provider).toHaveBeenLastCalledWith(
+    expect.objectContaining({ signInForceRedirectUrl: '/bench/' }),
+  );
 });
 
 function openProfile(): void {

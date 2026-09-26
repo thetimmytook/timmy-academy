@@ -1,11 +1,13 @@
 import { ClerkProvider, SignIn, SignUp, useClerk, useSession } from '@clerk/react';
-import { createContext, useContext } from 'react';
+import { createContext, useContext, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router';
 
 import { lastBrowse } from '../bench/navigation';
 import { readConfig } from '../config';
 import { Button } from '../elements/Button';
 import { Message } from '../elements/Message';
+
+import { oauthContinuation } from './oauth-continuation';
 
 import type { JSX, ReactNode } from 'react';
 
@@ -78,10 +80,6 @@ export function useBrowserSession(): BrowserSession {
 
 export function BrowserAuthForm({ mode }: Readonly<{ mode: 'sign-in' | 'sign-up' }>): JSX.Element {
   const { status } = useBrowserSession();
-  const { search } = useLocation();
-  const destination = signInDestination(search);
-  const suffix =
-    destination === '/bench/me' || destination === '/admin' ? '?returnTo=' + destination : '';
 
   if (status === 'unavailable') {
     return (
@@ -93,6 +91,37 @@ export function BrowserAuthForm({ mode }: Readonly<{ mode: 'sign-in' | 'sign-up'
 
   if (status === 'loading') {
     return <Message role="status">Loading sign-in…</Message>;
+  }
+
+  return <AvailableAuthForm mode={mode} />;
+}
+
+function AvailableAuthForm({ mode }: Readonly<{ mode: 'sign-in' | 'sign-up' }>): JSX.Element {
+  const { status } = useBrowserSession();
+  const clerk = useClerk();
+  const { search } = useLocation();
+  const continuation = oauthContinuation(search, clerk.frontendApi, clerk.buildUserProfileUrl());
+  const destination = signInDestination(search);
+  const webSuffix =
+    destination === '/bench/me' || destination === '/admin' ? '?returnTo=' + destination : '';
+  const suffix = continuation
+    ? '?' + new URLSearchParams({ redirect_url: continuation }).toString()
+    : webSuffix;
+  const signInRedirect = continuation
+    ? { forceRedirectUrl: continuation, signUpForceRedirectUrl: continuation }
+    : {};
+  const signUpRedirect = continuation
+    ? { forceRedirectUrl: continuation, signInForceRedirectUrl: continuation }
+    : {};
+
+  useEffect(() => {
+    if (status === 'signed-in' && continuation) {
+      window.location.replace(continuation);
+    }
+  }, [status, continuation]);
+
+  if (status === 'signed-in' && continuation) {
+    return <Message role="status">Continuing desktop sign-in…</Message>;
   }
 
   if (status === 'signed-in') {
@@ -107,9 +136,9 @@ export function BrowserAuthForm({ mode }: Readonly<{ mode: 'sign-in' | 'sign-up'
   }
 
   return mode === 'sign-in' ? (
-    <SignIn routing="path" path="/sign-in" signUpUrl={'/sign-up' + suffix} />
+    <SignIn routing="path" path="/sign-in" signUpUrl={'/sign-up' + suffix} {...signInRedirect} />
   ) : (
-    <SignUp routing="path" path="/sign-up" signInUrl={'/sign-in' + suffix} />
+    <SignUp routing="path" path="/sign-up" signInUrl={'/sign-in' + suffix} {...signUpRedirect} />
   );
 }
 
