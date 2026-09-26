@@ -3,6 +3,8 @@ import { drizzle } from 'drizzle-orm/d1';
 
 import { runs, submissions } from '../db/schema';
 
+import { BenchmarkRequestError } from './repository';
+
 import type { D1Database } from '@cloudflare/workers-types';
 
 // Private moderation operation; never an owner action.
@@ -51,7 +53,11 @@ export class D1SubmissionRejection {
       return undefined;
     }
 
-    if (row.status !== 'rejected' || row.visibility !== 'hidden' || row.publishedAt !== null) {
+    if (row.status !== 'rejected') {
+      throw new BenchmarkRequestError('moderation_conflict');
+    }
+
+    if (row.visibility !== 'hidden' || row.publishedAt !== null) {
       throw new Error('Submission cannot be rejected in its current state.');
     }
 

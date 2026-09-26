@@ -20,3 +20,9 @@ export const moderationQueueSchema = z.strictObject({
 });
 export type ModerationQuery = z.infer<typeof moderationQuerySchema>;
 export type ModerationQueue = z.infer<typeof moderationQueueSchema>;
+export const moderationDecisionSchema = z.enum(['approve', 'reject']);
+export const moderationDecisionResponseSchema = z.strictObject({
+  submission_id: z.number().int().positive(),
+  publication_status: z.enum(['published', 'rejected']),
+});
+export type ModerationDecision = z.infer<typeof moderationDecisionSchema>;

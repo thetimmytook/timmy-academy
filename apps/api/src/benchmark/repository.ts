@@ -15,6 +15,10 @@ export interface BenchmarkRepository {
 }
 
 const errors = {
+  moderation_conflict: {
+    status: 409,
+    message: 'This submission already has a different decision. Refresh the queue.',
+  },
   forbidden: { status: 403, message: 'Moderator access is required.' },
   not_owner: { status: 403, message: 'This publication belongs to another account.' },
   publication_deleted: {

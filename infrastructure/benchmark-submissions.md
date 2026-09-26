@@ -233,9 +233,8 @@ writes or revision changes. A missing submission returns undefined. Other states
 fail closed. Concurrent approval and upload retry are serialized by D1 batches;
 a retry may observe pending before approval or published after it.
 
-This is a private repository operation with tests, not an HTTP endpoint or an
-owner capability. A moderator entry point and its authorization must be implemented
-separately before approval can be used through the application.
+This is a private repository operation, not an owner capability. The role-protected
+Admin API invokes it through the moderator entry point described in [admin.md](admin.md).
 
 ## Private rejection
 
@@ -252,8 +251,8 @@ An exact upload retry after rejection returns HTTP 200 with `publication_status:
 rejected`, null public ID/URL and `status_reason: rejected`. It does not reopen the
 submission or allocate a second run. Changed payloads still return 409
 `idempotency_conflict`. Owner lists and lookup show the rejected status, while
-public readers cannot access the hidden run. Detailed reasons, reconsideration and
-the moderator HTTP/UI entry points remain outside this repository step.
+public readers cannot access the hidden run. Detailed reasons and reconsideration
+remain outside the current workflow. The Admin page provides the moderator entry point.
 
 ## Deletion storage foundation
 
@@ -277,8 +276,8 @@ Admin remains the last feature step: a role-protected `/admin` page, an Admin
 entry in the profile menu for moderators, and a left menu with Approvals selected
 by default. Role assignment stays in Clerk Dashboard. Archive retention remains
 an open product decision.
-The protected pending queue and Clerk role mapping are implemented as described in
-[admin.md](admin.md); the admin page and decision endpoints follow separately.
+The protected pending queue, Clerk role mapping, admin page and decision endpoints
+are implemented as described in [admin.md](admin.md).
 
 ## Atomic owner deletion
 

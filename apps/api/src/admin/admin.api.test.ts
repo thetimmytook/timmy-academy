@@ -120,6 +120,8 @@ const cacheControl = 'Cache-Control';
 const queuePath = '/api/admin/v1/approvals';
 const queue = (suffix = ''): Promise<Response> =>
   request('', contentType, suffix, 'GET', queuePath);
+const decide = (id: number, decision: string, body = '', suffix = ''): Promise<Response> =>
+  request(body, contentType, `/${id}/${decision}${suffix}`, 'POST', queuePath);
 
 async function submit(client = dto.client_run_id): Promise<number> {
   expect((await request(JSON.stringify({ ...dto, client_run_id: client }))).status).toBe(202);
@@ -131,6 +133,75 @@ async function submit(client = dto.client_run_id): Promise<number> {
 }
 
 describe('moderator approvals queue', () => {
+  it.each(['approve', 'reject'])('applies %s and acknowledges exact repeats', async decision => {
+    const id = await submit();
+    const status = decision === 'approve' ? 'published' : 'rejected';
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const response = await decide(id, decision);
+      expect(response.status).toBe(200);
+      expect(response.headers.get(cacheControl)).toBe('no-store');
+      expect(await response.json()).toEqual({ submission_id: id, publication_status: status });
+    }
+
+    expect(await db.prepare('SELECT status FROM benchmark_submissions').first('status')).toBe(
+      status,
+    );
+    expect(await (await queue()).json()).toEqual({ items: [], next_after: null });
+    const publicId = await db
+      .prepare('SELECT public_id FROM benchmark_runs')
+      .first<string>('public_id');
+    const publicRead = await createApp().request(
+      '/api/bench/v1/runs/' + publicId,
+      {},
+      { BENCHMARK_DB: db },
+    );
+    expect(publicRead.status).toBe(decision === 'approve' ? 200 : 404);
+  });
+
+  it('returns a conflict when moderators make opposite decisions', async () => {
+    const id = await submit();
+    const responses = await Promise.all([decide(id, 'approve'), decide(id, 'reject')]);
+    expect(responses.map(response => response.status).sort((a, b) => a - b)).toEqual([200, 409]);
+    expect(await responses.find(response => response.status === 409)!.json()).toMatchObject({
+      code: 'moderation_conflict',
+    });
+  });
+
+  it.each(['approve', 'reject'])(
+    'denies owner %s requests before validation or writes',
+    async decision => {
+      const id = await submit();
+      authenticate.mockResolvedValue({
+        accountId: owner,
+        emailVerified: true,
+        canModerate: false,
+        session: { kind: 'browser', expiresAt: Date.now() + 60000 },
+      });
+      expect((await decide(id, decision)).status).toBe(403);
+      expect((await decide(-1, decision, '{}')).status).toBe(403);
+      expect(await db.prepare('SELECT status FROM benchmark_submissions').first('status')).toBe(
+        'pending_review',
+      );
+      authenticate.mockRejectedValue(new AuthenticationDenied());
+      expect((await decide(id, decision)).status).toBe(401);
+    },
+  );
+
+  it.each([
+    [-1, 'approve', '', ''],
+    [1, 'unknown', '', ''],
+    [1, 'approve', '{}', ''],
+    [1, 'reject', '', '?role=admin'],
+  ] as const)('rejects invalid decision input %s %s %s %s', async (id, decision, body, suffix) => {
+    expect((await decide(id, decision, body, suffix)).status).toBe(422);
+  });
+
+  it('returns not_found for a missing submission', async () => {
+    expect((await decide(999, 'approve')).status).toBe(404);
+    expect((await decide(999, 'reject')).status).toBe(404);
+  });
+
   it('shows only pending measurements with an explicit projection', async () => {
     const id = await submit();
     const response = await queue();

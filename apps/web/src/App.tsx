@@ -6,6 +6,7 @@ import { css } from '../styled-system/css';
 import { SessionControls } from './auth/SessionControls';
 import { lastBrowse } from './bench/navigation';
 import { Button } from './elements/Button';
+import AdminPage from './pages/AdminPage';
 import BenchPage from './pages/BenchPage';
 import MyBenchPage from './pages/MyBenchPage';
 import NotFoundPage from './pages/NotFoundPage';
@@ -94,6 +95,14 @@ export default function App(): JSX.Element {
         })}
       >
         <Routes>
+          <Route
+            path="/admin"
+            element={
+              <PageTitle title="Admin">
+                <AdminPage />
+              </PageTitle>
+            }
+          />
           <Route
             path="/bench/me"
             element={

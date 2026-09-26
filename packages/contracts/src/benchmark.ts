@@ -278,6 +278,7 @@ export const benchmarkErrorSchema = z.strictObject({
     'email_verification_required',
     'not_owner',
     'forbidden',
+    'moderation_conflict',
     'duplicate_run',
     'idempotency_conflict',
     'publication_deleted',

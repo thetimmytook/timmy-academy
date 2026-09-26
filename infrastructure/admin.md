@@ -36,5 +36,33 @@ under `run`. Preallocated public IDs and URLs, owner/client identifiers, fingerp
 and provider identities are omitted. Only pending submissions linked to hidden,
 unpublished runs appear. This endpoint never approves or rejects a submission.
 
-This step provides the protected queue. The `/admin` Approvals page, role-only
-profile-menu entry and moderator decision endpoints are the next implementation step.
+## Decisions
+
+- `POST /api/admin/v1/approvals/:submissionId/approve`
+- `POST /api/admin/v1/approvals/:submissionId/reject`
+
+Both routes use the same browser moderator guard and accept no body or query.
+They call the atomic approval/rejection repositories. A successful response is
+HTTP 200 with `submission_id` and `publication_status` (`published` or `rejected`).
+Repeating the same decision returns the same acknowledgement. An opposing decision
+or a deleted submission returns 409 `moderation_conflict`; a missing ID returns 404.
+Invalid parameters return 422. Mutations retain the browser Origin checks.
+
+## Admin page
+
+The profile menu shows Admin only when the current browser user's public metadata
+has the exact `admin` role. `/admin` displays a left menu with Approvals selected,
+pending measurements, expandable conditions/metrics/settings, and pagination.
+Guest visits offer sign-in with `/admin` as the return destination. The UI role
+check controls presentation; the server rechecks authorization for every request.
+
+Approve and Reject each require confirmation. Pending actions disable duplicate
+clicks; successful decisions refresh the queue from the first page. A network error
+keeps the item available for an idempotent retry. A conflict offers a queue refresh.
+Unloading the page, losing the client-side role, signing out or changing sessions
+unmounts the private queue and aborts requests; late responses are ignored.
+Aborting the browser request does not undo a decision already accepted by the server.
+
+No role-management page or reconsideration workflow is provided. Change roles in
+Clerk Dashboard; if the browser still shows old metadata, reload it. Server checks
+use the current role regardless of the menu's state.

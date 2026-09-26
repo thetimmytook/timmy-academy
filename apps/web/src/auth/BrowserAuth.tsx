@@ -10,12 +10,14 @@ import { Message } from '../elements/Message';
 import type { JSX, ReactNode } from 'react';
 
 interface BrowserSession {
+  canModerate: boolean;
   sessionKey: string | null;
   status: 'unavailable' | 'loading' | 'signed-out' | 'signed-in';
   signOut: () => Promise<void>;
 }
 
 const SessionContext = createContext<BrowserSession>({
+  canModerate: false,
   sessionKey: null,
   status: 'unavailable',
   signOut: () => Promise.resolve(),
@@ -29,6 +31,7 @@ function SessionProvider({ children }: Readonly<{ children: ReactNode }>): JSX.E
   return (
     <SessionContext.Provider
       value={{
+        canModerate: isLoaded && session?.user.publicMetadata.role === 'admin',
         sessionKey: session?.id ?? null,
         status: isLoaded ? loadedStatus : 'loading',
         async signOut(): Promise<void> {
@@ -77,7 +80,8 @@ export function BrowserAuthForm({ mode }: Readonly<{ mode: 'sign-in' | 'sign-up'
   const { status } = useBrowserSession();
   const { search } = useLocation();
   const destination = signInDestination(search);
-  const suffix = destination === '/bench/me' ? '?returnTo=/bench/me' : '';
+  const suffix =
+    destination === '/bench/me' || destination === '/admin' ? '?returnTo=' + destination : '';
 
   if (status === 'unavailable') {
     return (
@@ -92,10 +96,12 @@ export function BrowserAuthForm({ mode }: Readonly<{ mode: 'sign-in' | 'sign-up'
   }
 
   if (status === 'signed-in') {
+    const pageLabel = destination === '/admin' ? 'Admin' : 'My Bench';
+
     return (
       <Message>
         You are signed in.{' '}
-        <Button href={destination}>{suffix ? 'My Bench' : 'Browse benchmarks'}</Button>
+        <Button href={destination}>{suffix ? pageLabel : 'Browse benchmarks'}</Button>
       </Message>
     );
   }
@@ -108,5 +114,7 @@ export function BrowserAuthForm({ mode }: Readonly<{ mode: 'sign-in' | 'sign-up'
 }
 
 function signInDestination(search: string): string {
-  return new URLSearchParams(search).get('returnTo') === '/bench/me' ? '/bench/me' : lastBrowse();
+  const destination = new URLSearchParams(search).get('returnTo');
+
+  return destination === '/bench/me' || destination === '/admin' ? destination : lastBrowse();
 }

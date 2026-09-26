@@ -3,6 +3,8 @@ import { drizzle } from 'drizzle-orm/d1';
 
 import { runs, submissions } from '../db/schema';
 
+import { BenchmarkRequestError } from './repository';
+
 import type { D1Database } from '@cloudflare/workers-types';
 
 export interface ApprovedSubmission {
@@ -63,12 +65,11 @@ export class D1SubmissionApproval {
       return undefined;
     }
 
-    if (
-      row.status !== 'published' ||
-      row.visibility !== 'published' ||
-      row.publicRunId === null ||
-      row.publishedAt === null
-    ) {
+    if (row.status !== 'published') {
+      throw new BenchmarkRequestError('moderation_conflict');
+    }
+
+    if (row.visibility !== 'published' || row.publicRunId === null || row.publishedAt === null) {
       throw new Error('Submission cannot be approved in its current state.');
     }
 

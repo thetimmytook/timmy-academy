@@ -17,6 +17,7 @@ interface ProviderProps {
 
 const clerk = vi.hoisted(() => ({
   loaded: true,
+  metadata: {},
   session: null as { id: string } | null,
   signOut: vi.fn<() => Promise<void>>(),
   provider: vi.fn<(props: ProviderProps) => void>(),
@@ -30,9 +31,12 @@ vi.mock('@clerk/react', () => ({
 
     return props.children;
   },
-  useSession: (): { isLoaded: boolean; session: typeof clerk.session } => ({
+  useSession: (): {
+    isLoaded: boolean;
+    session: { id: string; user: { publicMetadata: Record<string, unknown> } } | null;
+  } => ({
     isLoaded: clerk.loaded,
-    session: clerk.session,
+    session: clerk.session ? { ...clerk.session, user: { publicMetadata: clerk.metadata } } : null,
   }),
   useClerk: (): { signOut: typeof clerk.signOut } => ({ signOut: clerk.signOut }),
   SignIn: (props: unknown): JSX.Element => {
@@ -65,6 +69,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv('VITE_CLERK_PUBLISHABLE_KEY', 'pk_test_fixture');
   clerk.loaded = true;
+  clerk.metadata = {};
   clerk.session = null;
   clerk.signOut.mockResolvedValue(undefined);
 });
@@ -82,6 +87,29 @@ const expandedAttribute = 'aria-expanded';
 const signInLabel = 'Sign in with email →';
 
 describe('browser authentication in the main app', () => {
+  it.each(['admin', 'Admin', 'moderator', undefined])(
+    'shows Admin only for the exact role: %s',
+    role => {
+      clerk.session = { id: 'session_admin' };
+      clerk.metadata = { role };
+      start();
+      openProfile();
+      expect(Boolean(screen.queryByRole('link', { name: 'Admin' }))).toBe(role === 'admin');
+    },
+  );
+
+  it('preserves the admin sign-in destination through sign-up', () => {
+    start('/sign-in?returnTo=/admin');
+    expect(clerk.provider).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        signInForceRedirectUrl: '/admin',
+        signUpForceRedirectUrl: '/admin',
+      }),
+    );
+    expect(clerk.signIn).toHaveBeenLastCalledWith(
+      expect.objectContaining({ signUpUrl: '/sign-up?returnTo=/admin' }),
+    );
+  });
   it('toggles the profile panel and closes with Escape, outside click and focus leaving', () => {
     start();
     const trigger = screen.getByRole('button', { name: 'Profile' });

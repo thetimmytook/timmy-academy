@@ -10,7 +10,7 @@ import { useBrowserSession } from './BrowserAuth';
 import type { JSX } from 'react';
 
 export function SessionControls(): JSX.Element {
-  const { status, signOut } = useBrowserSession();
+  const { status, signOut, canModerate } = useBrowserSession();
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -117,6 +117,11 @@ export function SessionControls(): JSX.Element {
               <Button href="/bench/me" variant="ghost" onClick={() => setOpen(false)}>
                 My Bench
               </Button>
+              {canModerate && (
+                <Button href="/admin" variant="ghost" onClick={() => setOpen(false)}>
+                  Admin
+                </Button>
+              )}
               <Button variant="ghost" disabled={pending} onClick={() => void logOut()}>
                 {pending ? 'Signing out…' : 'Sign out'}
               </Button>

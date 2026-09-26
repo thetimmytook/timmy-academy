@@ -1,9 +1,22 @@
-import { moderationQuerySchema, moderationQueueSchema } from '@timmy/contracts';
+import {
+  moderationQuerySchema,
+  moderationQueueSchema,
+  moderationDecisionSchema,
+  moderationDecisionResponseSchema,
+} from '@timmy/contracts';
 import { Hono } from 'hono';
+import { z } from 'zod';
 
+import { D1SubmissionApproval } from '../benchmark/d1-submission-approval';
+import { D1SubmissionRejection } from '../benchmark/d1-submission-rejection';
 import { BenchmarkRequestError } from '../benchmark/repository';
 
 import { D1ModerationRepository } from './d1-moderation-repository';
+
+const decisionParamsSchema = z.strictObject({
+  submissionId: z.coerce.number().int().positive(),
+  decision: moderationDecisionSchema,
+});
 
 export function createAdminRouter(): Hono {
   const app = new Hono();
@@ -34,6 +47,37 @@ export function createAdminRouter(): Hono {
     const page = await new D1ModerationRepository(database).pending(query.data);
 
     return context.json(moderationQueueSchema.parse(page));
+  });
+
+  app.post('/approvals/:submissionId/:decision', async context => {
+    const parsed = decisionParamsSchema.safeParse(context.req.param());
+
+    if (!parsed.success || new URL(context.req.url).search || context.req.raw.body !== null) {
+      throw new BenchmarkRequestError('invalid_input');
+    }
+
+    const { database } = context.get('config');
+
+    if (!database) {
+      throw new Error('Database is not configured.');
+    }
+
+    const { submissionId, decision } = parsed.data;
+    const result =
+      decision === 'approve'
+        ? await new D1SubmissionApproval(database).approve(submissionId)
+        : await new D1SubmissionRejection(database).reject(submissionId);
+
+    if (!result) {
+      throw new BenchmarkRequestError('not_found');
+    }
+
+    return context.json(
+      moderationDecisionResponseSchema.parse({
+        submission_id: submissionId,
+        publication_status: decision === 'approve' ? 'published' : 'rejected',
+      }),
+    );
   });
 
   return app;
