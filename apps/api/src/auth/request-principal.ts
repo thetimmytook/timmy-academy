@@ -1,3 +1,6 @@
+import { BenchmarkRequestError } from '../benchmark/repository';
+import { AUTH_RATE_LIMIT_RETRY_SECONDS } from '../config';
+
 import { AuthenticationDenied } from './application-principal';
 import { createClerkBrowserAdapter } from './clerk-browser-adapter';
 import { createClerkDesktopAdapter } from './clerk-desktop-adapter';
@@ -26,7 +29,7 @@ export function requestPrincipal(): MiddlewareHandler {
 }
 
 async function authenticate(context: Context): Promise<ApplicationPrincipal> {
-  const { auth, database } = context.get('config');
+  const { auth, database, authRateLimit } = context.get('config');
 
   if (!auth) {
     throw new Error('Authentication is not configured.');
@@ -34,6 +37,20 @@ async function authenticate(context: Context): Promise<ApplicationPrincipal> {
 
   if (!database) {
     throw new Error('Database is not configured.');
+  }
+
+  if (!authRateLimit) {
+    throw new Error('Authentication rate limiting is not configured.');
+  }
+
+  // Cloudflare supplies this header. Do not trust X-Forwarded-For or token contents.
+  // Requests without it (for example local development) share one fallback bucket.
+  const { success } = await authRateLimit.limit({
+    key: context.req.header('CF-Connecting-IP') ?? 'unknown',
+  });
+
+  if (!success) {
+    throw new BenchmarkRequestError('rate_limited', AUTH_RATE_LIMIT_RETRY_SECONDS);
   }
 
   const accounts = new D1AccountRepository(database);

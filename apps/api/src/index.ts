@@ -68,10 +68,18 @@ export function createApp(repository?: BenchmarkRepository): Hono {
 
     const known = error instanceof BenchmarkRequestError;
 
+    if (known && error.retryAfterSeconds !== undefined) {
+      context.header('Retry-After', String(error.retryAfterSeconds));
+      context.header('Cache-Control', 'no-store');
+    }
+
     return context.json(
       benchmarkErrorSchema.parse({
         code: known ? error.code : 'internal_error',
         message: known ? error.message : 'The benchmark request could not be completed.',
+        ...(known && error.retryAfterSeconds !== undefined
+          ? { retry_after_seconds: error.retryAfterSeconds }
+          : {}),
         request_id: `req_${crypto.randomUUID()}`,
       }),
       known ? error.status : 500,

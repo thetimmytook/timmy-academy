@@ -62,6 +62,7 @@ async function request(
       CLERK_ISSUER: 'https://browser.clerk.accounts.dev',
       CLERK_PUBLISHABLE_KEY: 'pk_test_fixture',
       CLERK_SECRET_KEY: 'sk_test_fixture',
+      AUTH_RATE_LIMIT: { limit: vi.fn().mockResolvedValue({ success: true }) },
     },
   );
 }

@@ -1,7 +1,8 @@
 import { clientRunIdSchema, publicRunDetailSchema } from '@timmy/contracts';
-import { and, eq, notExists, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, notExists, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 
+import { SUBMISSION_ACCOUNT_LIMIT, SUBMISSION_QUOTA_WINDOW_MS } from '../config';
 import { runs, submissions } from '../db/schema';
 
 import { BenchmarkRequestError } from './repository';
@@ -40,7 +41,8 @@ export class D1SubmissionWriter {
       public_run_id: publicId,
       url: '/bench/runs/' + publicId,
     });
-    const submittedAt = new Date().toISOString();
+    const now = Date.now();
+    const submittedAt = new Date(now).toISOString();
 
     // D1 batch is one transaction on the primary. Only the winning request inserts
     // a run; any failed submission insert rolls it back. Never ignore a conflict.
@@ -63,11 +65,28 @@ export class D1SubmissionWriter {
         ),
       )
       .limit(1);
-    const [, , result, duplicates] = await this.db.batch([
+
+    // The 50th most recent accepted submission determines when another slot opens.
+    // Deleted markers still count, so deletion cannot reset the quota.
+    const exhaustedQuota = this.db
+      .select({ submittedAt: submissions.submittedAt })
+      .from(submissions)
+      .where(
+        and(
+          eq(submissions.accountId, accountId),
+          gt(submissions.submittedAt, new Date(now - SUBMISSION_QUOTA_WINDOW_MS).toISOString()),
+        ),
+      )
+      .orderBy(desc(submissions.submittedAt))
+      .limit(1)
+      .offset(SUBMISSION_ACCOUNT_LIMIT - 1);
+    const [quota, , , result, duplicates] = await this.db.batch([
+      exhaustedQuota,
+
       // SELECT lists follow writable schema columns; generated search columns are omitted.
       this.db.insert(runs)
         .select(sql`SELECT NULL, ${publicId}, ${accountId}, NULL, 'hidden', ${JSON.stringify(detail)}, 0
-        WHERE ${and(notExists(existingSubmission), notExists(duplicate))}`),
+        WHERE ${and(notExists(existingSubmission), notExists(duplicate), notExists(exhaustedQuota))}`),
       this.db.insert(submissions)
         .select(sql`SELECT NULL, ${accountId}, ${clientId}, ${submittedAt}, 'pending_review', ${runs.sequence}, NULL, ${requestFingerprint}, NULL
         FROM ${runs} WHERE ${and(eq(runs.publicId, publicId), notExists(existingSubmission))}`),
@@ -90,6 +109,14 @@ export class D1SubmissionWriter {
     if (!stored) {
       if (duplicates.length > 0) {
         throw new BenchmarkRequestError('duplicate_run');
+      }
+
+      if (quota[0]) {
+        const retryAfter = Math.max(
+          1,
+          Math.ceil((Date.parse(quota[0].submittedAt) + SUBMISSION_QUOTA_WINDOW_MS - now) / 1000),
+        );
+        throw new BenchmarkRequestError('rate_limited', retryAfter);
       }
 
       throw new Error('Submission is missing after its transaction.');

@@ -14,6 +14,7 @@ export function readConfig(env: AppBindings = {}): AppConfig {
       : undefined;
 
   return {
+    authRateLimit: env.AUTH_RATE_LIMIT,
     cursorSecret: env.BENCHMARK_CURSOR_SECRET,
     database: env.BENCHMARK_DB,
     disableIndexing: env.DISABLE_INDEXING === 'true',

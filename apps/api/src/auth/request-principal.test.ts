@@ -21,6 +21,7 @@ const config = {
   CLERK_ISSUER: 'https://browser.clerk.accounts.dev',
   CLERK_PUBLISHABLE_KEY: 'pk_test_fixture',
   CLERK_SECRET_KEY: 'sk_test_fixture',
+  AUTH_RATE_LIMIT: { limit: vi.fn().mockResolvedValue({ success: true }) },
   CLERK_DESKTOP_CLIENT_ID: 'desktop_fixture',
 };
 const principal: ApplicationPrincipal = {
@@ -34,6 +35,7 @@ const desktopAuthorization = 'Bearer opaque-fixture';
 const browserAuthorization = 'Bearer browser.jwt.fixture';
 const browserCookie = '__session=browser-fixture';
 const privatePath = '/api/test-private';
+const cacheControl = 'Cache-Control';
 
 beforeEach(() => {
   vi.mocked(createClerkBrowserAdapter).mockReset().mockReturnValue({ authenticate });
@@ -47,6 +49,60 @@ beforeEach(() => {
 });
 
 describe('request auth in the product API', () => {
+  it.each([desktopAuthorization, browserAuthorization])(
+    'limits auth before contacting Clerk for %s',
+    async authorization => {
+      const limit = vi.fn().mockResolvedValue({ success: false });
+      const response = await createApp().request(
+        ownerPath,
+        {
+          headers: {
+            Authorization: authorization,
+            'CF-Connecting-IP': '192.0.2.1',
+            'X-Forwarded-For': '192.0.2.99',
+          },
+        },
+        { ...config, AUTH_RATE_LIMIT: { limit } },
+      );
+      expect(response.status).toBe(429);
+      expect(response.headers.get('Retry-After')).toBe('60');
+      expect(response.headers.get(cacheControl)).toBe('no-store');
+      expect(await response.json()).toMatchObject({
+        code: 'rate_limited',
+        retry_after_seconds: 60,
+      });
+      expect(limit).toHaveBeenCalledExactlyOnceWith({ key: '192.0.2.1' });
+      expect(createClerkBrowserAdapter).not.toHaveBeenCalled();
+      expect(createClerkDesktopAdapter).not.toHaveBeenCalled();
+    },
+  );
+  it('does not spend auth rate limits on public requests', async () => {
+    const limit = vi.fn().mockResolvedValue({ success: false });
+    const response = await createApp(new InMemoryBenchmarkRepository()).request(
+      '/api/bench/v1/runs',
+      {},
+      { ...config, AUTH_RATE_LIMIT: { limit } },
+    );
+    expect(response.status).toBe(200);
+    expect(limit).not.toHaveBeenCalled();
+  });
+  it('fails closed when the auth rate limiter is missing or unavailable', async () => {
+    for (const binding of [
+      undefined,
+      { limit: vi.fn().mockRejectedValue(new Error('binding failed')) },
+    ]) {
+      const response = await createApp().request(
+        ownerPath,
+        {},
+        { ...config, AUTH_RATE_LIMIT: binding },
+      );
+      expect(response.status).toBe(500);
+      expect(await response.json()).toMatchObject({ code: 'internal_error' });
+    }
+
+    expect(createClerkBrowserAdapter).not.toHaveBeenCalled();
+    expect(createClerkDesktopAdapter).not.toHaveBeenCalled();
+  });
   it('preserves the request body for browser-authenticated submission handlers', async () => {
     const app = createApp();
     app.post(privatePath, async context => {
@@ -176,6 +232,8 @@ describe('request auth in the product API', () => {
   });
 
   it('resolves once within a request, then authenticates again on the next request', async () => {
+    const limit = vi.fn().mockResolvedValue({ success: true });
+    const bindings = { ...config, AUTH_RATE_LIMIT: { limit } };
     const app = createApp();
     app.get(privatePath, async context => {
       const [first, second] = await Promise.all([
@@ -187,12 +245,14 @@ describe('request auth in the product API', () => {
 
       return context.json({ status: 'ok' });
     });
-    const first = await app.request(privatePath, {}, config);
+    const first = await app.request(privatePath, {}, bindings);
     expect(first.status).toBe(200);
     expect(await first.json()).toEqual({ status: 'ok' });
-    expect(first.headers.get('Cache-Control')).toBe('no-store');
+    expect(first.headers.get(cacheControl)).toBe('no-store');
     expect(authenticate).toHaveBeenCalledOnce();
-    expect((await app.request(privatePath, {}, config)).status).toBe(200);
+    expect(limit).toHaveBeenCalledExactlyOnceWith({ key: 'unknown' });
+    expect((await app.request(privatePath, {}, bindings)).status).toBe(200);
+    expect(limit).toHaveBeenCalledTimes(2);
     expect(authenticate).toHaveBeenCalledTimes(2);
   });
 
@@ -209,7 +269,7 @@ describe('request auth in the product API', () => {
     });
     const response = await app.request(privatePath, {}, config);
     expect(response.status).toBe(status);
-    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(response.headers.get(cacheControl)).toBe('no-store');
     const body: unknown = await response.json();
     expect(body).toMatchObject({ code });
     expect(JSON.stringify(body)).not.toContain('private');

@@ -6,11 +6,15 @@ import {
   groupSearchResponseSchema,
 } from '@timmy/contracts';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AuthenticationDenied } from '../auth/application-principal';
 import { createClerkBrowserAdapter } from '../auth/clerk-browser-adapter';
-import { SUBMISSION_MAX_BODY_BYTES } from '../config';
+import {
+  SUBMISSION_ACCOUNT_LIMIT,
+  SUBMISSION_MAX_BODY_BYTES,
+  SUBMISSION_QUOTA_WINDOW_MS,
+} from '../config';
 import { createApp } from '../index';
 
 import { D1SubmissionApproval } from './d1-submission-approval';
@@ -69,6 +73,7 @@ async function request(
       CLERK_ISSUER: 'https://browser.clerk.accounts.dev',
       CLERK_PUBLISHABLE_KEY: 'pk_test_fixture',
       CLERK_SECRET_KEY: 'sk_test_fixture',
+      AUTH_RATE_LIMIT: { limit: vi.fn().mockResolvedValue({ success: true }) },
     },
   );
 }
@@ -81,6 +86,23 @@ async function counts(expected: number): Promise<void> {
     await db.prepare('SELECT COUNT(*) AS count FROM benchmark_submissions').first('count'),
   ).toBe(expected);
 }
+
+function quotaSubmission(index: number): string {
+  return JSON.stringify({
+    ...dto,
+    client_run_id: `00000000-0000-4000-8000-${String(100 + index).padStart(12, '0')}`,
+    captured_day: new Date(Date.UTC(2026, 0, index + 1)).toISOString().slice(0, 10),
+  });
+}
+
+async function fillQuota(count = SUBMISSION_ACCOUNT_LIMIT): Promise<void> {
+  const responses = await Promise.all(
+    Array.from({ length: count }, (_, index) => request(quotaSubmission(index))),
+  );
+  expect(responses.map(response => response.status)).toEqual(Array<number>(count).fill(202));
+}
+
+afterEach(() => vi.restoreAllMocks());
 
 beforeAll(async () => {
   mf = new Miniflare(
@@ -133,6 +155,65 @@ afterAll(async () => {
 });
 
 describe('protected submission upload', () => {
+  it('limits new submissions while preserving retries, conflicts and independent account quotas', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(Date.UTC(2026, 8, 26, 12));
+    await fillQuota();
+    const blocked = await request();
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers.get('Retry-After')).toBe('86400');
+    expect(blocked.headers.get(cacheControl)).toBe(noStore);
+    expect(await blocked.json()).toMatchObject({
+      code: 'rate_limited',
+      retry_after_seconds: 86400,
+    });
+    expect((await request(quotaSubmission(0))).status).toBe(202);
+    const conflict = await request(quotaSubmission(0).replace('lighthouse', 'woods'));
+    expect(await conflict.json()).toMatchObject({ code: 'idempotency_conflict' });
+    const duplicate = await request(quotaSubmission(0).replace('000000000100', '000000000999'));
+    expect(await duplicate.json()).toMatchObject({ code: 'duplicate_run' });
+    await counts(SUBMISSION_ACCOUNT_LIMIT);
+    authenticate.mockResolvedValue({
+      accountId: stranger,
+      emailVerified: true,
+      canModerate: false,
+      session: { kind: 'browser', expiresAt: Date.now() + 60000 },
+    });
+    expect((await request()).status).toBe(202);
+    await counts(SUBMISSION_ACCOUNT_LIMIT + 1);
+  }, 30000);
+  it('accepts only one concurrent submission into the last quota slot without orphan runs', async () => {
+    await fillQuota(SUBMISSION_ACCOUNT_LIMIT - 1);
+    const responses = await Promise.all([49, 50, 51].map(index => request(quotaSubmission(index))));
+    expect(responses.map(response => response.status).sort((a, b) => a - b)).toEqual([
+      202, 429, 429,
+    ]);
+    await counts(SUBMISSION_ACCOUNT_LIMIT);
+  }, 30000);
+  it('opens a slot exactly when a submission leaves the rolling 24-hour window', async () => {
+    const now = Date.UTC(2026, 8, 26, 12);
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+    await fillQuota();
+    clock.mockReturnValue(now + SUBMISSION_QUOTA_WINDOW_MS - 1);
+    const blocked = await request();
+    expect(blocked.status).toBe(429);
+    expect(await blocked.json()).toMatchObject({ retry_after_seconds: 1 });
+    clock.mockReturnValue(now + SUBMISSION_QUOTA_WINDOW_MS);
+    expect((await request()).status).toBe(202);
+    await counts(SUBMISSION_ACCOUNT_LIMIT + 1);
+  }, 30000);
+  it('does not restore submission quota when a published run is deleted', async () => {
+    await fillQuota();
+    const sequence = await db.prepare(submissionSequenceQuery).first<number>('sequence');
+    const published = await new D1SubmissionApproval(db).approve(sequence!);
+    await new D1SubmissionDeletion(db).delete(owner, published!.publicRunId);
+    expect((await request()).status).toBe(429);
+    expect(await db.prepare('SELECT COUNT(*) AS count FROM benchmark_runs').first('count')).toBe(
+      SUBMISSION_ACCOUNT_LIMIT - 1,
+    );
+    expect(
+      await db.prepare('SELECT COUNT(*) AS count FROM benchmark_submissions').first('count'),
+    ).toBe(SUBMISSION_ACCOUNT_LIMIT);
+  }, 30000);
   it.each([
     ['lighthouse', 'Lighthouse'],
     ['customs', 'Customs'],

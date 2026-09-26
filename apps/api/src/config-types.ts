@@ -1,6 +1,7 @@
-import type { D1Database } from '@cloudflare/workers-types';
+import type { D1Database, RateLimit } from '@cloudflare/workers-types';
 
 export interface AppBindings {
+  AUTH_RATE_LIMIT?: RateLimit;
   BENCHMARK_CURSOR_SECRET?: string;
   BENCHMARK_DB?: D1Database;
   DISABLE_INDEXING?: string;
@@ -22,6 +23,7 @@ export interface AuthConfig {
 }
 
 export interface AppConfig {
+  authRateLimit: RateLimit | undefined;
   database: D1Database | undefined;
   cursorSecret: string | undefined;
   disableIndexing: boolean;

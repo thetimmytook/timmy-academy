@@ -15,6 +15,7 @@ export interface BenchmarkRepository {
 }
 
 const errors = {
+  rate_limited: { status: 429, message: 'Too many requests. Please try again later.' },
   duplicate_run: {
     status: 409,
     message: 'This measurement was already submitted by your account.',
@@ -48,7 +49,10 @@ const errorsByCode = new Map(Object.entries(errors));
 
 export class BenchmarkRequestError extends Error {
   readonly status;
-  constructor(readonly code: keyof typeof errors) {
+  constructor(
+    readonly code: keyof typeof errors,
+    readonly retryAfterSeconds?: number,
+  ) {
     const error = errorsByCode.get(code);
 
     if (!error) {

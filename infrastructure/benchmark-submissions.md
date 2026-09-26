@@ -279,6 +279,30 @@ an open product decision.
 The protected pending queue, Clerk role mapping, admin page and decision endpoints
 are implemented as described in [admin.md](admin.md).
 
+## Request and submission limits
+
+All requests that require a principal pass through `AUTH_RATE_LIMIT` before Clerk
+verification. `wrangler.jsonc` configures 30 attempts per 60 seconds, keyed only by
+Cloudflare's `CF-Connecting-IP`. Browser and desktop requests share the IP budget;
+public benchmark reads do not consume it. Local requests without that header share
+an `unknown` bucket. A missing or failing binding stops authentication rather than
+silently disabling protection. Local, staging and production use separate namespaces.
+
+This is approximate protection per Cloudflare location, as described in the
+[Workers Rate Limiting documentation](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/).
+Clients sharing an IP share this limit. `429 rate_limited` includes
+`retry_after_seconds` and `Retry-After` (60 seconds for the edge limit).
+
+The exact account quota is 50 accepted submissions in the rolling last 24 hours.
+Its limit and window live in `apps/api/src/config.ts`. The writer checks existing
+submission timestamps through the owner index inside the same D1 transaction as
+the inserts. No quota table, counter writes or migration are needed. Rejected and
+deleted submissions still count until their timestamp leaves the window. Exact
+retries, duplicate measurements, invalid requests and failed transactions consume
+no additional quota. Existing IDs retain their normal retry/conflict responses
+even when the quota is full. A quota rejection returns 429 with the time until the
+next slot opens; concurrent new uploads cannot exceed the account limit.
+
 ## Atomic owner deletion
 
 `D1SubmissionDeletion.delete(accountId, publicRunId)` allows deletion only of an
