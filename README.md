@@ -129,6 +129,11 @@ contrast over the original draft; `fg.faint` is reserved for decorative or disab
 The root npm overrides keep Panda's pinned PostCSS, selector parser and Browserslist dependencies
 on patched releases. Revisit these overrides when Panda updates its dependency pins.
 
+## Planned error reporting
+
+Windows error reports will go through the Academy API into GitHub Issues.
+This is deferred work; see [the recorded direction](design/error-reporting.md).
+
 ## Checks
 
 ```sh
