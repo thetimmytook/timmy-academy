@@ -1,5 +1,10 @@
 import { readFile, readdir } from 'node:fs/promises';
 
+import {
+  cohortResponseSchema,
+  filterOptionsSchema,
+  groupSearchResponseSchema,
+} from '@timmy/contracts';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -13,6 +18,7 @@ import { D1SubmissionDeletion } from './d1-submission-deletion';
 import { D1SubmissionRejection } from './d1-submission-rejection';
 
 import type { ApplicationPrincipal } from '../auth/application-principal';
+import type { CohortResponse, GroupSearchResponse } from '@timmy/contracts';
 vi.mock('../auth/clerk-browser-adapter', () => ({ createClerkBrowserAdapter: vi.fn() }));
 const authenticate = vi.fn<() => Promise<ApplicationPrincipal>>();
 let mf: Miniflare;
@@ -126,6 +132,86 @@ afterAll(async () => {
 });
 
 describe('protected submission upload', () => {
+  it.each([
+    ['lighthouse', 'Lighthouse'],
+    ['customs', 'Customs'],
+    ['streets', 'Streets of Tarkov'],
+    ['woods', 'Woods'],
+    ['factory', 'Factory'],
+    ['the-lab', 'The Lab'],
+    ['reserve', 'Reserve'],
+    ['ground-zero', 'Ground Zero'],
+    ['interchange', 'Interchange'],
+    ['shoreline', 'Shoreline'],
+    ['labyrinth', 'Labyrinth'],
+  ])('supports %s from submission through public search and Position', async (id, name) => {
+    const map = { id, name };
+    const input = {
+      ...dto,
+      map: id,
+      game_resolution: { width: 2560, height: 1440 },
+      game_version: 'test-version',
+    };
+    const publicRequest = (suffix: string, init?: RequestInit): Promise<Response> =>
+      Promise.resolve(
+        createApp().request('/api/bench/v1' + suffix, init, {
+          BENCHMARK_DB: db,
+          BENCHMARK_CURSOR_SECRET: 'test-signing-secret',
+        }),
+      );
+
+    const search = async (mapId = id): Promise<GroupSearchResponse> => {
+      const response = await publicRequest('/runs?map=' + mapId);
+      expect(response.status).toBe(200);
+
+      return groupSearchResponseSchema.parse(await response.json());
+    };
+
+    const position = async (mapId = id): Promise<CohortResponse> => {
+      const response = await publicRequest('/cohorts/query', {
+        method: 'POST',
+        headers: { 'Content-Type': contentType },
+        body: JSON.stringify({
+          hardware: input.hardware,
+          map: mapId,
+          execution: input.execution,
+          game_resolution: input.game_resolution,
+          game_version: input.game_version,
+        }),
+      });
+      expect(response.status).toBe(200);
+
+      return cohortResponseSchema.parse(await response.json());
+    };
+
+    expect((await position()).status).toBe('no_data');
+    expect((await search()).summary.run_count).toBe(0);
+    expect((await request(JSON.stringify(input))).status).toBe(202);
+    expect((await position()).status).toBe('no_data');
+    expect((await search()).summary.run_count).toBe(0);
+    const pendingOptions = await publicRequest('/filter-options');
+    expect(filterOptionsSchema.parse(await pendingOptions.json()).maps).toEqual([]);
+
+    const sequence = await db.prepare(submissionSequenceQuery).first<number>('sequence');
+    const approved = await new D1SubmissionApproval(db).approve(sequence!);
+    expect(approved).toBeDefined();
+    const found = await search();
+    expect(found.summary.run_count).toBe(1);
+    expect(found.groups[0]?.preview_runs[0]).toMatchObject({
+      public_run_id: approved!.publicRunId,
+      map,
+    });
+    const cohort = await position();
+    expect(cohort.status).toBe('matches');
+    expect(cohort.criteria.map).toEqual(map);
+    expect(cohort.runs.map(run => run.public_run_id)).toEqual([approved!.publicRunId]);
+    const options = await publicRequest('/filter-options');
+    expect(filterOptionsSchema.parse(await options.json()).maps).toEqual([map]);
+    const otherMap = id === 'woods' ? 'factory' : 'woods';
+    expect((await search(otherMap)).summary.run_count).toBe(0);
+    expect((await position(otherMap)).status).toBe('no_data');
+  });
+
   it('stores one hidden run and returns only a pending receipt', async () => {
     const response = await request();
     expect(response.status).toBe(202);

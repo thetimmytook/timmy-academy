@@ -1,10 +1,16 @@
-import { mapCatalog as syntheticMaps } from './catalog';
 import { syntheticHardware } from './fixture-hardware';
 
 import type { StoredRun } from './stored-run';
-export { mapCatalog as syntheticMaps } from './catalog';
 export { syntheticHardware } from './fixture-hardware';
 export type { StoredRun } from './stored-run';
+
+// Keep existing seed measurements independent of the supported map catalog.
+const syntheticMaps = [
+  { id: 'lighthouse', name: 'Lighthouse' },
+  { id: 'customs', name: 'Customs' },
+  { id: 'streets', name: 'Streets of Tarkov' },
+  { id: 'woods', name: 'Woods' },
+];
 
 const ids = [
   '8N4qP2vK',

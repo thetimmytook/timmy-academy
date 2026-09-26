@@ -11,8 +11,9 @@ import {
   type GroupRunsResponse,
 } from '@timmy/contracts';
 
+import { mapCatalog } from './catalog';
 import { publicFilterOptions } from './filter-options';
-import { createSyntheticRuns, syntheticMaps, type StoredRun } from './fixtures';
+import { createSyntheticRuns, type StoredRun } from './fixtures';
 import { normalizeHardware } from './hardware-normalization';
 import { projectDetail, projectHardware, projectSummary } from './projection';
 import { BenchmarkRequestError, type BenchmarkRepository } from './repository';
@@ -266,7 +267,7 @@ export class InMemoryBenchmarkRepository implements BenchmarkRepository {
   private async queryCohort(query: CohortQuery): Promise<CohortResponse> {
     const hardware = await normalizeHardware(query.hardware);
     const { cpu, gpu } = hardware;
-    const map = syntheticMaps.find(candidate => candidate.id === query.map);
+    const map = mapCatalog.find(candidate => candidate.id === query.map);
 
     if (!map) {
       throw new BenchmarkRequestError('invalid_input');
