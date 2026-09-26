@@ -103,9 +103,11 @@ describe('submission normalization', () => {
       upscaling: null,
       game_resolution: null,
     });
-    expect(publicRunDetailSchema.omit({ public_run_id: true, url: true }).parse(result)).toEqual(
-      result,
-    );
+    expect(
+      publicRunDetailSchema
+        .omit({ public_run_id: true, url: true, is_synthetic: true })
+        .parse(result),
+    ).toEqual(result);
 
     for (const key of ['app_version', 'client_run_id', 'schema_version', 'settings_snapshot']) {
       expect(result).not.toHaveProperty(key);

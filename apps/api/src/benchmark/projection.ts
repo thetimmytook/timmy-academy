@@ -81,6 +81,7 @@ export function projectSummary(run: StoredRun): PublicRunSummary {
   const { map, execution, game_resolution, game_version } = detail.conditions;
 
   return publicRunSummarySchema.parse({
+    is_synthetic: detail.is_synthetic,
     public_run_id: detail.public_run_id,
     url: `/bench/runs/${detail.public_run_id}`,
     captured_day: detail.captured_day,
@@ -104,6 +105,7 @@ export function projectDetail(run: StoredRun): PublicRunDetail {
 
   // Select public fields before validation; private additions never enter the DTO.
   return publicRunDetailSchema.parse({
+    is_synthetic: summary.is_synthetic,
     public_run_id: summary.public_run_id,
     url: summary.url,
     captured_day: summary.captured_day,

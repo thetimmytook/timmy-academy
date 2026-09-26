@@ -363,6 +363,29 @@ describe('real local D1 public HTTP integration', { timeout: 30000 }, () => {
     expect((await request(firstSeedRunPath)).status).toBe(404);
     await groups(`limit=1&cursor=${first.next_cursor}`);
   });
+  it('uses each row synthetic flag in mixed previews, items, details and Position', async () => {
+    const source = seedRows()[0]!;
+    await insert(
+      { ...source, detail: { ...source.detail, captured_day: '2026-09-26' } },
+      'br_real',
+    );
+
+    // The inserted document says synthetic, but the database default is real.
+    const result = await groups('ram_gb=32');
+    const previews = result.groups[0]!.preview_runs;
+    expect(previews.find(run => run.public_run_id === 'br_real')?.is_synthetic).toBe(false);
+    expect(previews.some(run => run.is_synthetic)).toBe(true);
+    const page = await items(result.groups[0]!.group_key, '&ram_gb=32');
+    expect(page.items.find(run => run.public_run_id === 'br_real')?.is_synthetic).toBe(false);
+    expect(
+      page.items.filter(run => run.public_run_id !== 'br_real').every(run => run.is_synthetic),
+    ).toBe(true);
+    expect(await (await request('/runs/br_real')).json()).toMatchObject({ is_synthetic: false });
+    expect(await (await request(firstSeedRunPath)).json()).toMatchObject({ is_synthetic: true });
+    const cohort = await position();
+    expect(cohort.runs.find(run => run.public_run_id === 'br_real')?.is_synthetic).toBe(false);
+    expect(cohort.runs.some(run => run.is_synthetic)).toBe(true);
+  });
   it('uses explicit projections even when stored documents contain future private fields', async () => {
     await db
       .prepare(

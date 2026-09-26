@@ -12,6 +12,7 @@ import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core';
 
 export type BenchmarkDatabase = DrizzleD1Database;
 export const runColumns = {
+  isSynthetic: runs.isSynthetic,
   detail: runs.detail,
   contributor: runs.contributor,
   publishedAt: runs.publishedAt,
@@ -28,6 +29,7 @@ export function runFields<T extends Record<keyof typeof runColumns, AnySQLiteCol
   source: T,
 ): Record<keyof typeof runColumns, AnySQLiteColumn> {
   return {
+    isSynthetic: source.isSynthetic,
     detail: source.detail,
     contributor: source.contributor,
     publishedAt: source.publishedAt,
@@ -82,13 +84,15 @@ export function tuple(row: RunRow): Tuple {
   return [row.cpu, row.gpu, row.ram];
 }
 
-export function stored(row: Pick<RunRow, 'detail' | 'contributor' | 'publishedAt'>): StoredRun {
+export function stored(
+  row: Pick<RunRow, 'detail' | 'contributor' | 'publishedAt' | 'isSynthetic'>,
+): StoredRun {
   if (row.publishedAt === null) {
     throw new Error('A public run must have a publication date.');
   }
 
   return {
-    detail: JSON.parse(row.detail) as PublicRunDetail,
+    detail: { ...(JSON.parse(row.detail) as PublicRunDetail), is_synthetic: row.isSynthetic },
     contributor: row.contributor,
     publishedAt: row.publishedAt,
   };

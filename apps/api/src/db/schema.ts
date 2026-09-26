@@ -58,6 +58,7 @@ export const runs = sqliteTable(
       .notNull()
       .default('published'),
     detail: text('detail').notNull(),
+    isSynthetic: integer('is_synthetic', { mode: 'boolean' }).notNull().default(false),
     cpu: jsonText('cpu', '$.hardware.cpu.id'),
     gpu: jsonText('gpu', '$.hardware.gpu.id'),
     ram: jsonInt('ram_gb', '$.hardware.ram_gb'),

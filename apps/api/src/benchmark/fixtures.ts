@@ -41,6 +41,7 @@ export function createSyntheticRuns(): StoredRun[] {
         contributor: `fictional-contributor-${groupIndex}-${index % 2}`,
         publishedAt: `2026-09-20T10:0${index}:00Z`,
         detail: {
+          is_synthetic: true,
           public_run_id: `br_${id}${['a', 'b', 'c'].at(groupIndex) ?? 'x'}`,
           url: `/bench/runs/br_${id}${['a', 'b', 'c'].at(groupIndex) ?? 'x'}`,
           captured_day: `2026-09-${String(19 - Math.floor(index / 2)).padStart(2, '0')}`,

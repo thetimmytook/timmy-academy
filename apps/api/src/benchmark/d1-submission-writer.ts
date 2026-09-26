@@ -10,8 +10,12 @@ import type { D1Database } from '@cloudflare/workers-types';
 import type { PublicRunDetail, SubmissionResponse } from '@timmy/contracts';
 
 // Internal storage input after normalization and capture validation; not an HTTP payload.
-const submissionDataSchema = publicRunDetailSchema.omit({ public_run_id: true, url: true });
-export type SubmissionData = Omit<PublicRunDetail, 'public_run_id' | 'url'>;
+const submissionDataSchema = publicRunDetailSchema.omit({
+  public_run_id: true,
+  url: true,
+  is_synthetic: true,
+});
+export type SubmissionData = Omit<PublicRunDetail, 'public_run_id' | 'url' | 'is_synthetic'>;
 export class D1SubmissionWriter {
   private readonly db;
 
@@ -32,6 +36,7 @@ export class D1SubmissionWriter {
     const publicId = 'br_' + crypto.randomUUID();
     const detail = publicRunDetailSchema.parse({
       ...normalized,
+      is_synthetic: false,
       public_run_id: publicId,
       url: '/bench/runs/' + publicId,
     });
@@ -46,7 +51,7 @@ export class D1SubmissionWriter {
     const [, , result] = await this.db.batch([
       // SELECT lists follow writable schema columns; generated search columns are omitted.
       this.db.insert(runs)
-        .select(sql`SELECT NULL, ${publicId}, ${accountId}, NULL, 'hidden', ${JSON.stringify(detail)}
+        .select(sql`SELECT NULL, ${publicId}, ${accountId}, NULL, 'hidden', ${JSON.stringify(detail)}, 0
         WHERE ${notExists(existingSubmission)}`),
       this.db.insert(submissions)
         .select(sql`SELECT NULL, ${accountId}, ${clientId}, ${submittedAt}, 'pending_review', ${runs.sequence}, NULL, ${requestFingerprint}, NULL

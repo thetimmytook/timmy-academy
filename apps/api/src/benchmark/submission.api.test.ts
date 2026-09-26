@@ -195,14 +195,19 @@ describe('protected submission upload', () => {
     const sequence = await db.prepare(submissionSequenceQuery).first<number>('sequence');
     const approved = await new D1SubmissionApproval(db).approve(sequence!);
     expect(approved).toBeDefined();
+    expect(await db.prepare('SELECT is_synthetic FROM benchmark_runs').first('is_synthetic')).toBe(
+      0,
+    );
     const found = await search();
     expect(found.summary.run_count).toBe(1);
     expect(found.groups[0]?.preview_runs[0]).toMatchObject({
       public_run_id: approved!.publicRunId,
+      is_synthetic: false,
       map,
     });
     const cohort = await position();
     expect(cohort.status).toBe('matches');
+    expect(cohort.runs.every(run => run.is_synthetic === false)).toBe(true);
     expect(cohort.criteria.map).toEqual(map);
     expect(cohort.runs.map(run => run.public_run_id)).toEqual([approved!.publicRunId]);
     const options = await publicRequest('/filter-options');
@@ -311,6 +316,8 @@ describe('protected submission upload', () => {
     [JSON.stringify(dto), 'text/plain', '', 415],
     [JSON.stringify(dto), contentType, '?accountId=other', 422],
     [JSON.stringify({ ...dto, accountId: stranger }), contentType, '', 422],
+    [JSON.stringify({ ...dto, is_synthetic: true }), contentType, '', 422],
+    [JSON.stringify({ ...dto, is_synthetic: false }), contentType, '', 422],
     [
       JSON.stringify({ ...dto, capture: { duration_sec: 120, sample_count: 1000 } }),
       contentType,

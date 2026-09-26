@@ -42,7 +42,7 @@ const quote = (value: string): string => `'${value.replaceAll("'", "''")}'`;
 export function seedStatements(): string[] {
   return seedRows().map(
     run =>
-      `INSERT INTO benchmark_runs(public_id, contributor_key, published_at, visibility, detail) VALUES (${[
+      `INSERT INTO benchmark_runs(public_id, contributor_key, published_at, visibility, detail, is_synthetic) VALUES (${[
         run.detail.public_run_id,
         run.contributor,
         run.publishedAt,
@@ -50,6 +50,6 @@ export function seedStatements(): string[] {
         JSON.stringify(run.detail),
       ]
         .map(quote)
-        .join(', ')}) ON CONFLICT(public_id) DO NOTHING;`,
+        .join(', ')}, 1) ON CONFLICT(public_id) DO NOTHING;`,
   );
 }

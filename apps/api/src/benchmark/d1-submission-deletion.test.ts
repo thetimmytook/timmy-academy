@@ -19,7 +19,7 @@ const owner = 'acc_owner';
 const stranger = 'acc_stranger';
 const client = '00000000-0000-4000-8000-000000000001';
 const data = publicRunDetailSchema
-  .omit({ public_run_id: true, url: true })
+  .omit({ public_run_id: true, url: true, is_synthetic: true })
   .strip()
   .parse(createSyntheticRuns()[0]!.detail);
 const countRuns = async (): Promise<number | null> =>
@@ -111,6 +111,7 @@ describe('atomic owner publication deletion', () => {
     expect(JSON.parse(archived[0]!.detail)).toEqual(
       projectArchivedMeasurement({
         ...data,
+        is_synthetic: false,
         public_run_id: publicId,
         url: '/bench/runs/' + publicId,
       }),

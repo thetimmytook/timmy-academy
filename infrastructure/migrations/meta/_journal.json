@@ -57,6 +57,13 @@
       "when": 1790412347590,
       "tag": "0007_measurement-archive",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1790422688772,
+      "tag": "0008_giant_captain_flint",
+      "breakpoints": true
     }
   ]
 }

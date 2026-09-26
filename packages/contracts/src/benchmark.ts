@@ -98,6 +98,7 @@ export const metricsSchema = summaryMetricsSchema.extend({
   p99_frametime_ms: z.number().positive(),
 });
 export const publicRunSummarySchema = z.strictObject({
+  is_synthetic: z.boolean(),
   public_run_id: publicRunIdSchema,
   url: z.string().regex(/^\/bench\/runs\/br_[A-Za-z0-9_-]+$/),
   captured_day: z.iso.date(),
@@ -157,6 +158,7 @@ export const publicSettingsSchema = z
     ),
   );
 export const publicRunDetailSchema = z.strictObject({
+  is_synthetic: z.boolean(),
   public_run_id: publicRunIdSchema,
   url: publicRunSummarySchema.shape.url,
   captured_day: z.iso.date(),

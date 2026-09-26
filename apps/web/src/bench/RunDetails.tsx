@@ -28,6 +28,7 @@ export function RunDetails({ run }: Readonly<{ run: PublicRunDetail }>): JSX.Ele
     <>
       <div>
         <p className={css({ textStyle: 'eyebrow', color: 'brand.default' })}>Public run</p>
+        {run.is_synthetic && <p className={muted}>Demo data</p>}
         <h1 tabIndex={-1} className={css({ textStyle: 'h1' })}>
           {conditions.map.name} benchmark
         </h1>

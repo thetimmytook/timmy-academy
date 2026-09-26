@@ -7,7 +7,11 @@ export const moderationQuerySchema = z.strictObject({
   limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
   after: z.coerce.number().int().positive().optional(),
 });
-export const moderationRunSchema = publicRunDetailSchema.omit({ public_run_id: true, url: true });
+export const moderationRunSchema = publicRunDetailSchema.omit({
+  public_run_id: true,
+  url: true,
+  is_synthetic: true,
+});
 export const moderationQueueSchema = z.strictObject({
   items: z.array(
     z.strictObject({
