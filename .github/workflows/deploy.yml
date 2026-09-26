@@ -32,6 +32,8 @@ jobs:
       - run: npm run build
 
   staging:
+    env:
+      VITE_CLERK_PUBLISHABLE_KEY: ${{ vars.STAGING_CLERK_PUBLISHABLE_KEY }}
     concurrency:
       group: academy-staging-database
       cancel-in-progress: false
@@ -46,12 +48,20 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
+      - name: Check Clerk build configuration
+        run: |
+          if [ -z "$VITE_CLERK_PUBLISHABLE_KEY" ]; then
+            echo "::error::Set the STAGING_CLERK_PUBLISHABLE_KEY repository variable."
+            exit 1
+          fi
       - run: npm run deploy:staging
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
   production:
+    env:
+      VITE_CLERK_PUBLISHABLE_KEY: ${{ vars.PRODUCTION_CLERK_PUBLISHABLE_KEY }}
     concurrency:
       group: academy-production-database
       cancel-in-progress: false
@@ -66,6 +76,12 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
+      - name: Check Clerk build configuration
+        run: |
+          if [ -z "$VITE_CLERK_PUBLISHABLE_KEY" ]; then
+            echo "::error::Set the PRODUCTION_CLERK_PUBLISHABLE_KEY repository variable."
+            exit 1
+          fi
       - run: npm run deploy:production
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
