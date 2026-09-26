@@ -74,7 +74,7 @@ export function createOwnerRunsRouter(): Hono<OwnerEnv> {
 
     return context.json(
       submissionResponseSchema.parse(receipt),
-      receipt.publication_status === 'published' ? 200 : 202,
+      receipt.publication_status === 'pending_review' ? 202 : 200,
     );
   });
 

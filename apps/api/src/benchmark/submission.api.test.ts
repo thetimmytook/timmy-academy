@@ -10,6 +10,7 @@ import { createApp } from '../index';
 
 import { D1SubmissionApproval } from './d1-submission-approval';
 import { D1SubmissionDeletion } from './d1-submission-deletion';
+import { D1SubmissionRejection } from './d1-submission-rejection';
 
 import type { ApplicationPrincipal } from '../auth/application-principal';
 vi.mock('../auth/clerk-browser-adapter', () => ({ createClerkBrowserAdapter: vi.fn() }));
@@ -20,6 +21,9 @@ const owner = 'acc_owner';
 const stranger = 'acc_stranger';
 const path = '/api/bench/v1/me/runs';
 const contentType = 'application/json';
+const noStore = 'no-store';
+const cacheControl = 'Cache-Control';
+const submissionSequenceQuery = 'SELECT sequence FROM benchmark_submissions';
 const dto = {
   schema_version: 1,
   client_run_id: '00000000-0000-4000-8000-000000000001',
@@ -124,7 +128,7 @@ describe('protected submission upload', () => {
   it('stores one hidden run and returns only a pending receipt', async () => {
     const response = await request();
     expect(response.status).toBe(202);
-    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(response.headers.get(cacheControl)).toBe(noStore);
     expect(await response.json()).toEqual({
       client_run_id: dto.client_run_id,
       publication_status: 'pending_review',
@@ -241,13 +245,11 @@ describe('protected submission upload', () => {
 
 it('returns 200 for an exact retry after approval and keeps changed requests conflicting', async () => {
   expect((await request()).status).toBe(202);
-  const id = await db
-    .prepare('SELECT sequence FROM benchmark_submissions')
-    .first<number>('sequence');
+  const id = await db.prepare(submissionSequenceQuery).first<number>('sequence');
   const approved = await new D1SubmissionApproval(db).approve(id!);
   const response = await request();
   expect(response.status).toBe(200);
-  expect(response.headers.get('Cache-Control')).toBe('no-store');
+  expect(response.headers.get(cacheControl)).toBe(noStore);
   expect(await response.json()).toEqual({
     client_run_id: dto.client_run_id,
     publication_status: 'published',
@@ -267,13 +269,38 @@ it('returns 200 for an exact retry after approval and keeps changed requests con
 
 it('returns publication_deleted instead of recreating a deleted submission', async () => {
   expect((await request()).status).toBe(202);
-  const id = (await db
-    .prepare('SELECT sequence FROM benchmark_submissions')
-    .first<number>('sequence'))!;
+  const id = (await db.prepare(submissionSequenceQuery).first<number>('sequence'))!;
   const approved = (await new D1SubmissionApproval(db).approve(id))!;
   await new D1SubmissionDeletion(db).delete(owner, approved.publicRunId);
   const replay = await request();
   expect(replay.status).toBe(409);
   expect(await replay.json()).toMatchObject({ code: 'publication_deleted' });
   expect(await db.prepare('SELECT count(*) AS count FROM benchmark_runs').first('count')).toBe(0);
+});
+
+it('returns a rejected receipt for an exact retry after moderation', async () => {
+  expect((await request()).status).toBe(202);
+  const id = (await db.prepare(submissionSequenceQuery).first<number>('sequence'))!;
+  await new D1SubmissionRejection(db).reject(id);
+  const replay = await request();
+  expect(replay.status).toBe(200);
+  expect(replay.headers.get(cacheControl)).toBe(noStore);
+  expect(await replay.json()).toEqual({
+    client_run_id: dto.client_run_id,
+    publication_status: 'rejected',
+    public_run_id: null,
+    url: null,
+    status_reason: 'rejected',
+  });
+  expect((await request(JSON.stringify({ ...dto, app_version: 'changed' }))).status).toBe(409);
+  const lookup = await request('', contentType, '/by-client-id/' + dto.client_run_id, 'GET');
+  expect(await lookup.json()).toMatchObject({
+    item: {
+      publication_status: 'rejected',
+      status_reason: 'rejected',
+      public_run_id: null,
+      url: null,
+    },
+  });
+  await counts(1);
 });

@@ -74,10 +74,6 @@ export class D1SubmissionWriter {
       throw new BenchmarkRequestError('publication_deleted');
     }
 
-    if (stored.status !== 'pending_review' && stored.status !== 'published') {
-      throw new Error('This submission status is not supported by the writer.');
-    }
-
     if (stored.detail === null) {
       throw new Error('Submission run is missing.');
     }
@@ -108,6 +104,16 @@ export class D1SubmissionWriter {
         publication_status: 'published',
         public_run_id: existingId,
         url: existing.url,
+      };
+    }
+
+    if (stored.status === 'rejected') {
+      return {
+        client_run_id: clientId,
+        publication_status: 'rejected',
+        public_run_id: null,
+        url: null,
+        status_reason: 'rejected',
       };
     }
 

@@ -19,8 +19,8 @@ All non-deleted submissions require a run; a deleted marker has no run link.
 
 Approval updates the existing run's visibility and publication timestamp and the
 submission status in one transaction. It does not copy or recreate the detail.
-Rejection keeps the run hidden. Approval is implemented by the private repository
-described below; rejection remains a separate step. Schema foreign keys do not
+Rejection keeps the run hidden. Approval and rejection are implemented by the
+private repositories described below. Schema foreign keys do not
 synchronize the two states.
 Public readers continue to select only `visibility = published` and use explicit
 allowlist projections. SQL requires a publication timestamp for visible runs.
@@ -116,7 +116,8 @@ then requires JSON with a streaming 32 KiB limit. It validates the strict DTO,
 normalizes the run and atomically stores it as pending. New submissions and exact
 pending retries return 202 with `publication_status: pending_review`, null public ID
 and URL. An exact retry after approval returns 200 with the existing public ID and
-URL. Both responses use `Cache-Control: no-store`. No upload automatically publishes.
+URL. An exact retry after rejection returns 200 with the rejected receipt described
+below. All responses use `Cache-Control: no-store`. No upload automatically publishes.
 
 The route rejects unauthenticated requests with 401, unsupported media with 415,
 oversized bodies with 413, malformed/invalid input or query parameters with 422,
@@ -130,8 +131,8 @@ retry identity. The fingerprint is not exposed in owner or public responses.
 No second request document is stored. Historical rows have null fingerprints;
 a retry cannot establish their full original payload and fails with 409.
 
-Cross-client-ID duplicate detection, quotas and rejection remain separate steps.
-The private deletion repository is described below; its HTTP route is not yet wired. Apply the migration before using the POST endpoint.
+Cross-client-ID duplicate detection and quotas remain separate steps.
+Private moderation and owner deletion are described below. Apply the migration before using the POST endpoint.
 
 ## Submission transport contract
 
@@ -211,7 +212,7 @@ validated input separately to retain complete retry identity.
 The signed-in profile menu opens `/bench/me`. The page reads the existing owner
 list API with status filtering and cursor pagination, and links only published
 runs to public detail. It never submits a run. Pending and rejected runs remain
-visible only to their owner. No moderation or deletion controls are added here.
+visible only to their owner. Published rows offer the deletion confirmation described below.
 
 Private requests start only after browser sign-in. The list unmounts on logout
 and is recreated on a session change; late responses are discarded. A direct
@@ -233,9 +234,26 @@ fail closed. Concurrent approval and upload retry are serialized by D1 batches;
 a retry may observe pending before approval or published after it.
 
 This is a private repository operation with tests, not an HTTP endpoint or an
-owner capability. No moderator UI, role policy, rejection or deletion operation
-is introduced. A moderator entry point and its authorization must be implemented
+owner capability. A moderator entry point and its authorization must be implemented
 separately before approval can be used through the application.
+
+## Private rejection
+
+`D1SubmissionRejection.reject(submissionId)` changes only a pending submission
+whose linked run is hidden and has no publication timestamp. It stores the generic
+`rejected` reason and leaves the measurement, ownership, fingerprint and submission
+time unchanged. An atomic D1 batch performs the conditional update and reads its
+result. Repeated rejection is a no-op; a missing ID returns undefined. Published
+and deleted submissions cannot be rejected. Approval and rejection racing for the
+same pending submission produce exactly one decision; rejected submissions cannot
+subsequently be approved.
+
+An exact upload retry after rejection returns HTTP 200 with `publication_status:
+rejected`, null public ID/URL and `status_reason: rejected`. It does not reopen the
+submission or allocate a second run. Changed payloads still return 409
+`idempotency_conflict`. Owner lists and lookup show the rejected status, while
+public readers cannot access the hidden run. Detailed reasons, reconsideration and
+the moderator HTTP/UI entry points remain outside this repository step.
 
 ## Deletion storage foundation
 

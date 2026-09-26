@@ -111,6 +111,13 @@ export type SubmissionRequest = z.infer<typeof submissionRequestSchema>;
 export const submissionResponseSchema = z.discriminatedUnion('publication_status', [
   z.strictObject({
     client_run_id: clientRunIdSchema,
+    publication_status: z.literal('rejected'),
+    public_run_id: z.null(),
+    url: z.null(),
+    status_reason: z.literal('rejected'),
+  }),
+  z.strictObject({
+    client_run_id: clientRunIdSchema,
     publication_status: z.literal('pending_review'),
     public_run_id: z.null(),
     url: z.null(),
