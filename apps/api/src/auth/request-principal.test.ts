@@ -5,12 +5,15 @@ import { createApp } from '../index';
 
 import { AuthenticationDenied } from './application-principal';
 import { createClerkBrowserAdapter } from './clerk-browser-adapter';
+import { createClerkDesktopAdapter } from './clerk-desktop-adapter';
 
 import type { ApplicationPrincipal } from './application-principal';
 
 vi.mock('./clerk-browser-adapter', () => ({ createClerkBrowserAdapter: vi.fn() }));
+vi.mock('./clerk-desktop-adapter', () => ({ createClerkDesktopAdapter: vi.fn() }));
 
 const authenticate = vi.fn<(request: Request) => Promise<ApplicationPrincipal>>();
+const authenticateDesktop = vi.fn<(token: string) => Promise<ApplicationPrincipal>>();
 const config = {
   // This suite stubs authentication; no D1 operation is performed.
   BENCHMARK_DB: {} as D1Database,
@@ -18,6 +21,7 @@ const config = {
   CLERK_ISSUER: 'https://browser.clerk.accounts.dev',
   CLERK_PUBLISHABLE_KEY: 'pk_test_fixture',
   CLERK_SECRET_KEY: 'sk_test_fixture',
+  CLERK_DESKTOP_CLIENT_ID: 'desktop_fixture',
 };
 const principal: ApplicationPrincipal = {
   accountId: 'private_account',
@@ -25,14 +29,142 @@ const principal: ApplicationPrincipal = {
   canModerate: false,
   session: { kind: 'browser', expiresAt: Date.now() + 60_000 },
 };
+const ownerPath = '/api/bench/v1/me/runs';
+const desktopAuthorization = 'Bearer opaque-fixture';
+const browserAuthorization = 'Bearer browser.jwt.fixture';
+const browserCookie = '__session=browser-fixture';
 const privatePath = '/api/test-private';
 
 beforeEach(() => {
   vi.mocked(createClerkBrowserAdapter).mockReset().mockReturnValue({ authenticate });
   authenticate.mockReset().mockResolvedValue(principal);
+  vi.mocked(createClerkDesktopAdapter)
+    .mockReset()
+    .mockReturnValue({ authenticate: authenticateDesktop });
+  authenticateDesktop
+    .mockReset()
+    .mockResolvedValue({ ...principal, session: { ...principal.session, kind: 'desktop' } });
 });
 
-describe('browser auth in the product API', () => {
+describe('request auth in the product API', () => {
+  it('preserves the request body for browser-authenticated submission handlers', async () => {
+    const app = createApp();
+    app.post(privatePath, async context => {
+      await context.get('requirePrincipal')();
+
+      return context.text(await context.req.text());
+    });
+    const response = await app.request(
+      privatePath,
+      {
+        method: 'POST',
+        headers: { Authorization: browserAuthorization, Origin: config.APP_ORIGIN },
+        body: 'submission body',
+      },
+      config,
+    );
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('submission body');
+  });
+
+  it('allows desktop POST to reach the existing submission validator without browser Origin', async () => {
+    const response = await createApp().request(
+      ownerPath,
+      {
+        method: 'POST',
+        headers: { Authorization: desktopAuthorization, 'Content-Type': 'application/json' },
+        body: '{}',
+      },
+      config,
+    );
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({ code: 'invalid_input' });
+    expect(authenticateDesktop).toHaveBeenCalledOnce();
+    expect(authenticate).not.toHaveBeenCalled();
+  });
+
+  it('uses desktop credentials without Origin and never falls back to browser cookies', async () => {
+    authenticateDesktop.mockRejectedValue(new AuthenticationDenied());
+    const response = await createApp().request(
+      ownerPath,
+      {
+        method: 'POST',
+        headers: { Authorization: desktopAuthorization, Cookie: browserCookie },
+      },
+      config,
+    );
+    expect(response.status).toBe(401);
+    expect(authenticateDesktop).toHaveBeenCalledExactlyOnceWith('opaque-fixture');
+    expect(createClerkDesktopAdapter).toHaveBeenCalledWith(
+      expect.objectContaining({ desktopClientId: config.CLERK_DESKTOP_CLIENT_ID }),
+      expect.anything(),
+    );
+    expect(authenticate).not.toHaveBeenCalled();
+    expect(await response.text()).not.toContain('fixture');
+  });
+
+  it('rejects desktop access to the real Admin routes even for an admin account', async () => {
+    authenticateDesktop.mockResolvedValue({
+      ...principal,
+      canModerate: true,
+      session: { ...principal.session, kind: 'desktop' },
+    });
+    const response = await createApp().request(
+      '/api/admin/v1/approvals',
+      {
+        headers: { Authorization: desktopAuthorization },
+      },
+      config,
+    );
+    expect(response.status).toBe(403);
+    expect(authenticate).not.toHaveBeenCalled();
+  });
+
+  it.each(['', 'Basic fixture', 'Bearer ', 'Bearer first second', 'Bearer first,Bearer second'])(
+    'does not fall back to cookies on malformed Authorization: %s',
+    async authorization => {
+      const response = await createApp().request(
+        ownerPath,
+        {
+          headers: { Authorization: authorization, Cookie: browserCookie },
+        },
+        config,
+      );
+      expect(response.status).toBe(401);
+      expect(authenticate).not.toHaveBeenCalled();
+      expect(authenticateDesktop).not.toHaveBeenCalled();
+    },
+  );
+
+  it('rejects a foreign Origin for desktop credentials', async () => {
+    const response = await createApp().request(
+      ownerPath,
+      {
+        headers: { Authorization: desktopAuthorization, Origin: 'https://foreign.example' },
+      },
+      config,
+    );
+    expect(response.status).toBe(401);
+    expect(authenticateDesktop).not.toHaveBeenCalled();
+  });
+
+  it('keeps browser JWT verification and removes cookies when a bearer is explicit', async () => {
+    authenticate.mockRejectedValue(new AuthenticationDenied());
+    const response = await createApp().request(
+      ownerPath,
+      {
+        headers: {
+          Authorization: browserAuthorization,
+          Cookie: browserCookie,
+        },
+      },
+      config,
+    );
+    expect(response.status).toBe(401);
+    expect(authenticate.mock.calls[0]?.[0].headers.get('Cookie')).toBeNull();
+    expect(authenticate.mock.calls[0]?.[0].headers.get('Authorization')).toBe(browserAuthorization);
+    expect(authenticateDesktop).not.toHaveBeenCalled();
+  });
   it('keeps public benchmark requests anonymous even with invalid credentials and no auth config', async () => {
     const app = createApp(new InMemoryBenchmarkRepository());
     const response = await app.request('/api/bench/v1/runs', {

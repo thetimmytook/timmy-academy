@@ -1,4 +1,6 @@
+import { AuthenticationDenied } from './application-principal';
 import { createClerkBrowserAdapter } from './clerk-browser-adapter';
+import { createClerkDesktopAdapter } from './clerk-desktop-adapter';
 import { D1AccountRepository } from './d1-account-repository';
 
 import type { ApplicationPrincipal } from './application-principal';
@@ -27,14 +29,45 @@ async function authenticate(context: Context): Promise<ApplicationPrincipal> {
   const { auth, database } = context.get('config');
 
   if (!auth) {
-    throw new Error('Browser authentication is not configured.');
+    throw new Error('Authentication is not configured.');
   }
 
   if (!database) {
     throw new Error('Database is not configured.');
   }
 
-  const adapter = createClerkBrowserAdapter(auth, new D1AccountRepository(database));
+  const accounts = new D1AccountRepository(database);
+  const request = context.req.raw;
+  const authorization = request.headers.get('Authorization');
 
-  return adapter.authenticate(context.req.raw);
+  if (authorization !== null) {
+    const match = /^Bearer ([a-z0-9._~+/-]+=*)$/i.exec(authorization);
+    const token = match?.[1];
+
+    if (!token || token.length > 4096) {
+      throw new AuthenticationDenied();
+    }
+
+    // The deployed desktop client issues opaque tokens. JWTs remain browser-only.
+    // Shape selects a verifier; only the verifier can establish an identity.
+    if (!token.includes('.')) {
+      const origin = request.headers.get('Origin');
+
+      if (origin !== null && origin !== auth.origin) {
+        throw new AuthenticationDenied();
+      }
+
+      return createClerkDesktopAdapter(auth, accounts).authenticate(token);
+    }
+
+    // An explicit bearer must never silently fall back to a browser cookie.
+    const headers = new Headers(request.headers);
+    headers.delete('Cookie');
+
+    return createClerkBrowserAdapter(auth, accounts).authenticate(
+      new Request(request.url, { method: request.method, headers }),
+    );
+  }
+
+  return createClerkBrowserAdapter(auth, accounts).authenticate(request);
 }

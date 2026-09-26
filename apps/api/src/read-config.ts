@@ -9,6 +9,7 @@ export function readConfig(env: AppBindings = {}): AppConfig {
           publishableKey: env.CLERK_PUBLISHABLE_KEY,
           secretKey: env.CLERK_SECRET_KEY,
           jwtKey: env.CLERK_JWT_KEY,
+          desktopClientId: env.CLERK_DESKTOP_CLIENT_ID,
         }
       : undefined;
 

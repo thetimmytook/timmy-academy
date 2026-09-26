@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AuthenticationDenied } from './application-principal';
 import { createClerkBrowserAdapter } from './clerk-browser-adapter';
+import { createClerkDesktopAdapter } from './clerk-desktop-adapter';
 import { D1AccountRepository } from './d1-account-repository';
 
 const foreignOrigin = 'https://attacker.example';
@@ -111,7 +112,7 @@ describe('Clerk browser session adapter with real JWT signatures', () => {
     expect((await adapter.authenticate(request(jwt))).canModerate).toBe(true);
     expect((await adapter.authenticate(request(jwt))).canModerate).toBe(false);
   });
-  it('persists the same account across verified browser sign-ins through real D1', async () => {
+  it('persists the same account across browser and desktop sign-ins through real D1', async () => {
     const mf = new Miniflare(
       convertV4MiniflareOptions({
         modules: true,
@@ -144,6 +145,26 @@ describe('Clerk browser session adapter with real JWT signatures', () => {
         new D1AccountRepository(db),
       ).authenticate(request());
       expect(second).toEqual(first);
+      transport
+        .mockResolvedValueOnce(
+          Response.json({
+            object: 'clerk_idp_oauth_access_token',
+            client_id: 'desktop_fixture',
+            subject: claims.sub,
+            scopes: ['email', 'offline_access'],
+            revoked: false,
+            expired: false,
+            expiration: now + 120,
+          }),
+        )
+        .mockResolvedValueOnce(Response.json(verifiedUser));
+      const desktop = await createClerkDesktopAdapter(
+        { ...config, desktopClientId: 'desktop_fixture' },
+        new D1AccountRepository(db),
+      ).authenticate('opaque-fixture');
+      expect(desktop.accountId).toBe(first.accountId);
+      expect(desktop.session.kind).toBe('desktop');
+      expect(desktop.canModerate).toBe(false);
       expect(
         await db
           .prepare('SELECT account_id FROM account_identities WHERE issuer = ? AND subject = ?')
@@ -151,6 +172,27 @@ describe('Clerk browser session adapter with real JWT signatures', () => {
           .first('account_id'),
       ).toBe(first.accountId);
       expect(await db.prepare('SELECT count(*) FROM accounts').first('count(*)')).toBe(1);
+
+      // The same email on a different verified subject must not link accounts.
+      transport
+        .mockResolvedValueOnce(
+          Response.json({
+            object: 'clerk_idp_oauth_access_token',
+            client_id: 'desktop_fixture',
+            subject: 'user_other',
+            scopes: ['email'],
+            revoked: false,
+            expired: false,
+            expiration: now + 120,
+          }),
+        )
+        .mockResolvedValueOnce(Response.json({ ...verifiedUser, id: 'user_other' }));
+      const other = await createClerkDesktopAdapter(
+        { ...config, desktopClientId: 'desktop_fixture' },
+        new D1AccountRepository(db),
+      ).authenticate('opaque-other-fixture');
+      expect(other.accountId).not.toBe(first.accountId);
+      expect(await db.prepare('SELECT count(*) FROM accounts').first('count(*)')).toBe(2);
     } finally {
       await mf.dispose();
     }

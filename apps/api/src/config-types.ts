@@ -9,6 +9,7 @@ export interface AppBindings {
   CLERK_PUBLISHABLE_KEY?: string;
   CLERK_SECRET_KEY?: string;
   CLERK_JWT_KEY?: string;
+  CLERK_DESKTOP_CLIENT_ID?: string;
 }
 
 export interface AuthConfig {
@@ -17,6 +18,7 @@ export interface AuthConfig {
   publishableKey: string;
   secretKey: string;
   jwtKey: string | undefined;
+  desktopClientId?: string | undefined;
 }
 
 export interface AppConfig {
