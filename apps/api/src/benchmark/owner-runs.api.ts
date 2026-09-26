@@ -81,7 +81,7 @@ export function createOwnerRunsRouter(): Hono<OwnerEnv> {
   app.delete('/runs/:publicRunId', async context => {
     const parsed = publicRunIdSchema.safeParse(context.req.param('publicRunId'));
 
-    if (!parsed.success || new URL(context.req.url).search || context.req.raw.body !== null) {
+    if (!parsed.success || new URL(context.req.url).search) {
       throw new BenchmarkRequestError('invalid_input');
     }
 

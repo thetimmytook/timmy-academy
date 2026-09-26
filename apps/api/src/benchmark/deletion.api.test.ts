@@ -51,7 +51,7 @@ async function request(
     path + suffix,
     {
       method,
-      body: method === 'GET' || body === '' ? null : body,
+      body: method === 'GET' ? null : body,
       headers: { 'Content-Type': type },
     },
     {
@@ -131,8 +131,8 @@ describe('owner publication deletion API', () => {
   it('removes the public run, returns only the receipt, and accepts retries', async () => {
     const id = await publish();
 
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const response = await remove(id);
+    for (const body of ['', '{}', 'not JSON', '{"public_run_id":"br_other"}']) {
+      const response = await request(body, contentType, '/' + id, 'DELETE');
       expect(response.status).toBe(200);
       expect(response.headers.get('Cache-Control')).toBe('no-store');
       expect(await response.json()).toEqual({ publication_status: 'deleted', public_run_id: id });
@@ -172,8 +172,7 @@ describe('owner publication deletion API', () => {
   it.each([
     ['invalid', ''],
     ['br_missing?extra=private', ''],
-    ['br_missing', '{}'],
-  ])('rejects invalid ID, query or body: %s %s', async (id, body) => {
+  ])('rejects invalid ID or query: %s %s', async (id, body) => {
     const response = await request(body, contentType, '/' + id, 'DELETE');
     expect(response.status).toBe(422);
     expect(await response.json()).toMatchObject({ code: 'invalid_input' });

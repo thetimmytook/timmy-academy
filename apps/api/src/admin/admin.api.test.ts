@@ -53,7 +53,7 @@ async function request(
     endpoint + suffix,
     {
       method,
-      body: method === 'GET' || body === '' ? null : body,
+      body: method === 'GET' ? null : body,
       headers: { 'Content-Type': type },
     },
     {
@@ -137,8 +137,8 @@ describe('moderator approvals queue', () => {
     const id = await submit();
     const status = decision === 'approve' ? 'published' : 'rejected';
 
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const response = await decide(id, decision);
+    for (const body of ['', '{}', 'not JSON', '{"decision":"other","submissionId":999}']) {
+      const response = await decide(id, decision, body);
       expect(response.status).toBe(200);
       expect(response.headers.get(cacheControl)).toBe('no-store');
       expect(await response.json()).toEqual({ submission_id: id, publication_status: status });
@@ -191,7 +191,6 @@ describe('moderator approvals queue', () => {
   it.each([
     [-1, 'approve', '', ''],
     [1, 'unknown', '', ''],
-    [1, 'approve', '{}', ''],
     [1, 'reject', '', '?role=admin'],
   ] as const)('rejects invalid decision input %s %s %s %s', async (id, decision, body, suffix) => {
     expect((await decide(id, decision, body, suffix)).status).toBe(422);

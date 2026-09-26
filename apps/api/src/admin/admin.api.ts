@@ -52,7 +52,7 @@ export function createAdminRouter(): Hono {
   app.post('/approvals/:submissionId/:decision', async context => {
     const parsed = decisionParamsSchema.safeParse(context.req.param());
 
-    if (!parsed.success || new URL(context.req.url).search || context.req.raw.body !== null) {
+    if (!parsed.success || new URL(context.req.url).search) {
       throw new BenchmarkRequestError('invalid_input');
     }
 
