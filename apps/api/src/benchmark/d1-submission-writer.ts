@@ -48,11 +48,26 @@ export class D1SubmissionWriter {
       .select({ sequence: submissions.sequence })
       .from(submissions)
       .where(and(eq(submissions.accountId, accountId), eq(submissions.clientRunId, clientId)));
-    const [, , result] = await this.db.batch([
+
+    // Stored details have canonical schema order. Compare the measurement without
+    // publication metadata, so a new client UUID or app version cannot duplicate it.
+    // Reading existing details also covers submissions created before this check.
+    const duplicate = this.db
+      .select({ sequence: submissions.sequence })
+      .from(submissions)
+      .innerJoin(runs, eq(runs.sequence, submissions.runSequence))
+      .where(
+        and(
+          eq(submissions.accountId, accountId),
+          sql`json_remove(${runs.detail}, '$.public_run_id', '$.url', '$.is_synthetic', '$.hardware.cpu.name', '$.hardware.gpu.name') = json_remove(${JSON.stringify(normalized)}, '$.hardware.cpu.name', '$.hardware.gpu.name')`,
+        ),
+      )
+      .limit(1);
+    const [, , result, duplicates] = await this.db.batch([
       // SELECT lists follow writable schema columns; generated search columns are omitted.
       this.db.insert(runs)
         .select(sql`SELECT NULL, ${publicId}, ${accountId}, NULL, 'hidden', ${JSON.stringify(detail)}, 0
-        WHERE ${notExists(existingSubmission)}`),
+        WHERE ${and(notExists(existingSubmission), notExists(duplicate))}`),
       this.db.insert(submissions)
         .select(sql`SELECT NULL, ${accountId}, ${clientId}, ${submittedAt}, 'pending_review', ${runs.sequence}, NULL, ${requestFingerprint}, NULL
         FROM ${runs} WHERE ${and(eq(runs.publicId, publicId), notExists(existingSubmission))}`),
@@ -68,10 +83,15 @@ export class D1SubmissionWriter {
         .from(submissions)
         .leftJoin(runs, eq(runs.sequence, submissions.runSequence))
         .where(and(eq(submissions.accountId, accountId), eq(submissions.clientRunId, clientId))),
+      duplicate,
     ]);
     const stored = result[0];
 
     if (!stored) {
+      if (duplicates.length > 0) {
+        throw new BenchmarkRequestError('duplicate_run');
+      }
+
       throw new Error('Submission is missing after its transaction.');
     }
 

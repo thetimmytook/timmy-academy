@@ -25,6 +25,7 @@ let mf: Miniflare;
 let db: D1Database;
 const owner = 'acc_owner';
 const stranger = 'acc_stranger';
+const secondClientId = '00000000-0000-4000-8000-000000000002';
 const path = '/api/bench/v1/me/runs';
 const contentType = 'application/json';
 const noStore = 'no-store';
@@ -285,6 +286,82 @@ describe('protected submission upload', () => {
   it('serializes simultaneous exact retries without orphan runs', async () => {
     const responses = await Promise.all([request(), request(), request()]);
     expect(responses.map(response => response.status)).toEqual([202, 202, 202]);
+    await counts(1);
+  });
+  it.each(['pending_review', 'published', 'rejected'])(
+    'rejects a new client ID for the same %s measurement',
+    async status => {
+      expect((await request()).status).toBe(202);
+      const sequence = await db.prepare(submissionSequenceQuery).first<number>('sequence');
+
+      if (status === 'published') {
+        await new D1SubmissionApproval(db).approve(sequence!);
+      } else if (status === 'rejected') {
+        await new D1SubmissionRejection(db).reject(sequence!);
+      }
+
+      const response = await request(
+        JSON.stringify({
+          ...dto,
+          client_run_id: secondClientId,
+          app_version: '2.0',
+          hardware: { ...dto.hardware, cpu_name: ' NEW  CPU 123 ' },
+        }),
+      );
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({ code: 'duplicate_run' });
+      await counts(1);
+    },
+  );
+  it('serializes duplicate measurements with different client IDs without orphan runs', async () => {
+    const responses = await Promise.all(
+      [1, 2, 3].map(index =>
+        request(
+          JSON.stringify({
+            ...dto,
+            client_run_id: `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
+          }),
+        ),
+      ),
+    );
+    expect(responses.map(response => response.status).sort((a, b) => a - b)).toEqual([
+      202, 409, 409,
+    ]);
+
+    for (const response of responses.filter(response => response.status === 409)) {
+      expect(await response.json()).toMatchObject({ code: 'duplicate_run' });
+    }
+
+    await counts(1);
+  });
+  it('accepts a distinct measurement with a new client ID', async () => {
+    expect((await request()).status).toBe(202);
+    expect(
+      (
+        await request(
+          JSON.stringify({
+            ...dto,
+            client_run_id: secondClientId,
+            map: 'woods',
+          }),
+        )
+      ).status,
+    ).toBe(202);
+    await counts(2);
+  });
+  it('detects duplicates of older stored measurements without synthetic metadata', async () => {
+    expect((await request()).status).toBe(202);
+    await db
+      .prepare("UPDATE benchmark_runs SET detail = json_remove(detail, '$.is_synthetic')")
+      .run();
+    const response = await request(
+      JSON.stringify({
+        ...dto,
+        client_run_id: secondClientId,
+      }),
+    );
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'duplicate_run' });
     await counts(1);
   });
   it('allows only one winner for simultaneous conflicting requests', async () => {

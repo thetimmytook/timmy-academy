@@ -15,6 +15,10 @@ export interface BenchmarkRepository {
 }
 
 const errors = {
+  duplicate_run: {
+    status: 409,
+    message: 'This measurement was already submitted by your account.',
+  },
   moderation_conflict: {
     status: 409,
     message: 'This submission already has a different decision. Refresh the queue.',

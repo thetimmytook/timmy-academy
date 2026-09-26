@@ -124,7 +124,18 @@ const decide = (id: number, decision: string, body = '', suffix = ''): Promise<R
   request(body, contentType, `/${id}/${decision}${suffix}`, 'POST', queuePath);
 
 async function submit(client = dto.client_run_id): Promise<number> {
-  expect((await request(JSON.stringify({ ...dto, client_run_id: client }))).status).toBe(202);
+  // Pagination needs distinct measurements, not retries under new client IDs.
+  expect(
+    (
+      await request(
+        JSON.stringify({
+          ...dto,
+          client_run_id: client,
+          captured_day: `2026-09-${String(20 + Number(client.slice(-1))).padStart(2, '0')}`,
+        }),
+      )
+    ).status,
+  ).toBe(202);
 
   return (await db
     .prepare('SELECT sequence FROM benchmark_submissions WHERE client_run_id = ?')

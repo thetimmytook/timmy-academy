@@ -307,6 +307,16 @@ Content-Type: application/json
 
 A retry with the same account, `client_run_id` and identical validated payload returns the existing result (`200` if published; `202` if pending) without creating another run. The same key with changed payload returns `409 idempotency_conflict`; a new client ID with an already accepted run fingerprint returns `409 duplicate_run`. Retrying a deleted publication returns `409 publication_deleted`, never republishes it. Invalid captures return `422 invalid_input`; an uncertain network response is recovered using the same client ID or the owner lookup below. Published measurements are immutable.
 
+Duplicate detection is per account and compares the canonical normalized measurement
+already stored for pending, published or rejected submissions. Publication identifiers
+and the synthetic marker are excluded; hardware uses normalized model IDs rather
+than display names. Client IDs and app versions are not part of
+the normalized measurement. The comparison and inserts share one D1 transaction.
+The full request fingerprint remains separate for exact idempotent retries. Deletion
+removes the measurement and its request fingerprint; its existing client-ID tombstone
+still prevents retrying that deleted publication. No new fingerprint is retained to
+link a deleted measurement to the anonymous archive.
+
 ### `GET /me/runs` and `GET /me/runs/by-client-id/{clientRunId}` — owner reads
 
 Both require verified account ownership. `GET /me/runs` accepts `status=all|published|pending_review|rejected` (default `all`), `limit` (default 20, maximum 50) and opaque `cursor`; it orders by server `submitted_at` descending with a stable private tie-breaker. It lists server submissions, not the Windows app's complete local history. Deleted publications are excluded. Its cursor binds status, limit and a stable result snapshot; changed parameters return `400 invalid_cursor`, and a no-longer-safe snapshot returns `409 cursor_stale`.
