@@ -38,7 +38,10 @@
           "migrations_dir": "migrations",
         },
       ],
-      "vars": { "DISABLE_INDEXING": "true" },
+      "vars": {
+        "DISABLE_INDEXING": "true",
+        "APP_ORIGIN": "https://staging.timmy.academy",
+      },
       "routes": [{ "pattern": "staging.timmy.academy", "custom_domain": true }],
     },
     "production": {
@@ -58,6 +61,7 @@
           "migrations_dir": "migrations",
         },
       ],
+      "vars": { "APP_ORIGIN": "https://timmy.academy" },
       "routes": [{ "pattern": "timmy.academy", "custom_domain": true }],
     },
   },
