@@ -82,10 +82,24 @@ Set the actual browser origin and Clerk instance values. The product Worker's
 existing `BENCHMARK_DB` binding uses the accounts migration already in the main
 migration sequence; no second database is required.
 
-For staging and production, configure these bindings independently: `APP_ORIGIN`,
-`CLERK_ISSUER`, `CLERK_PUBLISHABLE_KEY`, and secret `CLERK_SECRET_KEY`. Use
-`https://staging.timmy.academy` and `https://timmy.academy` respectively as the browser
-origins. Do not reuse PoC secrets implicitly. An optional `CLERK_JWT_KEY` can supply
+For staging and production, `infrastructure/wrangler.jsonc` is the source of truth
+for public runtime bindings: `APP_ORIGIN`, `CLERK_DESKTOP_CLIENT_ID`, `CLERK_ISSUER`
+and `CLERK_PUBLISHABLE_KEY`. `DISABLE_INDEXING` is set only in staging. Keep these
+values in each environment's `vars` so deployments preserve the configuration;
+local `.dev.vars` and manual Dashboard changes are not the deployment source.
+Missing issuer or publishable key disables API auth configuration and causes
+protected endpoints to return 500 even if browser sign-in works.
+
+The GitHub repository variables `STAGING_CLERK_PUBLISHABLE_KEY` and
+`PRODUCTION_CLERK_PUBLISHABLE_KEY` supply the frontend build and must match the
+corresponding Worker's `CLERK_PUBLISHABLE_KEY`. When changing Clerk instances,
+update both together. `deployment-config.test.ts` reads the checked-in JSONC
+directly, independently of `.dev.vars`; it does not query GitHub or Cloudflare.
+
+`CLERK_SECRET_KEY` and `BENCHMARK_CURSOR_SECRET` remain exclusively in Cloudflare
+Secrets for each deployed environment. Never add their values to Wrangler `vars`,
+frontend build variables, tests or documentation. Do not reuse PoC secrets
+implicitly. An optional `CLERK_JWT_KEY` can supply
 the instance's PEM public key; if configured, it must be updated on key rotation.
 Without it the SDK retrieves and caches the instance's JWKS.
 
