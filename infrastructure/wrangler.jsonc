@@ -41,6 +41,7 @@
       "vars": {
         "DISABLE_INDEXING": "true",
         "APP_ORIGIN": "https://staging.timmy.academy",
+        "CLERK_DESKTOP_CLIENT_ID": "33gFOhc9r5yRSe6s",
       },
       "routes": [{ "pattern": "staging.timmy.academy", "custom_domain": true }],
     },
@@ -61,7 +62,10 @@
           "migrations_dir": "migrations",
         },
       ],
-      "vars": { "APP_ORIGIN": "https://timmy.academy" },
+      "vars": {
+        "APP_ORIGIN": "https://timmy.academy",
+        "CLERK_DESKTOP_CLIENT_ID": "qdlSafxYpIuB7U5x",
+      },
       "routes": [{ "pattern": "timmy.academy", "custom_domain": true }],
     },
   },

@@ -55,7 +55,14 @@ Unix seconds, converted to milliseconds for the application principal. See the
 The token is sent only in the server-to-Clerk POST body, never a URL or report.
 
 Set `CLERK_DESKTOP_CLIENT_ID` to the public client ID shared by Benchmark and Toolkit
-in this environment. The issuer, publishable key, server secret key and OAuth client
+in this environment. `wrangler.jsonc` pins the public IDs in each environment's
+`vars`: staging uses the Development Clerk client `33gFOhc9r5yRSe6s`, and production
+uses the Production Clerk client `qdlSafxYpIuB7U5x`. These are public identifiers,
+not secrets. Local `.dev.vars` values and GitHub's frontend publishable-key variables
+do not configure these deployed bindings. Changing a Worker binding requires a
+backend deployment, not a new Windows package or Microsoft Store submission.
+
+The issuer, publishable key, server secret key and OAuth client
 must all belong to the same Clerk instance. The OAuth client has no client secret;
 the existing `CLERK_SECRET_KEY` stays server-only. Browser auth still works if the
 desktop client ID is absent; desktop requests then fail with a configuration error.
