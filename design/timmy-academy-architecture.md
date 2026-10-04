@@ -1,6 +1,6 @@
 # TimmyTook / Timmy Academy — Architecture Decisions
 
-_Last updated: 2026-09-18_
+_Last updated: 2026-10-04_
 
 This document records the current baseline architecture for TimmyTook / Timmy Academy. It is the default starting point for new features unless a later decision explicitly replaces something here.
 
@@ -528,6 +528,45 @@ HTTP request
 ```
 
 Do not rely only on TypeScript types for untrusted runtime input.
+
+### 11.1 Public contracts and private policy
+
+The repository is public. Public schemas define API correctness, not publication trust.
+Current submissions pass contract and arithmetic consistency checks, enter pending review,
+and become public only after an authorized moderator decision. Those checks do not prove
+capture authenticity. No trust score, anomaly detector, quarantine workflow or FPS aggregate
+eligibility policy is implemented yet.
+
+Keep these responsibilities public:
+
+- request/response schemas, DTO types, enum values and explicit public field allowlists;
+- input ranges, capture arithmetic and documented collector rounding compatibility;
+- public read APIs, synthetic fixtures, API collections and contract documentation;
+- ordinary idempotency, exact duplicate checks and the generic approve/reject mechanism.
+
+When agreed for implementation, keep these responsibilities in private server code and tests:
+
+- trust scoring and anomaly detection;
+- credibility thresholds and publication tolerances beyond contract/rounding correctness;
+- abuse, spam and suspicious-duplicate heuristics;
+- quarantine and internal moderation decision rules;
+- rules deciding which measurements qualify for future aggregates.
+
+Ordinary aggregate calculations and admin UI do not require private source merely because they
+run on the backend or are used by moderators. Browser-delivered admin code remains visible to
+clients; the server enforces access to data and operations. Private policy must not enter shared
+contracts, browser bundles, public documentation, CI logs or public build artifacts. Source
+privacy supplements server validation and authorization; it never replaces them.
+
+The current artifact contains the complete compiled Worker, frontend assets, migrations and
+deployment metadata. A later private component requires private storage for that artifact and
+control of build/test output before it is included. Pin every participating source revision and
+record it in artifact metadata. Preserve one build, successful staging, manual production approval,
+and promotion of the same verified files without rebuilding.
+
+This records the separation decision only. It creates no private repository, package, service or
+deployment path and moves no existing implementation. Already published source remains in Git
+history; ordinary validation is not a reason to rewrite that history.
 
 ---
 

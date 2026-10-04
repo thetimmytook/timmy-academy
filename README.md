@@ -1,6 +1,8 @@
 # Timmy Academy
 
-Timmy Academy workspace with a public Benchmark web UI and API backed by persistent Cloudflare D1 storage. Fictional data is an explicit local/staging seed.
+Timmy Academy workspace with public Benchmark browsing, authenticated submissions and owner
+controls, and moderator approval backed by Cloudflare D1. Synthetic data is added only through
+explicit seed commands; there is no runtime fixture fallback.
 
 ## Local development
 
@@ -51,17 +53,19 @@ These plain-text collection files live beside the API code in Git; there is no s
 or filesystem link to maintain. The collection uses only synthetic public data and sends no
 authentication or publication request.
 
-Runtime Zod schemas and inferred types live in `packages/contracts/src/benchmark.ts`.
+Runtime Zod schemas and inferred types live in `packages/contracts/src`.
 HTTP route registration and transport validation live in `apps/api/src/**/*.api.ts`;
 `apps/api/src/index.ts` assembles the app and shared error handling; `apps/api/src/benchmark/` contains
 the asynchronous repository boundary, query logic, synthetic fixtures and explicit public projections.
-There are 24 fictional runs across three CPU/GPU/RAM-capacity tuples and four maps. No data is
-loaded from Windows, local captures or real accounts. Settings and metrics belong to each run.
+The local/staging fixture seed contains 24 fictional runs across three CPU/GPU/RAM-capacity tuples
+and four maps. Fixtures do not read Windows captures or real accounts. Published owner submissions
+use the same public projections; settings and metrics belong to each run.
 
-The initial catalog recognizes the CPU/GPU display names in `catalog.ts` for Position,
-ignoring case and repeated whitespace; unrecognized names/maps return `422 invalid_input`.
-Search takes exact canonical IDs and returns an empty result when none match. This limited catalog
-is not a production hardware normalizer. Unknown game version/resolution stay `null` and yield
+Hardware normalization trims and collapses whitespace and derives stable CPU/GPU IDs from the
+complete case-insensitive names, without a fixture allowlist or fuzzy matching. Supported map IDs
+live in `catalog.ts`; unknown maps return `422 invalid_input` for Position and submissions.
+Search takes exact canonical IDs and returns an empty result when none match.
+Unknown game version/resolution stay `null` and yield
 `missing_conditions` in Position. Graphics settings never become default equality conditions.
 Derived render scale/upscaling remain `null`; quality notes stay empty until their codes are approved.
 
@@ -76,11 +80,35 @@ caps the body at 4 KiB before JSON parsing, including streamed requests. Unsuppo
 missing media types return `415 unsupported_media_type`; oversized bodies return
 `413 payload_too_large`. These policies are recorded in the v1 design contract.
 
-Production catalog normalization, approved warning codes and abuse limits remain future work.
-Publishing must add validation/metric tolerances, idempotency, moderation, deletion and retention.
-Authentication/provider selection and ownership remain separate work; this slice adds storage
-for anonymous reads without public write or owner endpoints. Empty databases stay empty; no
-fixture fallback is used. Seed is explicit, idempotent and forbidden on production.
+Anonymous reads expose only published runs. Empty databases stay empty. The fixture seed supports
+only local/staging; the separate manual demo seed can target production and marks its measurements
+as synthetic. See [synthetic data policy](infrastructure/synthetic-benchmarks.md).
+
+## Submissions, ownership and moderation
+
+Protected owner routes require a verified Clerk browser session or desktop OAuth principal:
+
+- `POST /api/bench/v1/me/runs`: validate and store a submission for review.
+- `GET /api/bench/v1/me/runs`: list the current owner's submissions.
+- `GET /api/bench/v1/me/runs/by-client-id/{clientRunId}`: retrieve an owner receipt.
+- `DELETE /api/bench/v1/me/runs/{publicRunId}`: remove an owned publication.
+
+Upload requires JSON with a 32 KiB body limit. The server checks the strict input allowlist,
+capture metric consistency and normalized settings, handles idempotent retries, rejects duplicate
+measurements within the same account, and enforces a rolling per-account submission quota.
+New submissions return `pending_review` with no public ID or URL; upload never publishes a run.
+
+Browser moderators can inspect the pending queue and approve or reject submissions through
+`/api/admin/v1/approvals`. Moderator capability comes from Clerk's server-read admin role; ordinary
+owners and desktop sessions cannot use admin routes. Owner deletion removes the public run and
+retains an anonymous measurement archive that public readers do not expose.
+
+See [submission contracts and lifecycle](infrastructure/benchmark-submissions.md),
+[moderator access and decisions](infrastructure/admin.md), and
+[browser/desktop authentication](infrastructure/browser-auth.md).
+Trust scoring, anomaly detection, quarantine, FPS aggregate eligibility, approved warning codes
+and archive retention policy remain future work. Arithmetic consistency checks establish valid
+input, not proof that a capture is authentic.
 
 ## Public Benchmark UI
 
@@ -99,13 +127,35 @@ A direct detail visit with no saved browse URL falls back to `/bench/`. Vite and
 Cloudflare SPA asset fallback both serve direct detail URLs on refresh.
 
 The UI has loading, empty, invalid-link, unavailable-run and retry states. Missing settings are
-not inferred; recorded quality codes and mode tokens retain their saved values. The profile
-icon is a noninteractive placeholder. No auth, owner actions, Position or Academy pages are added.
+not inferred; recorded quality codes and mode tokens retain their saved values.
+Clerk sign-in and sign-up live at `/sign-in` and `/sign-up`. The profile menu opens My Bench
+at `/bench/me`, where owners view submission status and can remove published runs. Browser
+moderators also have `/admin` for pending approvals. Public browsing requires no sign-in.
+Position has an API but no dedicated page; the other Academy product pages remain future work.
 
 UI integration tests use the real Hono read routes with synthetic test data to cover navigation,
 filtering, both cursors, null settings, errors and out-of-order requests. The current options
 endpoint returns all distinct observed values in one response; a large production dataset will
-need a searchable/paginated options contract. Real publication data remains future backend work.
+need a searchable/paginated options contract.
+
+## Public contracts and private policy
+
+This repository is public. Shared schemas, enum values, explicit public projections, basic input
+and capture consistency checks, ordinary idempotency, public reads, synthetic fixtures and API
+collections remain public. Schema acceptance does not establish authenticity or authorize
+publication; publication is currently a moderator decision.
+
+Future trust scoring, anomaly detection, abuse heuristics, quarantine and aggregate eligibility
+rules belong to private server implementation when those features are agreed. They may evolve
+without changing public transport contracts and must not enter browser bundles or shared contracts.
+An admin page's browser code is visible to clients; access to its data and operations is enforced
+by the server. Private submission data means restricted access, not private source code.
+
+No repository split is implemented here. Before adding private policy, the build must also keep
+the compiled Worker, related tests, logs and deployment artifacts private: the current public
+Actions artifact contains the Worker. Preserve one build and promotion of the same artifact,
+with every source revision pinned. See the
+[architecture boundary](design/timmy-academy-architecture.md#111-public-contracts-and-private-policy).
 
 ## Style system
 
