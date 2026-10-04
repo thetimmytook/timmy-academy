@@ -8,6 +8,7 @@ import { registerBenchmarkApi } from './benchmark/benchmark.api';
 import { D1BenchmarkRepository } from './benchmark/d1-repository';
 import { createOwnerRunsRouter } from './benchmark/owner-runs.api';
 import { BenchmarkRequestError, type BenchmarkRepository } from './benchmark/repository';
+import { createPublicConfigRouter } from './public-config/public-config.api';
 import { readConfig } from './read-config';
 
 import type { AppBindings } from './config-types';
@@ -23,6 +24,7 @@ export function createApp(repository?: BenchmarkRepository): Hono {
       context.header('X-Robots-Tag', 'noindex');
     }
   });
+  app.route('/api/config', createPublicConfigRouter());
   app.use('/api/*', requestPrincipal());
   app.route('/api/bench/v1/me', createOwnerRunsRouter());
   app.route('/api/admin/v1', createAdminRouter());

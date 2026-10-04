@@ -21,6 +21,12 @@ schema. Contract changes are rebuilt automatically.
 Open `http://127.0.0.1:5173`. The web app proxies `/api` to the local Cloudflare Worker on port 8787. `GET /api/bench/v1/health` returns `{ "status": "ok" }`. `dev` also
 watches the shared contracts package. Use `npm run dev:web` or `npm run dev:api` for one app.
 
+For browser sign-in, copy `infrastructure/.dev.vars.example` to `.dev.vars` in that
+directory and configure the local Clerk instance there. The frontend loads its public
+key from `/api/config` through the same Vite proxy; it needs no Vite environment key.
+Without runtime config, public benchmarks remain available. See
+[runtime config and key rotation](infrastructure/browser-auth.md).
+
 ## Public Benchmark API
 
 The [v1 contract](design/benchmark-backend-draft.md) is implemented by these anonymous routes:
@@ -63,7 +69,8 @@ Pagination uses client-held, HMAC-signed navigation tokens with a fixed 30-minut
 are excluded from existing snapshots; updates/deletions invalidate them with 409. Cursors bind
 filters, sort, view, group and limit, and use keyset continuation. See the [D1 policy, setup commands
 and staging acceptance table](infrastructure/README.md#d1-persistence-and-migrations). All API
-responses use Cache-Control: no-store.
+benchmark responses use Cache-Control: no-store. The public runtime configuration has
+its own versioned cache policy described in [browser-auth.md](infrastructure/browser-auth.md).
 The Position POST requires `Content-Type: application/json` (parameters are accepted) and
 caps the body at 4 KiB before JSON parsing, including streamed requests. Unsupported or
 missing media types return `415 unsupported_media_type`; oversized bodies return

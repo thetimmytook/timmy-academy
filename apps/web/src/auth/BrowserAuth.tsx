@@ -3,12 +3,12 @@ import { createContext, useCallback, useContext, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router';
 
 import { lastBrowse } from '../bench/navigation';
-import { readConfig } from '../config';
 import { Button } from '../elements/Button';
 import { Message } from '../elements/Message';
 
 import { oauthContinuation } from './oauth-continuation';
 
+import type { PublicConfig } from '@timmy/contracts';
 import type { JSX, ReactNode } from 'react';
 
 interface BrowserSession {
@@ -50,19 +50,22 @@ function SessionProvider({ children }: Readonly<{ children: ReactNode }>): JSX.E
   );
 }
 
-export function BrowserAuthProvider({ children }: Readonly<{ children: ReactNode }>): JSX.Element {
+export function BrowserAuthProvider({
+  children,
+  config,
+}: Readonly<{ children: ReactNode; config: PublicConfig }>): JSX.Element {
   const navigate = useNavigate();
   const { search } = useLocation();
   const destination = signInDestination(search);
-  const { auth } = readConfig();
+  const publishableKey = config.clerkPublishableKey;
 
-  if (!auth) {
+  if (!publishableKey) {
     return <>{children}</>;
   }
 
   return (
     <ClerkProvider
-      publishableKey={auth.publishableKey}
+      publishableKey={publishableKey}
       signInUrl="/sign-in"
       signUpUrl="/sign-up"
       signInForceRedirectUrl={destination}

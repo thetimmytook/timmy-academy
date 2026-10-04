@@ -36,27 +36,19 @@ token with a narrower Workers Editor token and revoke the original token. Keep W
 for the zone if future deployments change custom-domain bindings. Never put a token value in this
 repository or a workflow log.
 
-Under **Settings → Secrets and variables → Actions → Variables**, configure these
-Repository variables before deploying:
-
-| Variable                           | Value                                             |
-| ---------------------------------- | ------------------------------------------------- |
-| `STAGING_CLERK_PUBLISHABLE_KEY`    | Publishable key for the staging Clerk instance    |
-| `PRODUCTION_CLERK_PUBLISHABLE_KEY` | Publishable key for the production Clerk instance |
-
-Each deployment job passes its own value as `VITE_CLERK_PUBLISHABLE_KEY` during
-the Vite build. Missing values stop the job before build, migrations or deployment.
-These are public frontend keys; never place a Clerk secret key in either variable.
-The selected key must match that environment's Worker Clerk configuration described
-in [browser-auth.md](browser-auth.md). The check job's build is not deployed and
-does not require Clerk keys. Ignored local `.env.local` files are not used by CI.
+The main frontend loads its Clerk publishable key from same-origin `/api/config`.
+`CLERK_PUBLISHABLE_KEY` in each Worker's `vars` is the source of truth; no Vite
+publishable-key variable is needed. See [browser-auth.md](browser-auth.md) for the
+explicit public allowlist, versioned browser/edge cache and key rotation procedure.
+Existing deployment jobs still check the legacy GitHub publishable-key variables;
+removing those checks belongs to the next, artifact-promotion pipeline step.
 
 `.github/workflows/deploy.yml` checks pull requests to `master`. A push to `master` runs the same
 checks and deploys staging on success. To deploy production, open **Actions → Check and deploy →
 Run workflow**, select `master`, and run it. The manual run checks the selected commit before
 deployment. The workflow uses Repository secrets and does not depend on GitHub Environments, which
-may be unavailable for a private repository on the current GitHub plan. Clerk
-publishable keys use Repository variables as described above.
+may be unavailable for a private repository on the current GitHub plan. This is the
+existing workflow; migration to a single artifact with Environment approval is pending.
 
 The first deployment creates the Worker and attaches its custom domain. Cloudflare manages the DNS
 record and TLS certificate for the custom domain. Before the production run, confirm that

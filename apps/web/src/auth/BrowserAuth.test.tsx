@@ -4,10 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from '../App';
 import { rememberBrowse } from '../bench/navigation';
+import { loadConfig } from '../config';
 
 import { BrowserAuthProvider } from './BrowserAuth';
 
+import type { PublicConfig } from '@timmy/contracts';
 import type { JSX, ReactNode } from 'react';
+
+let config: PublicConfig;
 
 interface ProviderProps {
   children: ReactNode;
@@ -65,7 +69,7 @@ function start(path = '/bench/'): ReturnType<typeof render> {
 
   return render(
     <BrowserRouter>
-      <BrowserAuthProvider>
+      <BrowserAuthProvider config={config}>
         <App />
       </BrowserAuthProvider>
     </BrowserRouter>,
@@ -75,7 +79,7 @@ function start(path = '/bench/'): ReturnType<typeof render> {
 beforeEach(() => {
   rememberBrowse('/bench/');
   vi.clearAllMocks();
-  vi.stubEnv('VITE_CLERK_PUBLISHABLE_KEY', 'pk_test_fixture');
+  config = { clerkPublishableKey: 'pk_test_fixture' };
   clerk.loaded = true;
   clerk.metadata = {};
   clerk.session = null;
@@ -118,7 +122,7 @@ it.each(['/sign-in', '/sign-up'])('resumes OAuth from an existing session on %s'
   clerk.session = { id: 'private_browser_session' };
   render(
     <BrowserRouter>
-      <BrowserAuthProvider>
+      <BrowserAuthProvider config={config}>
         <App />
       </BrowserAuthProvider>
     </BrowserRouter>,
@@ -147,8 +151,20 @@ function openProfile(): void {
 const publicBenchmarks = 'Public benchmarks';
 const expandedAttribute = 'aria-expanded';
 const signInLabel = 'Sign in with email →';
+const signInUnavailable = 'Sign-in is currently unavailable';
 
 describe('browser authentication in the main app', () => {
+  it('keeps public browsing available when runtime config cannot load', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network unavailable')));
+    config = await loadConfig();
+    start();
+    expect(screen.getByText(publicBenchmarks)).toBeTruthy();
+    expect(clerk.provider).not.toHaveBeenCalled();
+    openProfile();
+    fireEvent.click(screen.getByRole('link', { name: signInLabel }));
+    expect(screen.getByRole('status').textContent).toContain(signInUnavailable);
+  });
+
   it.each(['admin', 'Admin', 'moderator', undefined])(
     'shows Admin only for the exact role: %s',
     role => {
@@ -199,20 +215,20 @@ describe('browser authentication in the main app', () => {
   });
 
   it('keeps public browsing available without an auth key', () => {
-    vi.stubEnv('VITE_CLERK_PUBLISHABLE_KEY', '');
+    config = { clerkPublishableKey: null };
     start();
     expect(screen.getByText(publicBenchmarks)).toBeTruthy();
     openProfile();
     fireEvent.click(screen.getByRole('link', { name: signInLabel }));
     expect(window.location.pathname).toBe('/sign-in');
-    expect(screen.getByRole('status').textContent).toContain('Sign-in is currently unavailable');
+    expect(screen.getByRole('status').textContent).toContain(signInUnavailable);
     expect(clerk.provider).not.toHaveBeenCalled();
   });
 
   it('shows an unavailable message on a direct sign-in URL without a key', () => {
-    vi.stubEnv('VITE_CLERK_PUBLISHABLE_KEY', '');
+    config = { clerkPublishableKey: null };
     start('/sign-in');
-    expect(screen.getByRole('status').textContent).toContain('Sign-in is currently unavailable');
+    expect(screen.getByRole('status').textContent).toContain(signInUnavailable);
     expect(clerk.signIn).not.toHaveBeenCalled();
   });
 
@@ -278,7 +294,7 @@ describe('browser authentication in the main app', () => {
   );
 
   it('uses the configured key and SPA navigation with the default post-login destination', () => {
-    vi.stubEnv('VITE_CLERK_PUBLISHABLE_KEY', 'pk_live_fixture');
+    config = { clerkPublishableKey: 'pk_live_fixture' };
     start('/sign-in');
     expect(clerk.provider).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -320,7 +336,7 @@ describe('browser authentication in the main app', () => {
     clerk.session = null;
     view.rerender(
       <BrowserRouter>
-        <BrowserAuthProvider>
+        <BrowserAuthProvider config={config}>
           <App />
         </BrowserAuthProvider>
       </BrowserRouter>,

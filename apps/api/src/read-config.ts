@@ -14,6 +14,8 @@ export function readConfig(env: AppBindings = {}): AppConfig {
       : undefined;
 
   return {
+    // Public response allowlist, independent of private API auth configuration.
+    publicConfig: { clerkPublishableKey: env.CLERK_PUBLISHABLE_KEY || null },
     authRateLimit: env.AUTH_RATE_LIMIT,
     cursorSecret: env.BENCHMARK_CURSOR_SECRET,
     database: env.BENCHMARK_DB,
