@@ -2,10 +2,10 @@
 
 `wrangler.jsonc` defines two Cloudflare Workers deployments:
 
-| Environment | Worker                     | Custom domain           | Trigger                                 |
-| ----------- | -------------------------- | ----------------------- | --------------------------------------- |
-| Staging     | `timmy-academy-staging`    | `staging.timmy.academy` | Successful checks on a push to `master` |
-| Production  | `timmy-academy-production` | `timmy.academy`         | Manual GitHub Actions run from `master` |
+| Environment | Worker                     | Custom domain           | Trigger                                            |
+| ----------- | -------------------------- | ----------------------- | -------------------------------------------------- |
+| Staging     | `timmy-academy-staging`    | `staging.timmy.academy` | Successful checks and artifact build on `master`   |
+| Production  | `timmy-academy-production` | `timmy.academy`         | Successful staging and manual Environment approval |
 
 Each deployment includes the Vite build from `apps/web/dist` and the Hono Worker from `apps/api`.
 Cloudflare serves static files and SPA navigation without invoking the Worker script. Only `/api/*`
@@ -28,8 +28,11 @@ does not process `_headers`; validate host matching with a local Wrangler build.
 
 ## GitHub Actions setup
 
-The repository's **Repository secrets** must contain `CLOUDFLARE_ACCOUNT_ID` and
-`CLOUDFLARE_API_TOKEN`. The current Cloudflare token has Workers Admin for the first creation of both
+Deployment jobs use the Repository secrets `CLOUDFLARE_ACCOUNT_ID` and
+`CLOUDFLARE_API_TOKEN`. The `production` Environment may override these deployment
+credentials with its own secrets. Staging does not require a GitHub Environment;
+its Worker settings, Cloudflare Secrets and D1 remain separate from production.
+The current Cloudflare token has Workers Admin for the first creation of both
 Workers and Workers Routes Write for the `timmy.academy` zone. It has no expiration. After the first
 manual production deployment creates the production Worker and custom domain, replace this bootstrap
 token with a narrower Workers Editor token and revoke the original token. Keep Workers Routes Write
@@ -40,23 +43,85 @@ The main frontend loads its Clerk publishable key from same-origin `/api/config`
 `CLERK_PUBLISHABLE_KEY` in each Worker's `vars` is the source of truth; no Vite
 publishable-key variable is needed. See [browser-auth.md](browser-auth.md) for the
 explicit public allowlist, versioned browser/edge cache and key rotation procedure.
-Existing deployment jobs still check the legacy GitHub publishable-key variables;
-removing those checks belongs to the next, artifact-promotion pipeline step.
+The workflow no longer needs `STAGING_CLERK_PUBLISHABLE_KEY` or
+`PRODUCTION_CLERK_PUBLISHABLE_KEY` repository variables.
 
-`.github/workflows/deploy.yml` checks pull requests to `master`. A push to `master` runs the same
-checks and deploys staging on success. To deploy production, open **Actions → Check and deploy →
-Run workflow**, select `master`, and run it. The manual run checks the selected commit before
-deployment. The workflow uses Repository secrets and does not depend on GitHub Environments, which
-may be unavailable for a private repository on the current GitHub plan. This is the
-existing workflow; migration to a single artifact with Environment approval is pending.
+### One build, staging, approval, production
+
+`.github/workflows/deploy.yml` checks pull requests to `master` and builds their artifacts
+without deploying. A push to `master`, or **Actions → Check and deploy → Run workflow → master**,
+runs the same pipeline: checks → build artifact → deploy staging → manual approval → deploy production.
+Dispatching from another branch never deploys.
+
+The checks job compiles contracts once, runs formatting, lint, type checks and tests once,
+then builds the frontend and Worker once. Its artifact is named
+`academy-<commit SHA>-<run ID>-<attempt>` and retained for 30 days. The archive contains:
+
+- `assets/`: the full Vite output, including `_headers` and SPA HTML;
+- `worker/`: Wrangler's dry-run output, with the bundled Worker and any accompanying modules;
+- `migrations/`: the reviewed SQL and Drizzle metadata;
+- `wrangler.json`: the committed environment configuration with artifact-relative paths,
+  no custom build command and `no_bundle: true`;
+- `manifest.json`: commit SHA, Node/Wrangler versions and SHA-256 hashes of all packaged files.
+
+Staging and production download the same immutable artifact ID emitted by that build job.
+They check the manifest checksum against the job output, then verify every file, the commit SHA
+and the locked Wrangler version before any migration. Checkout is pinned to the triggering SHA,
+so a newer `master` cannot supply different scripts or dependencies. Deploy jobs install the
+locked tooling with `npm ci --ignore-scripts`, skipping package lifecycle code generation,
+and do not build either application. They apply migrations from
+the artifact to their own D1 binding before calling `wrangler deploy --no-bundle` against
+the same Worker and frontend files. No seed runs in this pipeline. Worker variables, routes,
+rate limits and D1 bindings remain environment-specific; Cloudflare Secrets stay on their
+respective Workers and are never downloaded or packaged.
+
+After staging succeeds, an unprotected preflight reads the production Environment through
+GitHub's API and requires a nonempty `required_reviewers` rule. The production job uses
+`environment: production`, so GitHub waits for manual approval before starting its steps.
+Immediately before production migrations, the deployment script checks the current rule
+again and requires an actual `approved` review for this run's production Environment ID.
+Missing rules, missing approval, a deleted/recreated Environment, unavailable API access or
+any verification failure stop production before migrations and deployment. The token has
+only `contents: read` and `actions: read`; it cannot configure or approve the Environment.
+
+Configure `production` manually under **Settings → Environments** after the GitHub plan
+supports Required reviewers for this private repository. GitHub Enterprise supports this;
+GitHub Pro/Team offer Required reviewers only for public repositories. Agree the production
+reviewer list and self-review policy separately, then add the reviewers to `production`.
+If the initiator is the only reviewer, preventing self-review would leave them unable to approve.
+Restrict deployment branches to `master` and disable administrator bypass when setting up
+production. These are manual setup instructions; this change does not alter GitHub settings,
+repository visibility or billing. Until Required reviewers are configured, staging can deploy
+and production fails closed.
+
+Review the SHA shown in the run name and the staging site, then use that run's **Review
+deployments → production → Approve and deploy**. Workflow concurrency keeps the active run,
+including its approval wait, in place. New commits queue; by default GitHub retains only the
+latest pending run, replacing an older pending one. To move on without promoting an old candidate,
+reject or cancel its run. Production always uses the approved run's artifact, never the latest
+branch checkout. A failed deploy may leave additive migrations applied; rerun failed jobs to
+reuse the successful build's artifact. An expired/deleted artifact fails download rather than
+rebuilding. Start a new full pipeline to produce and stage a new candidate.
+
+See GitHub's [Environment protection rules](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments),
+[Environment API permissions](https://docs.github.com/en/rest/deployments/environments#get-an-environment),
+[review history API](https://docs.github.com/en/rest/actions/workflow-runs#get-the-review-history-for-a-workflow-run),
+[concurrency behavior](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency),
+the official [immutable artifact action](https://github.com/actions/upload-artifact),
+and Wrangler's [bundling controls](https://developers.cloudflare.com/workers/wrangler/bundling/).
+This workflow targets GitHub.com (including Enterprise Cloud); artifact actions v4 are not
+supported by GitHub Enterprise Server.
 
 The first deployment creates the Worker and attaches its custom domain. Cloudflare manages the DNS
 record and TLS certificate for the custom domain. Before the production run, confirm that
 `timmy.academy` has no conflicting CNAME record and that replacing any current site at the apex is
 intentional. The staging hostname must also have no conflicting CNAME.
 
-From the repository root, `npm run deploy:staging` and `npm run deploy:production` perform the same
-build and deploy locally if Wrangler is authenticated. They are not required for GitHub Actions.
+`npm run build` remains a local build/dry-run without deployment. `npm run deploy:staging` and
+`npm run deploy:production` now consume the verified artifact and build-job metadata instead
+of rebuilding. Production also requires GitHub's protection and review checks; local Cloudflare
+authentication alone does not bypass approval. `npm run test:infrastructure` tests artifact
+verification and approval failure paths with synthetic credentials and a local Wrangler recorder.
 
 ## D1 persistence and migrations
 
@@ -180,8 +245,9 @@ seed workflow, copy mechanism or automatic fixture population.
    fictional data explicitly, run **Actions → Prepare staging Benchmark data → Run workflow → master**.
    This workflow migrates/seeds staging only; it does not deploy or touch production. Use the
    staging site/Bruno smoke flow below after the Worker version has been deployed.
-5. Production deployment remains the manual **Check and deploy** workflow from `master`.
-   It builds/checks, applies production migrations, then deploys the Worker. With no publications,
+5. Production deployment follows successful staging in that **Check and deploy** run, after
+   Required reviewers are configured and the candidate is manually approved. It applies production
+   migrations from the artifact, then deploys those same built files. With no publications,
    production search is empty. Never run a seed command against that database.
 
 Deployment and staging-data jobs share per-environment concurrency locks. In-progress migrations
