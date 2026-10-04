@@ -336,3 +336,25 @@ clicks while a request is pending are disabled. Success reloads the first page w
 preserving the status filter and page size. Leaving the page or changing the session
 aborts the browser request and ignores late responses; this does not undo a deletion
 already accepted by the server.
+
+## Manual read-only submission audit
+
+The **Audit benchmark submissions** workflow is manual and runs only from `master`.
+Select the target environment and supply the public ID of one published run that
+you own. The query verifies that this run is non-synthetic, belongs to a published
+authenticated submission and has an identity mapping for the target Clerk issuer.
+An absent or unverified mapping fails the audit; it does not report zero submissions.
+
+One Drizzle-generated SELECT counts the owner's submissions and other users'
+submissions by `pending_review`, `published`, `rejected` and `deleted`, with distinct
+sender totals and first/last submission dates in UTC. Deleted submissions are
+counted using their authenticated deletion markers, without reading the archive.
+Synthetic run rows and fictional contributors without authenticated submissions
+are excluded. Distinct sender totals are calculated across all statuses.
+
+The workflow uses the existing Cloudflare secrets and environment protection. It
+has no migrations, seed, deployment, data changes or additional credentials.
+Only validated aggregate fields reach logs and the Actions summary; raw Wrangler
+output, identity values, private run payloads and native errors are withheld.
+Review and approve its execution separately from preparing the workflow. This
+audit should precede any separately reviewed data reset.
