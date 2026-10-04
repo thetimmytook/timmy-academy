@@ -11,3 +11,5 @@ export * from './submission.js';
 export * from './limits.js';
 export * from './moderation.js';
 export * from './public-config.js';
+export * from './resource-telemetry.js';
+export type { ResourceMetric } from './resource-metric.js';
