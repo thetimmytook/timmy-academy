@@ -84,15 +84,18 @@ Missing rules, missing approval, a deleted/recreated Environment, unavailable AP
 any verification failure stop production before migrations and deployment. The token has
 only `contents: read` and `actions: read`; it cannot configure or approve the Environment.
 
-Configure `production` manually under **Settings → Environments** after the GitHub plan
-supports Required reviewers for this private repository. GitHub Enterprise supports this;
-GitHub Pro/Team offer Required reviewers only for public repositories. Agree the production
-reviewer list and self-review policy separately, then add the reviewers to `production`.
+This repository is public, so Required reviewers are available without GitHub Enterprise.
+As of 2026-10-04, `production` requires `thetimmytook`, permits self-review, disables administrator
+bypass, and allows only the `master` branch. Manage these settings manually under
+**Settings → Environments → production**; the workflow does not configure them.
 If the initiator is the only reviewer, preventing self-review would leave them unable to approve.
-Restrict deployment branches to `master` and disable administrator bypass when setting up
-production. These are manual setup instructions; this change does not alter GitHub settings,
-repository visibility or billing. Until Required reviewers are configured, staging can deploy
-and production fails closed.
+Missing Required reviewers still allows staging but stops production before migrations or deploy.
+
+The uploaded Actions artifact contains the compiled Worker and is accessible to signed-in users
+with repository read access. Before including private server policy, change artifact storage and
+build output visibility as described in the
+[architecture boundary](../design/timmy-academy-architecture.md#111-public-contracts-and-private-policy).
+Changing only the source repository would expose that policy through the compiled artifact.
 
 Review the SHA shown in the run name and the staging site, then use that run's **Review
 deployments → production → Approve and deploy**. Workflow concurrency keeps the active run,
