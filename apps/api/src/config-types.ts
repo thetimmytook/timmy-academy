@@ -1,4 +1,5 @@
 import type { D1Database, RateLimit } from '@cloudflare/workers-types';
+import type { PublicConfig } from '@timmy/contracts';
 
 export interface AppBindings {
   AUTH_RATE_LIMIT?: RateLimit;
@@ -23,6 +24,7 @@ export interface AuthConfig {
 }
 
 export interface AppConfig {
+  publicConfig: PublicConfig;
   authRateLimit: RateLimit | undefined;
   database: D1Database | undefined;
   cursorSecret: string | undefined;

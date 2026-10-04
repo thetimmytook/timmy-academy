@@ -8,12 +8,32 @@ list and by-client-ID lookup under `/api/bench/v1/me/runs` require this principa
 and create the stable account mapping on the first authenticated owner request.
 
 The main React app provides `/sign-in` and `/sign-up`, including Clerk's verification
-subroutes, and current-session logout in the header. Copy `.env.example` to
-`.env.local` here and set `VITE_CLERK_PUBLISHABLE_KEY` for the same Clerk instance as
-the API. Vite reads this directory; never expose a secret key through `VITE_*`.
-The key is embedded at build time, so build staging and production separately with
-their own public keys. Without a key, public browsing remains available and the
-sign-in pages show an unavailable message.
+subroutes, and current-session logout in the header. Before initializing Clerk,
+the SPA fetches same-origin `GET /api/config`. Its explicit public allowlist contains
+only `clerkPublishableKey`, sourced from this Worker's `CLERK_PUBLISHABLE_KEY` binding,
+or `null` when no key is configured. The main Vite build does not load `.env` files
+or embed a Clerk key. The same frontend build can serve both environments.
+Failed requests, invalid responses and a five-second timeout disable sign-in while
+keeping public browsing available. Sign-in pages show an unavailable message.
+
+`/api/config` returns a `302` with `Cache-Control: no-store` to
+`/api/config?version=<SHA-256 of the public JSON>`. The versioned JSON is cached for
+one year with `public, max-age=31536000, immutable`, both in the browser and through
+the Cloudflare Cache API. Cache keys include the full origin, so staging and production
+are separate even if their public keys happen to match. No cookies or authorization
+are sent by the SPA's config request, and `mode: 'same-origin'` prevents following
+redirects to a different origin. This route never authenticates or reads D1.
+If the Cache API fails, the Worker still returns the current public JSON with the
+same browser cache policy. The SPA displays its loading status while awaiting config.
+
+To rotate the key, update the environment's `CLERK_PUBLISHABLE_KEY` in
+`wrangler.jsonc` and deploy that Worker's configuration. Keep its Clerk instance
+settings consistent. Each fresh page load discovers a new versioned URL; clearing
+the CDN is unnecessary and would not clear browser caches. An old version requested
+from the Worker redirects without caching to the current version, rather than storing
+a new key at an old immutable URL. Already-open pages keep their initialized Clerk
+instance until reload. Do not configure a CDN rule that caches the discovery redirect.
+Only the public JSON is hashed or cached; private auth configuration and ENV are never serialized.
 
 For desktop OAuth, select **OAuth consent page on Account Portal** in the Clerk
 instance's component paths. The main application does not expose `/oauth/consent`;
@@ -28,7 +48,7 @@ or `/bench/` when no search is remembered. Browser login alone does not create a
 that requires a principal performs that mapping. The existing public benchmark
 routes do not require one.
 
-The API reads runtime bindings once per request through `readConfig` in `config.ts`.
+The API reads runtime bindings once per request through `readConfig` in `read-config.ts`.
 It supplies database, indexing and auth settings without format validation. If any
 required auth setting is missing, `config.auth` is unavailable and only handlers
 that request a principal fail with a configuration error. JWT and request-origin
@@ -58,8 +78,8 @@ Set `CLERK_DESKTOP_CLIENT_ID` to the public client ID shared by Benchmark and To
 in this environment. `wrangler.jsonc` pins the public IDs in each environment's
 `vars`: staging uses the Development Clerk client `33gFOhc9r5yRSe6s`, and production
 uses the Production Clerk client `qdlSafxYpIuB7U5x`. These are public identifiers,
-not secrets. Local `.dev.vars` values and GitHub's frontend publishable-key variables
-do not configure these deployed bindings. Changing a Worker binding requires a
+not secrets. Local `.dev.vars` values do not configure these deployed bindings.
+Changing a Worker binding requires a
 backend deployment, not a new Windows package or Microsoft Store submission.
 
 The issuer, publishable key, server secret key and OAuth client
@@ -90,10 +110,10 @@ local `.dev.vars` and manual Dashboard changes are not the deployment source.
 Missing issuer or publishable key disables API auth configuration and causes
 protected endpoints to return 500 even if browser sign-in works.
 
-The GitHub repository variables `STAGING_CLERK_PUBLISHABLE_KEY` and
-`PRODUCTION_CLERK_PUBLISHABLE_KEY` supply the frontend build and must match the
-corresponding Worker's `CLERK_PUBLISHABLE_KEY`. When changing Clerk instances,
-update both together. `deployment-config.test.ts` reads the checked-in JSONC
+The main frontend no longer consumes `STAGING_CLERK_PUBLISHABLE_KEY`,
+`PRODUCTION_CLERK_PUBLISHABLE_KEY` or `VITE_CLERK_PUBLISHABLE_KEY`.
+The Worker's runtime binding supplies its key through `/api/config`.
+`deployment-config.test.ts` reads the checked-in JSONC
 directly, independently of `.dev.vars`; it does not query GitHub or Cloudflare.
 
 `CLERK_SECRET_KEY` and `BENCHMARK_CURSOR_SECRET` remain exclusively in Cloudflare
