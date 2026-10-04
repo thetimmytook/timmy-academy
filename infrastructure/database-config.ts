@@ -13,8 +13,13 @@ type DatabaseConfig = EnvironmentConfig & {
   env?: { staging?: EnvironmentConfig; production?: EnvironmentConfig };
 };
 
-export function checkDatabaseTarget(environment: string): void {
-  const parsed: unknown = parse(readFileSync('infrastructure/wrangler.jsonc', 'utf8'));
+export function checkDatabaseTarget(
+  environment: string,
+  configPath = 'infrastructure/wrangler.jsonc',
+): void {
+  // Only repository and artifact config paths are supplied by our CLI entrypoints.
+  // eslint-disable-next-line security/detect-non-literal-fs-filename
+  const parsed: unknown = parse(readFileSync(configPath, 'utf8'));
   const config = parsed as DatabaseConfig;
   const binding = (list: DatabaseBinding[] | undefined): DatabaseBinding | undefined =>
     list?.find(value => value.binding === 'BENCHMARK_DB');
