@@ -222,6 +222,7 @@ describe('public benchmark UI', () => {
     const mounted = start(run.detail.url);
     await screen.findByRole('heading', { name: publicSettings });
     expect(screen.getByRole('link', { name: 'BENCH' }).getAttribute('href')).toBe('/bench/');
+    expect(screen.getByRole('region', { name: 'Capture resources' })).toBeTruthy();
     expect(screen.getAllByText('Unknown').length).toBeGreaterThan(3);
     expect(screen.getByText('Shadows quality code').nextElementSibling?.textContent).toBe('0');
     expect(screen.getByText('Automatic RAM Cleaner').nextElementSibling?.textContent).toBe('Off');

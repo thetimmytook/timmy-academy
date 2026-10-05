@@ -12,6 +12,7 @@ import { Message } from '../elements/Message';
 import { DeletePublication } from './DeletePublication';
 import { execution, number, resolution, words } from './format';
 import { useResource } from './resource';
+import { ResourceTelemetrySummary } from './ResourceTelemetrySummary';
 import { muted, stack } from './styles';
 
 import type { OwnerRunsQuery } from '@timmy/contracts';
@@ -94,6 +95,7 @@ function OwnerRunList({ query }: Readonly<{ query: OwnerRunsQuery }>): JSX.Eleme
             Average FPS: {number(item.metrics.average_fps)} · 1% low:{' '}
             {number(item.metrics.one_percent_low_fps)}
           </p>
+          <ResourceTelemetrySummary telemetry={item.resource_telemetry} />
           {item.publication_status === 'published' && (
             <>
               <Button href={item.url} variant="link">

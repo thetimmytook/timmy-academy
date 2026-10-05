@@ -204,6 +204,7 @@ describe(pageTitle, () => {
     );
     start();
     await screen.findAllByRole('article');
+    expect(screen.getAllByText('Resources · Available')).toHaveLength(2);
     expect(screen.getByText('Published', { selector: 'p' })).toBeTruthy();
     expect(screen.getAllByRole('link', { name: 'Open public run →' })).toHaveLength(1);
     expect(screen.getByRole('link', { name: 'BENCH' }).getAttribute('href')).toBe(

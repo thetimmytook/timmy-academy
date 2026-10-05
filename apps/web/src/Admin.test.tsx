@@ -115,6 +115,8 @@ describe('Admin approvals', () => {
     fireEvent.click(screen.getByText('Review measurement'));
     expect(screen.getByText('Frame samples')).toBeTruthy();
     expect(screen.getByText('p99 frametime')).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Capture resources' })).toBeTruthy();
+    expect(screen.getByText('Dedicated VRAM capacity')).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Public settings' })).toBeTruthy();
     expect(screen.queryByText('Copy run link')).toBeNull();
   });
