@@ -66,16 +66,19 @@ export function createResourceTelemetryFixture(
     },
     cpu: {
       total_utilization: sampled(50, 'percent', 'pdh_processor_information_processor_time'),
-      logical_processors: [0, 1, 2, 3].map(index => ({
-        group: 0,
-        index,
-        utilization: sampled(
-          50,
-          'percent',
-          'pdh_processor_information_processor_time',
-          'logical_processor',
-        ),
-      })),
+      logical_processors: Array.from(
+        { length: hardware.cpu.name === 'Core i5-12400F' ? 12 : 16 },
+        (_, index) => ({
+          group: 0,
+          index,
+          utilization: sampled(
+            50,
+            'percent',
+            'pdh_processor_information_processor_time',
+            'logical_processor',
+          ),
+        }),
+      ),
     },
     gpu: {
       adapter_name: hardware.gpu.name,
