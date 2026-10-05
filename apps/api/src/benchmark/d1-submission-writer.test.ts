@@ -97,6 +97,15 @@ describe('atomic submission writes', () => {
     const reordered = {
       ...data,
       metrics: Object.fromEntries(Object.entries(data.metrics).reverse()) as typeof data.metrics,
+      resource_telemetry: {
+        ...data.resource_telemetry,
+        cpu: {
+          ...data.resource_telemetry.cpu,
+          total_utilization: Object.fromEntries(
+            Object.entries(data.resource_telemetry.cpu.total_utilization).reverse(),
+          ) as typeof data.resource_telemetry.cpu.total_utilization,
+        },
+      },
     };
     await writer.submit(owner, client, reordered, requestFingerprint);
     expect((await db.prepare('SELECT * FROM benchmark_submissions').all()).results).toEqual(

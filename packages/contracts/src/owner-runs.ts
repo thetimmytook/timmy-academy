@@ -8,6 +8,7 @@ import {
   summaryMetricsSchema,
 } from './benchmark.js';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from './limits.js';
+import { resourceTelemetrySummarySchema } from './resource-telemetry.js';
 
 export const clientRunIdSchema = z.uuid();
 export const deletePublicationResponseSchema = z.strictObject({
@@ -37,6 +38,7 @@ const fields = {
   execution: executionSchema,
   game_resolution: resolutionSchema.nullable(),
   metrics: summaryMetricsSchema,
+  resource_telemetry: resourceTelemetrySummarySchema,
 };
 export const ownerRunSchema = z.discriminatedUnion('publication_status', [
   z.strictObject({

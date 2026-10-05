@@ -2,6 +2,9 @@ import { cleanup, fireEvent, render, screen, waitFor, act } from '@testing-libra
 import { BrowserRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { createSyntheticRuns } from '../../api/src/benchmark/fixtures';
+import { projectResourceTelemetrySummary } from '../../api/src/benchmark/resource-telemetry-projection';
+
 import App from './App';
 import { rememberBrowse } from './bench/navigation';
 const session = vi.hoisted(() => ({
@@ -29,6 +32,9 @@ const item = {
   execution: 'bsg_servers',
   game_resolution: null,
   metrics: { average_fps: 100, one_percent_low_fps: 80 },
+  resource_telemetry: projectResourceTelemetrySummary(
+    createSyntheticRuns()[0]!.detail.resource_telemetry,
+  ),
   status_reason: null,
 };
 const publishedItem = {

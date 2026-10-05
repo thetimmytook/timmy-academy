@@ -6,6 +6,7 @@ import {
   GROUP_PREVIEW_RUNS_LIMIT,
   COHORT_RUNS_LIMIT,
 } from './limits.js';
+import { resourceTelemetrySchema } from './resource-telemetry.js';
 
 const positiveInteger = z.number().int().positive();
 const count = z.number().int().nonnegative();
@@ -179,6 +180,7 @@ export const publicRunDetailSchema = z.strictObject({
   }),
   capture: z.strictObject({ duration_sec: z.number().positive(), sample_count: positiveInteger }),
   metrics: metricsSchema,
+  resource_telemetry: resourceTelemetrySchema,
   settings: publicSettingsSchema.nullable(),
 
   // No quality-note codes have been approved yet; do not invent or accept free text.

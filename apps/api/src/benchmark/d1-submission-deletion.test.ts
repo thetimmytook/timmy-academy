@@ -107,6 +107,7 @@ describe('atomic owner publication deletion', () => {
     expect(receipt).toEqual({ publication_status: 'deleted', public_run_id: publicId });
     const archived = await archives();
     expect(archived).toHaveLength(1);
+    expect(JSON.parse(archived[0]!.detail)).not.toHaveProperty('resource_telemetry');
     expect(archived[0]!.id).not.toBe(publicId);
     expect(JSON.parse(archived[0]!.detail)).toEqual(
       projectArchivedMeasurement({

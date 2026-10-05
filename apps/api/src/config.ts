@@ -1,4 +1,4 @@
-export const SUBMISSION_MAX_BODY_BYTES = 32 * 1024;
+export const SUBMISSION_MAX_BODY_BYTES = 256 * 1024;
 export const COHORT_QUERY_MAX_BODY_BYTES = 4 * 1024;
 export const TOKEN_LIFETIME_MS = 30 * 60 * 1000;
 export const SUBMISSION_ACCOUNT_LIMIT = 50;

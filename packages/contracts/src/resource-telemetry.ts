@@ -121,3 +121,10 @@ const telemetryDocumentSchema = z.strictObject({
 export type ResourceTelemetry = z.infer<typeof telemetryDocumentSchema>;
 
 export const resourceTelemetrySchema = telemetryDocumentSchema.superRefine(checkResourceTelemetry);
+
+// Owner cards retain aggregate measurements without expanding every processor/file.
+export const resourceTelemetrySummarySchema = telemetryDocumentSchema.extend({
+  cpu: telemetryDocumentSchema.shape.cpu.omit({ logical_processors: true }),
+  pagefile: telemetryDocumentSchema.shape.pagefile.omit({ files: true }),
+});
+export type ResourceTelemetrySummary = z.infer<typeof resourceTelemetrySummarySchema>;

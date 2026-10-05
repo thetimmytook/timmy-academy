@@ -61,7 +61,7 @@ export class D1SubmissionWriter {
       .where(
         and(
           eq(submissions.accountId, accountId),
-          sql`json_remove(${runs.detail}, '$.public_run_id', '$.url', '$.is_synthetic', '$.hardware.cpu.name', '$.hardware.gpu.name') = json_remove(${JSON.stringify(normalized)}, '$.hardware.cpu.name', '$.hardware.gpu.name')`,
+          sql`json_remove(${runs.detail}, '$.public_run_id', '$.url', '$.is_synthetic', '$.hardware.cpu.name', '$.hardware.gpu.name', '$.resource_telemetry') = json_remove(${JSON.stringify(normalized)}, '$.hardware.cpu.name', '$.hardware.gpu.name', '$.resource_telemetry')`,
         ),
       )
       .limit(1);

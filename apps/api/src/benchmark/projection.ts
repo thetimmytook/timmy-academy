@@ -9,6 +9,8 @@ import {
   type Hardware,
 } from '@timmy/contracts';
 
+import { projectResourceTelemetry } from './resource-telemetry-projection';
+
 import type { StoredRun } from './stored-run';
 
 function definedFields(fields: Record<string, unknown>): Record<string, unknown> {
@@ -137,6 +139,7 @@ export function projectDetail(run: StoredRun): PublicRunDetail {
       p99_frametime_ms: detail.metrics.p99_frametime_ms,
     },
     settings: projectPublicSettings(detail.settings),
+    resource_telemetry: projectResourceTelemetry(detail.resource_telemetry),
     quality_notes: detail.quality_notes,
     author:
       detail.author === null
