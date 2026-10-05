@@ -49,6 +49,8 @@ are saved automatically. If you change search filters or sort, repeat them when 
 The `Smoke flow` folder contains ordered requests with checks for search, pagination, details,
 Position and an invalid filter. Run that folder to check the complete flow. With Bruno CLI
 installed, run `bru run "Smoke flow" --env Local` from `api-collections/benchmark-v1`.
+The `Resource telemetry` folder checks eight full-demo scenarios after explicit
+`db:seed:demo:local`; see [collection instructions](api-collections/benchmark-v1/README.md).
 These plain-text collection files live beside the API code in Git; there is no second repository
 or filesystem link to maintain. The collection uses only synthetic public data and sends no
 authentication or publication request.
@@ -93,7 +95,9 @@ Protected owner routes require a verified Clerk browser session or desktop OAuth
 - `GET /api/bench/v1/me/runs/by-client-id/{clientRunId}`: retrieve an owner receipt.
 - `DELETE /api/bench/v1/me/runs/{publicRunId}`: remove an owned publication.
 
-Upload requires JSON with a 32 KiB body limit. The server checks the strict input allowlist,
+Upload requires JSON with a 256 KiB body limit and a required `resource_telemetry` block.
+Missing or null telemetry is rejected; explicit `not_collected`, partial coverage, unavailable
+measurements and UMA are supported. The server checks the strict input allowlist,
 capture metric consistency and normalized settings, handles idempotent retries, rejects duplicate
 measurements within the same account, and enforces a rolling per-account submission quota.
 New submissions return `pending_review` with no public ID or URL; upload never publishes a run.
@@ -104,6 +108,7 @@ owners and desktop sessions cannot use admin routes. Owner deletion removes the 
 retains an anonymous measurement archive that public readers do not expose.
 
 See [submission contracts and lifecycle](infrastructure/benchmark-submissions.md),
+[resource telemetry and desktop handoff](infrastructure/resource-telemetry.md),
 [moderator access and decisions](infrastructure/admin.md), and
 [browser/desktop authentication](infrastructure/browser-auth.md).
 Trust scoring, anomaly detection, quarantine, FPS aggregate eligibility, approved warning codes
@@ -128,6 +133,11 @@ Cloudflare SPA asset fallback both serve direct detail URLs on refresh.
 
 The UI has loading, empty, invalid-link, unavailable-run and retry states. Missing settings are
 not inferred; recorded quality codes and mode tokens retain their saved values.
+Public detail and moderator review show capture-window CPU, GPU, RAM, pagefile and commit
+summaries; My Bench cards show aggregates without individual processor/pagefile arrays.
+Measurements describe the whole system or selected adapter, including other applications.
+Unknown values remain unavailable rather than zero. Memory is shown in GiB; a near-full VRAM
+hint suggests a repeated texture-quality A/B test and does not establish the cause of FPS drops.
 Clerk sign-in and sign-up live at `/sign-in` and `/sign-up`. The profile menu opens My Bench
 at `/bench/me`, where owners view submission status and can remove published runs. Browser
 moderators also have `/admin` for pending approvals. Public browsing requires no sign-in.

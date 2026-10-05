@@ -1,0 +1,32 @@
+meta {
+  name: 08 UMA capture
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{base_url}}/api/bench/v1/runs/br_test_desktop_uma_lighthouse_local_1920_0
+  body: none
+  auth: none
+}
+
+tests {
+  test('UMA capture remains an explicit synthetic capture', function () {
+    expect(res.getStatus()).to.equal(200);
+    const body = res.getBody();
+    expect(body.is_synthetic).to.equal(true);
+    expect(body.public_run_id).to.equal('br_test_desktop_uma_lighthouse_local_1920_0');
+    const telemetry = body.resource_telemetry;
+    expect(telemetry.schema_version).to.equal(1);
+    expect(telemetry.gpu.memory_architecture).to.equal('unified');
+    expect(telemetry.gpu.dedicated_vram_capacity.status).to.equal('available');
+    expect(telemetry.gpu.dedicated_vram_capacity.value).to.equal(0);
+    expect(telemetry.gpu.dedicated_vram_capacity.source).to.equal('d3d12_unified_memory_no_discrete_vram');
+    expect(telemetry.gpu.shared_memory_used.maximum).to.be.greaterThan(0);
+    expect(telemetry.ram.os_usable_capacity.value).to.be.below(telemetry.ram.installed_capacity.value);
+  });
+}
+
+docs {
+  Requires the full 397-run demo seed in the selected environment. This request only reads one invented example and never uploads a run or changes data. Peaks do not establish a cause of FPS drops.
+}

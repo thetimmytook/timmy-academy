@@ -227,10 +227,17 @@ Normal `npm run dev` preserves whatever local data is present and never seeds au
 local runs. It keeps tables, migration history and the ingestion sequence. Stop the local API
 before resetting; run `db:seed:local` afterwards to restore fictional scenarios. The reset
 command has no remote target and never accesses staging or production.
+For the larger telemetry demo, run `npm run db:seed:demo:local` instead: it creates
+397 runs with the scenarios described in [synthetic-benchmarks.md](synthetic-benchmarks.md).
+Neither seed clears old records. The local reset currently clears submissions/runs only;
+it leaves the measurement archive, accounts and provider identities intact. Any full
+dataset reset must also clear the archive if it contains data. The local telemetry
+reset on 2026-10-05 had an empty archive; all 397 new details passed the public schema.
 The seed refuses every target except `local` and `staging`, uses stable `br_test_*` IDs and
 `ON CONFLICT(public_id) DO NOTHING`, and never deletes/updates existing rows. A hidden fixture
-stays hidden on rerun. Extra real or test records are preserved. Production has no seed command,
-seed workflow, copy mechanism or automatic fixture population.
+stays hidden on rerun. Extra real or test records are preserved. Production has no standard
+fixture seed or automatic population; the separate manual demo seed can target production.
+See [the telemetry handoff and agreed rollout](resource-telemetry.md#dataset-transition-and-rollout).
 
 ### One-time Cloudflare setup (no local authentication required)
 

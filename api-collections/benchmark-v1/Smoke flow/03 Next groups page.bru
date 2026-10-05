@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{base_url}}/api/bench/v1/runs?gpu=geforce-rtx-4070-super&limit=1&cursor={{groups_cursor}}
+  url: {{base_url}}/api/bench/v1/runs?ram_gb=32&limit=1&cursor={{groups_cursor}}
   body: none
   auth: none
 }
@@ -21,5 +21,5 @@ tests {
 }
 
 docs {
-  Run 02 Search groups first to obtain the cursor. The GPU filter and limit must stay unchanged.
+  Run 02 Search groups first to obtain the cursor. The RAM filter and limit must stay unchanged.
 }

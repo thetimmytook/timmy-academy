@@ -156,6 +156,8 @@ snake_case resource summary, with its own `schema_version: 1`. Missing or null
 blocks are rejected. There is no legacy request adapter or stored-data fallback;
 rollout requires the separately reviewed dataset reset and coordinated desktop
 submission/consent update. Preparing this change does not execute that reset.
+The exact wire fields, visibility, sharing text and required desktop changes are in
+[resource-telemetry.md](resource-telemetry.md). Desktop code is a separate follow-up.
 
 Memory values remain bytes, utilization remains percent, and coverage is 0–1.
 Strict nested schemas retain statistics, support counts/durations, source, scope,
@@ -178,6 +180,15 @@ The request fingerprint includes telemetry, so changing it under the same client
 ID conflicts. Cross-ID duplicate detection excludes telemetry while retaining the
 existing FPS measurement identity, preventing telemetry edits from duplicating
 the same run. POST receipts and deleted lookup markers remain minimal.
+
+Only the selected run is sent after explicit **Send for review**. Signing in,
+collecting a capture, opening history and running Position do not upload telemetry.
+The accepted summary becomes public only after moderator approval. It excludes raw
+samples/time series, process IDs, other application names, paths/drive letters,
+LUID/PCI/PnP/device identifiers, account identifiers and native error text. On owner
+deletion, telemetry is removed with the original run and is not copied to the
+closed measurement archive. These facts must be disclosed in the desktop sharing
+dialog and privacy text before releasing the new sender.
 
 ## Selected settings projection
 

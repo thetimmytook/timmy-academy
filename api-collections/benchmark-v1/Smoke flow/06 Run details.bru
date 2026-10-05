@@ -17,7 +17,13 @@ tests {
     expect(body.public_run_id).to.equal(bru.getVar('public_run_id'));
     expect(body.url).to.equal('/bench/runs/' + body.public_run_id);
     expect(body.metrics.average_fps).to.be.a('number');
-    for (const key of ['email', 'account_id', 'client_run_id', 'raw_capture', 'hostname']) {
+    expect(body.resource_telemetry.schema_version).to.equal(1);
+    expect(body.resource_telemetry.gpu.scope).to.equal('whole_adapter');
+    expect(body.resource_telemetry.cpu.total_utilization.scope).to.equal('whole_system');
+    expect(body.resource_telemetry.cpu.logical_processors).to.be.an('array');
+    expect(body.resource_telemetry.pagefile.files).to.be.an('array');
+    for (const key of ['email', 'account_id', 'client_run_id', 'raw_capture', 'hostname',
+      'samples', 'time_series', 'pid', 'luid', 'path', 'drive_letter', 'device_id', 'native_error']) {
       expect(JSON.stringify(body)).to.not.contain('"' + key + '"');
     }
   });
@@ -25,4 +31,5 @@ tests {
 
 docs {
   Works alone with the fictional Local environment ID. Request 04 replaces it with an ID from search.
+  Checks the capture-resource summary and excluded private fields without authenticating or uploading anything.
 }
