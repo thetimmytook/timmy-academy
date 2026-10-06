@@ -220,17 +220,51 @@ The existing local reset script leaves the archive intact; it was already empty.
 `db:seed:local` inserts missing standard fixtures only and cannot repair old rows.
 `db:seed:demo:local` inserts missing demo and refreshes their guarded telemetry blocks.
 
-After merge, review and test the actual staging rollout operation: pause submissions,
-explicitly reset the staging benchmark dataset, deploy API/web, seed fresh demo and
-verify the contract, public/owner/moderator reads and selected-run submission flow with
-the updated desktop. If staging deploy happens first, old details can fail until the
-reset; deploy alone does not migrate the stored JSON. This step does not add a reset
-workflow or change the deployment pipeline.
+The rollout has two separate manual steps. Neither workflow triggers the other:
 
-Before production cleanup, run the separately approved read-only submission audit while
-the known owner's published run still exists. Production counts and owner mapping remain
-unverified; lack of access is not zero other users. Then approve the concrete reset and
-the tested staging artifact promotion, perform reset/deploy/demo seed in the coordinated
-window, verify reads and reopen submissions with the new sender. Old Store clients
-without the required block will be rejected. Audit, remote reset, seed and deployment
-remain separate operations; this documentation does not dispatch them.
+1. **Review existing senders.** After merge, run **Audit benchmark submissions** for
+   production while the known owner's run still exists, using
+   `br_d6441fbb-c0af-4db4-9f56-254826da628e`. Review the **Other users** totals and
+   status rows in the Actions summary. If another user's data would be removed,
+   explicitly decide whether the full reset is still approved before continuing.
+   An unavailable audit is not zero other users. For a staging audit, supply one of
+   your published staging runs so that the target issuer/account mapping is verified.
+2. **Reset and seed the approved target.** Run the temporary **Reset benchmark dataset**
+   workflow from `master`, choose `staging` or `production`, check `audit_reviewed`
+   only after reviewing the report and approving the deletion scope, and enter exactly
+   `RESET staging` or `RESET production`. This acknowledgement is manual; the workflow
+   does not independently verify a prior audit run or assume zero other users.
+
+The reset deletes **all** submissions, runs and closed measurement archive entries in
+the selected database, including other users' records if present. It builds one SQL
+file containing those three deletes followed by all 397 demo statements and executes
+one remote `wrangler d1 execute --file` import. D1 owns the import transaction; do not
+add explicit `BEGIN`/`COMMIT` or split reset and seed into separate calls. Remote import
+failure returns the database to its pre-import state, as documented by
+[Cloudflare](https://blog.cloudflare.com/building-d1-a-global-database/). SQL generated
+under `infrastructure/.wrangler` is ignored and contains only synthetic seed documents.
+The workflow performs no migrations, build of the deploy artifact, or deployment.
+
+The workflow validates a manual `master` run, target-specific confirmation and reviewed
+audit before accessing D1. Production requires configured Environment reviewers and
+approval; the script rechecks the current rules and actual approval for this run
+immediately before mutation. Reset uses the same per-environment database concurrency
+group as deploy/seed. Aggregate before/after counts are written to the Actions summary;
+afterward it checks 397 synthetic runs, empty submissions/archive, unchanged account
+and identity counts, and a non-decreasing revision. Schema, identity contents, migration
+history and sequence preservation are covered by the local SQL tests.
+
+For staging, wait for the matching automatic deploy after merge, then perform step 2
+and verify the contract, public/owner/moderator reads and selected-run submission flow
+with the updated desktop. Old details can fail between deploy and reset; deployment
+alone does not migrate stored JSON. After staging passes, approve promotion of the
+tested artifact to production and perform the production reset in the coordinated
+window. Pause submissions/moderation/deletion writes for that window; workflow
+concurrency serializes jobs but does not block HTTP writers. These workflows do not
+implement a maintenance mode. Verify reads and reopen submissions with the new sender;
+old Store clients without the required block will be rejected.
+
+If import completion or post-reset verification is uncertain, inspect the database
+before retrying: a rerun deletes the entire current dataset again, including any new
+submissions. Preparing these workflows does not dispatch them. Remove the temporary
+reset workflow and its script/tests after both environments have completed the transition.

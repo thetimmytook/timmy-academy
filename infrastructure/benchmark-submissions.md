@@ -398,4 +398,7 @@ has no migrations, seed, deployment, data changes or additional credentials.
 Only validated aggregate fields reach logs and the Actions summary; raw Wrangler
 output, identity values, private run payloads and native errors are withheld.
 Review and approve its execution separately from preparing the workflow. This
-audit should precede any separately reviewed data reset.
+audit should precede any separately reviewed data reset. The separately dispatched
+temporary reset workflow requires explicit acknowledgement of that review and clears
+all benchmark records, not just the owner's. See
+[the two manual rollout steps](resource-telemetry.md#dataset-transition-and-rollout).
