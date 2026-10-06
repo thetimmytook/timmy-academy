@@ -2,8 +2,9 @@
 
 The Academy API and web implementation require `resource_telemetry` in version-1
 submissions and stored run detail. The Windows sender in `C:/projects/tarkov-skills`
-still excludes it. This document specifies that separate desktop change; no desktop
-code, Store release or remote rollout is performed by this documentation step.
+still excludes it. This document specifies that separate desktop change. The Academy
+dataset transition completed on staging and production on 2026-10-06; desktop code
+and the Store release remain separate work.
 
 ## Wire contract
 
@@ -208,11 +209,11 @@ Sources below are relative to `C:/projects/tarkov-skills`; this repository does 
 
 ## Dataset transition and rollout
 
-The agreed transition discards old benchmark data; there is no legacy API/stored-data
-fallback. Reset **data**, retaining tables, accounts/provider identities, migration
-journal, revision state and sequence counters. Clear submissions before linked runs,
-and clear the closed measurement archive. Old statuses and idempotency records disappear.
-Ordinary deploy and seed commands must not become implicit reset operations.
+The agreed transition discarded old benchmark data; there is no legacy API/stored-data
+fallback. The reset retained tables, accounts/provider identities, migration history,
+revision state and sequence counters. It cleared submissions before linked runs, plus
+the closed measurement archive. Old submission statuses and idempotency records were
+removed. Ordinary deploy and seed commands do not reset data.
 
 Local reset and fresh demo seed were performed on 2026-10-05: 397 published synthetic
 runs, zero submissions/archive entries, with the account and identity preserved.
@@ -220,51 +221,41 @@ The existing local reset script leaves the archive intact; it was already empty.
 `db:seed:local` inserts missing standard fixtures only and cannot repair old rows.
 `db:seed:demo:local` inserts missing demo and refreshes their guarded telemetry blocks.
 
-The rollout has two separate manual steps. Neither workflow triggers the other:
+The remote transition used two independent manual steps:
 
-1. **Review existing senders.** After merge, run **Audit benchmark submissions** for
-   production while the known owner's run still exists, using
-   `br_d6441fbb-c0af-4db4-9f56-254826da628e`. Review the **Other users** totals and
-   status rows in the Actions summary. If another user's data would be removed,
-   explicitly decide whether the full reset is still approved before continuing.
-   An unavailable audit is not zero other users. For a staging audit, supply one of
-   your published staging runs so that the target issuer/account mapping is verified.
-2. **Reset and seed the approved target.** Run the temporary **Reset benchmark dataset**
-   workflow from `master`, choose `staging` or `production`, check `audit_reviewed`
-   only after reviewing the report and approving the deletion scope, and enter exactly
-   `RESET staging` or `RESET production`. This acknowledgement is manual; the workflow
-   does not independently verify a prior audit run or assume zero other users.
+1. The [production read-only audit](https://github.com/thetimmytook/timmy-academy/actions/runs/37501604014)
+   verified the owner mapping from `br_d6441fbb-c0af-4db4-9f56-254826da628e` and
+   counted one published owner submission, with zero other authenticated submissions
+   across all statuses. This was the pre-reset snapshot; synthetic fixtures were excluded.
+2. The approved reset and demo seed completed on
+   [staging](https://github.com/thetimmytook/timmy-academy/actions/runs/37508960490) and
+   [production](https://github.com/thetimmytook/timmy-academy/actions/runs/37509699898),
+   both against merged commit `3de32b040083ef12881e25640ae06496e29f10de`.
 
-The reset deletes **all** submissions, runs and closed measurement archive entries in
-the selected database, including other users' records if present. It builds one SQL
-file containing those three deletes followed by all 397 demo statements and executes
-one remote `wrangler d1 execute --file` import. D1 owns the import transaction; do not
-add explicit `BEGIN`/`COMMIT` or split reset and seed into separate calls. Remote import
-failure returns the database to its pre-import state, as documented by
-[Cloudflare](https://blog.cloudflare.com/building-d1-a-global-database/). SQL generated
-under `infrastructure/.wrangler` is ignored and contains only synthetic seed documents.
-The workflow performs no migrations, build of the deploy artifact, or deployment.
+| Environment | Runs before | Submissions before | Runs after (all synthetic) | Submissions / archive after | Accounts / identities after | Revision before → after |
+| ----------- | ----------: | -----------------: | -------------------------: | --------------------------: | --------------------------: | ----------------------- |
+| Staging     |         422 |                  0 |                        397 |                       0 / 0 |                       1 / 1 | 27 → 449                |
+| Production  |         397 |                  1 |                        397 |                       0 / 0 |                       1 / 1 | 3 → 401                 |
 
-The workflow validates a manual `master` run, target-specific confirmation and reviewed
-audit before accessing D1. Production requires configured Environment reviewers and
-approval; the script rechecks the current rules and actual approval for this run
-immediately before mutation. Reset uses the same per-environment database concurrency
-group as deploy/seed. Aggregate before/after counts are written to the Actions summary;
-afterward it checks 397 synthetic runs, empty submissions/archive, unchanged account
-and identity counts, and a non-decreasing revision. Schema, identity contents, migration
-history and sequence preservation are covered by the local SQL tests.
+Production previously contained 396 synthetic runs plus the owner's one real run.
+The reset removed all old benchmark submissions, runs and archive entries, then
+inserted 397 fresh demo runs. Account and identity counts remained unchanged in both
+environments. Each reset used one SQL import containing the three deletes followed
+by the full demo seed, with explicit confirmation and reviewed audit acknowledgement;
+production approval was checked again immediately before mutation.
 
-For staging, wait for the matching automatic deploy after merge, then perform step 2
-and verify the contract, public/owner/moderator reads and selected-run submission flow
-with the updated desktop. Old details can fail between deploy and reset; deployment
-alone does not migrate stored JSON. After staging passes, approve promotion of the
-tested artifact to production and perform the production reset in the coordinated
-window. Pause submissions/moderation/deletion writes for that window; workflow
-concurrency serializes jobs but does not block HTTP writers. These workflows do not
-implement a maintenance mode. Verify reads and reopen submissions with the new sender;
-old Store clients without the required block will be rejected.
+After reset, all **13 Bruno smoke checks and 8 telemetry scenarios** passed against
+each environment's public API, including search/pagination, detail, Position,
+validation failures, unavailable readings, multiple pagefiles and UMA. This verifies
+the dataset and public API. Owner/moderator flows and selected-run submission from
+the updated desktop still need separate end-to-end verification; the Windows sender
+change and its consent/privacy update remain pending. Old Store clients without the
+required telemetry block are rejected.
 
-If import completion or post-reset verification is uncertain, inspect the database
-before retrying: a rerun deletes the entire current dataset again, including any new
-submissions. Preparing these workflows does not dispatch them. Remove the temporary
-reset workflow and its script/tests after both environments have completed the transition.
+The temporary reset workflow and its script/tests are retired after this transition.
+There is no reusable remote reset command. The read-only audit remains available,
+but its old default run was deleted by the reset: a future audit must supply a currently
+published real run owned by the requester in the selected environment. An unavailable
+owner mapping is not zero other users. Any future destructive dataset operation
+requires a newly reviewed scope and explicit authorization; ordinary deployment and
+demo seeding preserve existing data.

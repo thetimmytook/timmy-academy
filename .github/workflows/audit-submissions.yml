@@ -14,7 +14,6 @@ on:
         description: Public ID of your published run, used to verify your account mapping
         type: string
         required: true
-        default: br_d6441fbb-c0af-4db4-9f56-254826da628e
 
 permissions:
   contents: read
