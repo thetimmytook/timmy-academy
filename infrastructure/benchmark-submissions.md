@@ -397,8 +397,12 @@ The workflow uses the existing Cloudflare secrets and environment protection. It
 has no migrations, seed, deployment, data changes or additional credentials.
 Only validated aggregate fields reach logs and the Actions summary; raw Wrangler
 output, identity values, private run payloads and native errors are withheld.
-Review and approve its execution separately from preparing the workflow. This
-audit should precede any separately reviewed data reset. The separately dispatched
-temporary reset workflow requires explicit acknowledgement of that review and clears
-all benchmark records, not just the owner's. See
-[the two manual rollout steps](resource-telemetry.md#dataset-transition-and-rollout).
+Supply a currently published real run owned by the requester in the selected
+environment; there is no default owner run. The run used for the 2026-10-06 production
+audit was deleted by the approved dataset reset. That audit verified one owner
+submission and zero other authenticated submissions before the reset.
+
+Review and approve audit execution separately from preparing its workflow. An audit
+should precede any newly reviewed destructive operation. The one-time telemetry
+reset workflow is retired after successful staging and production transitions; see
+[the completed rollout](resource-telemetry.md#dataset-transition-and-rollout).
