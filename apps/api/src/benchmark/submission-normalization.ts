@@ -1,6 +1,7 @@
 import { mapCatalog } from './catalog';
 import { normalizeHardware } from './hardware-normalization';
 import { BenchmarkRequestError } from './repository';
+import { projectResourceTelemetry } from './resource-telemetry-projection';
 import { projectSubmissionSettings } from './submission-settings';
 
 import type { SubmissionData } from './d1-submission-writer';
@@ -36,6 +37,7 @@ export async function normalizeSubmission(request: SubmissionRequest): Promise<S
     },
     capture: request.capture,
     metrics: request.metrics,
+    resource_telemetry: projectResourceTelemetry(request.resource_telemetry),
     settings: projectSubmissionSettings(request.settings_snapshot),
     quality_notes: [],
     author: null,

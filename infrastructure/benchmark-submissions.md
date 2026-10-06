@@ -6,7 +6,7 @@ It does not register routes or assign existing fixture runs to users.
 ## One copy of the run data
 
 `benchmark_runs.detail` stores the full validated, public-safe run document once,
-including settings and metrics. A run can exist here before publication. Pending
+including settings, metrics and capture-window resource telemetry. A run can exist here before publication. Pending
 and rejected runs use `visibility = hidden` and have no `published_at` timestamp.
 A run's opaque ID and URL may be allocated internally before approval; their
 existence does not make the run publicly accessible. Owner responses must return
@@ -112,7 +112,7 @@ a new run. Rejected retry behavior remains a separate step.
 ## Protected submission upload
 
 `POST /api/bench/v1/me/runs` authenticates through the shared owner middleware,
-then requires JSON with a streaming 32 KiB limit. It validates the strict DTO,
+then requires JSON with a streaming 256 KiB limit. It validates the strict DTO,
 normalizes the run and atomically stores it as pending. New submissions and exact
 pending retries return 202 with `publication_status: pending_review`, null public ID
 and URL. An exact retry after approval returns 200 with the existing public ID and
@@ -148,6 +148,47 @@ The structural contract requires at least 110 measured seconds and 120 frame
 samples. A settings resolution, when provided, must match `game_resolution`.
 The contract also checks metric consistency as described below. The POST route
 uses this contract before normalization and storage; it never publishes automatically.
+
+### Capture-window resource telemetry
+
+Version 1 now requires an explicit `resource_telemetry` block matching Core's
+snake_case resource summary, with its own `schema_version: 1`. Missing or null
+blocks are rejected. There is no legacy request adapter or stored-data fallback;
+rollout requires the separately reviewed dataset reset and coordinated desktop
+submission/consent update. Preparing this change does not execute that reset.
+The exact wire fields, visibility, sharing text and required desktop changes are in
+[resource-telemetry.md](resource-telemetry.md). Desktop code is a separate follow-up.
+
+Memory values remain bytes, utilization remains percent, and coverage is 0–1.
+Strict nested schemas retain statistics, support counts/durations, source, scope,
+status and fixed reason codes. Arrays are bounded to 512 logical processors and
+32 anonymous pagefiles. Unknown/private fields are rejected at intake. Explicit
+`not_collected`, unavailable nulls, partial coverage and UMA are valid states.
+Telemetry duration is the union of accepted QPC frame intervals, whereas FPS
+duration is the sum of frametimes. Overlapping intervals may shorten the union;
+Core also merges gaps of at most one microsecond. Validation bounds the union by
+the FPS sum plus those per-boundary gaps and independent six/three-decimal rounding.
+
+Normalization stores the allowed block once in `benchmark_runs.detail`. Public
+details and moderation include the full summary; owner list/lookup cards retain
+aggregate sections without processor/pagefile arrays. All use explicit nested
+projections. Public search previews, groups and Position keep their existing fields
+and criteria. Approval/rejection do not change measurements. Deletion removes
+telemetry with the run; the existing archive allowlist is not expanded.
+
+The request fingerprint includes telemetry, so changing it under the same client
+ID conflicts. Cross-ID duplicate detection excludes telemetry while retaining the
+existing FPS measurement identity, preventing telemetry edits from duplicating
+the same run. POST receipts and deleted lookup markers remain minimal.
+
+Only the selected run is sent after explicit **Send for review**. Signing in,
+collecting a capture, opening history and running Position do not upload telemetry.
+The accepted summary becomes public only after moderator approval. It excludes raw
+samples/time series, process IDs, other application names, paths/drive letters,
+LUID/PCI/PnP/device identifiers, account identifiers and native error text. On owner
+deletion, telemetry is removed with the original run and is not copied to the
+closed measurement archive. These facts must be disclosed in the desktop sharing
+dialog and privacy text before releasing the new sender.
 
 ## Selected settings projection
 
@@ -336,3 +377,28 @@ clicks while a request is pending are disabled. Success reloads the first page w
 preserving the status filter and page size. Leaving the page or changing the session
 aborts the browser request and ignores late responses; this does not undo a deletion
 already accepted by the server.
+
+## Manual read-only submission audit
+
+The **Audit benchmark submissions** workflow is manual and runs only from `master`.
+Select the target environment and supply the public ID of one published run that
+you own. The query verifies that this run is non-synthetic, belongs to a published
+authenticated submission and has an identity mapping for the target Clerk issuer.
+An absent or unverified mapping fails the audit; it does not report zero submissions.
+
+One Drizzle-generated SELECT counts the owner's submissions and other users'
+submissions by `pending_review`, `published`, `rejected` and `deleted`, with distinct
+sender totals and first/last submission dates in UTC. Deleted submissions are
+counted using their authenticated deletion markers, without reading the archive.
+Synthetic run rows and fictional contributors without authenticated submissions
+are excluded. Distinct sender totals are calculated across all statuses.
+
+The workflow uses the existing Cloudflare secrets and environment protection. It
+has no migrations, seed, deployment, data changes or additional credentials.
+Only validated aggregate fields reach logs and the Actions summary; raw Wrangler
+output, identity values, private run payloads and native errors are withheld.
+Review and approve its execution separately from preparing the workflow. This
+audit should precede any separately reviewed data reset. The separately dispatched
+temporary reset workflow requires explicit acknowledgement of that review and clears
+all benchmark records, not just the owner's. See
+[the two manual rollout steps](resource-telemetry.md#dataset-transition-and-rollout).

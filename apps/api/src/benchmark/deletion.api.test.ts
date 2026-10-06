@@ -8,6 +8,7 @@ import { createClerkBrowserAdapter } from '../auth/clerk-browser-adapter';
 import { createApp } from '../index';
 
 import { D1SubmissionApproval } from './d1-submission-approval';
+import { createSyntheticRuns } from './fixtures';
 
 import type { ApplicationPrincipal } from '../auth/application-principal';
 vi.mock('../auth/clerk-browser-adapter', () => ({ createClerkBrowserAdapter: vi.fn() }));
@@ -31,6 +32,7 @@ const dto = {
   context: { weather: 'unknown', time_of_day: 'day' },
   settings_snapshot: null,
   capture: { duration_sec: 120, sample_count: 12000 },
+  resource_telemetry: createSyntheticRuns()[0]!.detail.resource_telemetry,
   metrics: {
     average_fps: 100,
     one_percent_low_fps: 100,

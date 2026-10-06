@@ -5,6 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { D1SubmissionRepository } from './d1-submission-repository';
 import { createSyntheticRuns } from './fixtures';
+import { projectResourceTelemetrySummary } from './resource-telemetry-projection';
 
 import type { SubmissionStatus } from './d1-submission-repository';
 
@@ -138,6 +139,7 @@ describe('private D1 submission reads', () => {
         one_percent_low_fps: fixture.metrics.one_percent_low_fps,
       },
       status_reason: null,
+      resource_telemetry: projectResourceTelemetrySummary(fixture.resource_telemetry),
     });
     const text = JSON.stringify(item);
 
@@ -149,6 +151,7 @@ describe('private D1 submission reads', () => {
       'sequence',
       'issuer',
       'subject',
+      'logical_processors',
     ]) {
       expect(text).not.toContain(privateValue);
     }

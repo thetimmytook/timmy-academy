@@ -37,6 +37,25 @@ SSR or framework mode. The application uses explicit React Router routes and rou
 
 See Cloudflare's [Static Assets routing](https://developers.cloudflare.com/workers/static-assets/) and [billing rules](https://developers.cloudflare.com/workers/static-assets/billing-and-limitations/) for current platform behavior.
 
+## Deferred artifact promotion option (2026-10-03)
+
+Record for a later implementation step: build once, deploy to staging, then manually
+approve promotion of the same built artifacts to production. The current workflow
+rebuilds for production and embeds an environment-specific Clerk publishable key
+through Vite; it does not yet promote the staging artifact.
+
+The proposed prerequisite is runtime public configuration: a same-origin endpoint
+(proposed path `GET /api/config`) returns an explicit allowlist containing the Clerk
+publishable key from that Worker's environment. The SPA loads this before initializing
+Clerk. Static browser JavaScript cannot read Worker environment bindings directly.
+Never expose secret keys or serialize the full environment. Keep environment bindings
+and secrets separate while reusing the built application artifacts.
+
+The production approval mechanism remains to be selected after checking available
+GitHub repository/plan capabilities. This records the option only; do not change
+application initialization, endpoints or deployment workflows until implementation
+is explicitly requested.
+
 ## Agreed package, contract and environment decisions
 
 - Use npm workspaces. The root scripts invoke workspace scripts explicitly with `npm run <script> -w <workspace>`. A root build runs `contracts` before its consumers; each app declares its workspace dependency. Package entry points must match actual build output. Do not copy the sample project's missing shared-package build step or mismatched `main` paths.

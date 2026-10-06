@@ -7,6 +7,7 @@ import { DefinitionList } from '../elements/DefinitionList';
 
 import { execution, number, resolution, words } from './format';
 import { PublicSettings } from './PublicSettings';
+import { ResourceTelemetry } from './ResourceTelemetry';
 import { grid, muted, stack } from './styles';
 
 import type { PublicRunDetail } from '@timmy/contracts';
@@ -107,7 +108,7 @@ export function RunDetails({ run }: Readonly<{ run: PublicRunDetail }>): JSX.Ele
             values={[
               ['CPU', run.hardware.cpu.name],
               ['GPU', run.hardware.gpu.name],
-              ['Installed RAM', `${run.hardware.ram_gb} GB`],
+              ['Hardware RAM', `${run.hardware.ram_gb} GB`],
               ['Tuning', words(run.hardware.tuning_class ?? 'unknown')],
               ['Capture duration', `${number(run.capture.duration_sec)} seconds`],
               ['Frame samples', number(run.capture.sample_count)],
@@ -115,6 +116,7 @@ export function RunDetails({ run }: Readonly<{ run: PublicRunDetail }>): JSX.Ele
           />
         </section>
       </div>
+      <ResourceTelemetry telemetry={run.resource_telemetry} />
       <PublicSettings settings={run.settings} />
     </>
   );

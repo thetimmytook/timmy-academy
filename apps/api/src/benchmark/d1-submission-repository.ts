@@ -4,8 +4,10 @@ import { drizzle } from 'drizzle-orm/d1';
 
 import { runs, submissions, state } from '../db/schema';
 
+import { projectResourceTelemetrySummary } from './resource-telemetry-projection';
+
 import type { D1Database } from '@cloudflare/workers-types';
-import type { PublicRunDetail } from '@timmy/contracts';
+import type { PublicRunDetail, ResourceTelemetrySummary } from '@timmy/contracts';
 
 export type SubmissionStatus = 'published' | 'pending_review' | 'rejected';
 export interface OwnerSubmission {
@@ -20,6 +22,7 @@ export interface OwnerSubmission {
   execution: PublicRunDetail['conditions']['execution'];
   game_resolution: PublicRunDetail['conditions']['game_resolution'];
   metrics: { average_fps: number; one_percent_low_fps: number };
+  resource_telemetry: ResourceTelemetrySummary;
   status_reason: string | null;
 }
 export interface DeletedSubmission {
@@ -106,6 +109,7 @@ function project(row: SubmissionRow): OwnerSubmission | DeletedSubmission {
       one_percent_low_fps: detail.metrics.one_percent_low_fps,
     },
     status_reason: row.reason,
+    resource_telemetry: projectResourceTelemetrySummary(detail.resource_telemetry),
   };
 }
 

@@ -1,5 +1,17 @@
 import type { Hardware } from '@timmy/contracts';
 
+export const syntheticUmaHardware: Hardware = {
+  cpu: {
+    id: 'cpu-ef2011b719dd38ea305c6d786de7780b32156c7cce1783ab08b19f582f7bd1ca',
+    name: 'Ryzen 7 7840U',
+  },
+  gpu: {
+    id: 'gpu-9ea273b6a3e5caa6c3b198a8cf5d917db84ca236c1e0c746151154756020a46f',
+    name: 'Radeon 780M',
+  },
+  ram_gb: 32,
+};
+
 // Test/seed data only. IDs follow the same SHA-256 name rule as real models.
 export const syntheticHardware: readonly Hardware[] = [
   {

@@ -12,7 +12,13 @@ tests {
   test('observed public options', function () {
     expect(res.getStatus()).to.equal(200);
     expect(res.getBody().ram_gb).to.deep.equal([16, 32, 64]);
-    expect(res.getBody().maps).to.have.lengthOf(4);
+    expect(res.getBody().maps.map(map => map.id)).to.include.members([
+      'lighthouse', 'customs', 'streets', 'woods'
+    ]);
     expect(res.getBody().game_versions).not.to.include(null);
   });
+}
+
+docs {
+  Checks the four standard fixture maps without excluding the additional full-demo maps.
 }

@@ -1,4 +1,5 @@
 import { syntheticHardware } from './fixture-hardware';
+import { createResourceScenario, resourceScenarios } from './fixture-resource-scenarios';
 
 import type { StoredRun } from './stored-run';
 export { syntheticHardware } from './fixture-hardware';
@@ -57,6 +58,10 @@ export function createSyntheticRuns(): StoredRun[] {
             time_of_day: 'day',
           },
           capture: { duration_sec: 120, sample_count: average * 120 },
+          resource_telemetry: createResourceScenario(
+            hardware,
+            groupIndex === 0 ? (resourceScenarios.at(index) ?? 'normal') : 'normal',
+          ),
           metrics: {
             average_fps: average,
             one_percent_low_fps: average * 0.7,

@@ -3,6 +3,7 @@ import { DefinitionList } from '../elements/DefinitionList';
 
 import { execution, number, resolution, words } from './format';
 import { PublicSettings } from './PublicSettings';
+import { ResourceTelemetry } from './ResourceTelemetry';
 import { stack } from './styles';
 
 import type { ModerationQueue } from '@timmy/contracts';
@@ -24,7 +25,7 @@ export function SubmissionReview({
             ['Captured', run.captured_day],
             ['CPU', run.hardware.cpu.name],
             ['GPU', run.hardware.gpu.name],
-            ['Installed RAM', `${run.hardware.ram_gb} GB`],
+            ['Hardware RAM', `${run.hardware.ram_gb} GB`],
             ['Tuning', words(run.hardware.tuning_class ?? 'unknown')],
             ['Map', conditions.map.name],
             ['Execution', execution(conditions.execution)],
@@ -42,6 +43,7 @@ export function SubmissionReview({
             ['p99 frametime', `${number(run.metrics.p99_frametime_ms)} ms`],
           ]}
         />
+        <ResourceTelemetry telemetry={run.resource_telemetry} />
         <PublicSettings settings={run.settings} />
       </div>
     </details>

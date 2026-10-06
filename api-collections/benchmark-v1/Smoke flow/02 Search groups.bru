@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{base_url}}/api/bench/v1/runs?gpu=geforce-rtx-4070-super&limit=1
+  url: {{base_url}}/api/bench/v1/runs?ram_gb=32&limit=1
   body: none
   auth: none
 }
@@ -18,6 +18,9 @@ tests {
     expect(body.groups).to.have.lengthOf(1);
     expect(body.groups[0].group_key).to.match(/^hg_/);
     expect(body.groups[0].preview_runs).to.be.an('array');
+    for (const run of body.groups[0].preview_runs) {
+      expect(run).not.to.have.property('resource_telemetry');
+    }
     expect(body.next_cursor).to.match(/^cur_/);
     bru.setVar('group_key', body.groups[0].group_key);
     bru.setVar('groups_cursor', body.next_cursor);
@@ -25,5 +28,5 @@ tests {
 }
 
 docs {
-  Uses the synthetic GPU catalog. The selected group and continuation cursor are saved for the next requests.
+  Uses the synthetic 32 GB hardware groups. The selected group and continuation cursor are saved for the next requests.
 }

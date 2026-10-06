@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
+import {
+  createMissingResourceTelemetryFixture,
+  createResourceTelemetryFixture,
+} from './resource-telemetry.fixture';
 import { settingsSnapshotSchema } from './settings-snapshot';
 import { submissionRequestSchema } from './submission';
 
@@ -61,6 +65,7 @@ const request = {
   context: { weather: 'unknown', time_of_day: 'day' },
   settings_snapshot: settings,
   capture: { duration_sec: 118.7, sample_count: 14363 },
+  resource_telemetry: createMissingResourceTelemetryFixture('not_collected'),
   metrics: {
     average_fps: 121,
     one_percent_low_fps: 82,
@@ -72,6 +77,51 @@ const request = {
 };
 
 describe('submission transport contract', () => {
+  it('requires the explicit telemetry block in schema version 1', () => {
+    expect(
+      submissionRequestSchema.safeParse({ ...request, resource_telemetry: undefined }).success,
+    ).toBe(false);
+    expect(
+      submissionRequestSchema.safeParse({ ...request, resource_telemetry: null }).success,
+    ).toBe(false);
+  });
+  it.each(['unavailable', 'not_collected'] as const)(
+    'accepts explicit %s telemetry without inventing measurements',
+    status => {
+      const input = {
+        ...request,
+        resource_telemetry: createMissingResourceTelemetryFixture(status),
+      };
+      expect(submissionRequestSchema.parse(input)).toEqual(input);
+    },
+  );
+  it('bounds the telemetry interval union by accepted FPS intervals and rounding', () => {
+    const input = {
+      ...request,
+      capture: { duration_sec: 120.0005, sample_count: 12000 },
+      metrics: { ...request.metrics, average_fps: 100, average_frametime_ms: 10 },
+      resource_telemetry: createResourceTelemetryFixture(),
+    };
+    expect(submissionRequestSchema.parse(input)).toEqual(input);
+    expect(
+      submissionRequestSchema.safeParse({
+        ...input,
+        resource_telemetry: createResourceTelemetryFixture(120.013),
+      }).success,
+    ).toBe(false);
+  });
+  it.each([119.995, 120.006])(
+    'accepts Core interval overlap or merged micro-gaps: %s seconds',
+    duration => {
+      const input = {
+        ...request,
+        capture: { duration_sec: 120, sample_count: 12000 },
+        metrics: { ...request.metrics, average_fps: 100, average_frametime_ms: 10 },
+        resource_telemetry: createResourceTelemetryFixture(duration),
+      };
+      expect(submissionRequestSchema.parse(input)).toEqual(input);
+    },
+  );
   it('accepts selected settings without rewriting measured values or false toggles', () => {
     expect(submissionRequestSchema.parse(request)).toEqual(request);
   });

@@ -8,6 +8,7 @@ import { AuthenticationDenied } from '../auth/application-principal';
 import { createClerkBrowserAdapter } from '../auth/clerk-browser-adapter';
 import { D1SubmissionApproval } from '../benchmark/d1-submission-approval';
 import { D1SubmissionRejection } from '../benchmark/d1-submission-rejection';
+import { createSyntheticRuns } from '../benchmark/fixtures';
 import { createApp } from '../index';
 
 import type { ApplicationPrincipal } from '../auth/application-principal';
@@ -32,6 +33,7 @@ const dto = {
   context: { weather: 'unknown', time_of_day: 'day' },
   settings_snapshot: null,
   capture: { duration_sec: 120, sample_count: 12000 },
+  resource_telemetry: createSyntheticRuns()[0]!.detail.resource_telemetry,
   metrics: {
     average_fps: 100,
     one_percent_low_fps: 100,
@@ -227,6 +229,7 @@ describe('moderator approvals queue', () => {
     ]);
     expect(body.items[0]!.submission_id).toBe(id);
     expect(body.items[0]!.run.metrics).toEqual(dto.metrics);
+    expect(body.items[0]!.run.resource_telemetry).toEqual(dto.resource_telemetry);
     expect(body.next_after).toBeNull();
     const serialized = JSON.stringify(body);
 

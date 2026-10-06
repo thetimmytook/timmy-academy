@@ -10,7 +10,16 @@ import {
 } from './benchmark.js';
 import { MIN_CAPTURE_DURATION_SEC, MIN_CAPTURE_SAMPLE_COUNT } from './limits.js';
 import { clientRunIdSchema } from './owner-runs.js';
+import { RESOURCE_DURATION_ROUNDING_TOLERANCE_SEC } from './resource-telemetry-precision.js';
+import { resourceTelemetrySchema } from './resource-telemetry.js';
 import { settingsSnapshotSchema } from './settings-snapshot.js';
+
+const CAPTURE_DURATION_ROUNDING_TOLERANCE_SEC = 0.0005;
+const AVERAGE_METRIC_ROUNDING_TOLERANCE = 0.005;
+const CAPTURE_FLOATING_POINT_SLACK = 1e-9;
+
+// CaptureWindow.FromFrames merges adjacent intervals separated by at most 1 microsecond.
+const RESOURCE_FRAME_INTERVAL_MERGE_GAP_SEC = 1e-6;
 
 // Accepted rounding: duration to 0.001 s; FPS and frametime to at least 0.01.
 // Desktop currently records frametime more precisely (0.001 ms).
@@ -20,18 +29,20 @@ function isConsistentCapture(
 ): boolean {
   const count = capture.sample_count;
   const earliest = Math.max(
-    capture.duration_sec - 0.0005,
-    (count * (metrics.average_frametime_ms - 0.005)) / 1000,
-    count / (metrics.average_fps + 0.005),
+    capture.duration_sec - CAPTURE_DURATION_ROUNDING_TOLERANCE_SEC,
+    (count * (metrics.average_frametime_ms - AVERAGE_METRIC_ROUNDING_TOLERANCE)) / 1000,
+    count / (metrics.average_fps + AVERAGE_METRIC_ROUNDING_TOLERANCE),
   );
   const latest = Math.min(
-    capture.duration_sec + 0.0005,
-    (count * (metrics.average_frametime_ms + 0.005)) / 1000,
-    metrics.average_fps > 0.005 ? count / (metrics.average_fps - 0.005) : Infinity,
+    capture.duration_sec + CAPTURE_DURATION_ROUNDING_TOLERANCE_SEC,
+    (count * (metrics.average_frametime_ms + AVERAGE_METRIC_ROUNDING_TOLERANCE)) / 1000,
+    metrics.average_fps > AVERAGE_METRIC_ROUNDING_TOLERANCE
+      ? count / (metrics.average_fps - AVERAGE_METRIC_ROUNDING_TOLERANCE)
+      : Infinity,
   );
 
   // Floating-point slack at interval boundaries, not a measurement tolerance.
-  return earliest <= latest + 1e-9;
+  return earliest <= latest + CAPTURE_FLOATING_POINT_SLACK;
 }
 
 export const submissionRequestSchema = z
@@ -60,9 +71,27 @@ export const submissionRequestSchema = z
       sample_count: z.number().int().min(MIN_CAPTURE_SAMPLE_COUNT),
     }),
     metrics: metricsSchema,
+    resource_telemetry: resourceTelemetrySchema,
   })
   .superRefine((request, context) => {
     const { metrics, capture } = request;
+    const telemetryDuration = request.resource_telemetry.window.duration_sec;
+
+    if (
+      telemetryDuration !== null &&
+      telemetryDuration >
+        capture.duration_sec +
+          CAPTURE_DURATION_ROUNDING_TOLERANCE_SEC +
+          RESOURCE_DURATION_ROUNDING_TOLERANCE_SEC +
+          (capture.sample_count - 1) * RESOURCE_FRAME_INTERVAL_MERGE_GAP_SEC +
+          CAPTURE_FLOATING_POINT_SLACK
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['resource_telemetry', 'window', 'duration_sec'],
+        message: 'Telemetry interval union must fit within the accepted FPS frame intervals.',
+      });
+    }
 
     if (!isConsistentCapture(capture, metrics)) {
       context.addIssue({

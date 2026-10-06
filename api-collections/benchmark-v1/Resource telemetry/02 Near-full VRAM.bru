@@ -1,0 +1,30 @@
+meta {
+  name: 02 Near-full VRAM
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{base_url}}/api/bench/v1/runs/br_test_desktop_0_lighthouse_bsg_servers_1920_1
+  body: none
+  auth: none
+}
+
+tests {
+  test('Near-full VRAM remains an explicit synthetic capture', function () {
+    expect(res.getStatus()).to.equal(200);
+    const body = res.getBody();
+    expect(body.is_synthetic).to.equal(true);
+    expect(body.public_run_id).to.equal('br_test_desktop_0_lighthouse_bsg_servers_1920_1');
+    const telemetry = body.resource_telemetry;
+    expect(telemetry.schema_version).to.equal(1);
+    expect(telemetry.status).to.equal('available');
+    expect(telemetry.gpu.memory_architecture).to.equal('discrete');
+    expect(telemetry.gpu.dedicated_memory_used.maximum).to.be.at.least(telemetry.gpu.dedicated_vram_capacity.value * 0.95);
+    expect(telemetry.gpu.dedicated_memory_used.maximum).to.be.at.most(telemetry.gpu.dedicated_vram_capacity.value);
+  });
+}
+
+docs {
+  Requires the full 397-run demo seed in the selected environment. This request only reads one invented example and never uploads a run or changes data. Peaks do not establish a cause of FPS drops.
+}

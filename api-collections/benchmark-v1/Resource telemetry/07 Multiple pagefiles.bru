@@ -1,0 +1,32 @@
+meta {
+  name: 07 Multiple pagefiles
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{base_url}}/api/bench/v1/runs/br_test_desktop_0_lighthouse_local_1920_0
+  body: none
+  auth: none
+}
+
+tests {
+  test('Multiple pagefiles remains an explicit synthetic capture', function () {
+    expect(res.getStatus()).to.equal(200);
+    const body = res.getBody();
+    expect(body.is_synthetic).to.equal(true);
+    expect(body.public_run_id).to.equal('br_test_desktop_0_lighthouse_local_1920_0');
+    const telemetry = body.resource_telemetry;
+    expect(telemetry.schema_version).to.equal(1);
+    expect(telemetry.pagefile.files).to.have.lengthOf(2);
+    expect(telemetry.pagefile.files.map(file => file.drive_media_type)).to.deep.equal(['SSD', 'HDD']);
+    expect(telemetry.pagefile.files[1].allocated.coverage).to.equal(0.5);
+    expect(telemetry.pagefile.file_count.average).to.equal(1.5);
+    expect(telemetry.pagefile.allocated.maximum).to.be.greaterThan(telemetry.pagefile.allocated.minimum);
+    expect(telemetry.commit.limit.maximum).to.be.greaterThan(telemetry.commit.limit.minimum);
+  });
+}
+
+docs {
+  Requires the full 397-run demo seed in the selected environment. This request only reads one invented example and never uploads a run or changes data. Peaks do not establish a cause of FPS drops.
+}

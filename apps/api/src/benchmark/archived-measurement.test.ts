@@ -44,6 +44,7 @@ describe('archived measurement allowlist', () => {
       'request_fingerprint',
       'submitted_at',
       'published_at',
+      'resource_telemetry',
     ]) {
       expect(archivedMeasurementSchema.safeParse({ ...archived, [field]: 'private' }).success).toBe(
         false,

@@ -1,6 +1,7 @@
 import { namedModelSchema, publicRunDetailSchema, submissionRequestSchema } from '@timmy/contracts';
 import { describe, expect, it } from 'vitest';
 
+import { createSyntheticRuns } from './fixtures';
 import { normalizeHardware } from './hardware-normalization';
 import { normalizeSubmission } from './submission-normalization';
 
@@ -80,6 +81,7 @@ describe('submission normalization', () => {
       context: { weather: 'unknown', time_of_day: 'day' },
       settings_snapshot: { schema_version: 1, game: { AutoEmptyWorkingSet: false } },
       capture: { duration_sec: 120, sample_count: 12000 },
+      resource_telemetry: createSyntheticRuns()[0]!.detail.resource_telemetry,
       metrics: {
         average_fps: 100,
         one_percent_low_fps: 100,
@@ -96,6 +98,7 @@ describe('submission normalization', () => {
     });
     expect(result.settings).toEqual({ game: { automatic_ram_cleaner: false } });
     expect(result.metrics).toEqual(request.metrics);
+    expect(result.resource_telemetry).toEqual(request.resource_telemetry);
     expect(result.author).toBeNull();
     expect(result.quality_notes).toEqual([]);
     expect(result.conditions).toMatchObject({
