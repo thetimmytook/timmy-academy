@@ -3,13 +3,13 @@ import type { Hardware, ResourceMetric, ResourceTelemetry } from '@timmy/contrac
 // Synthetic fixture values only; never used to fill missing submission measurements.
 const gib = 2 ** 30;
 
-function metric(
+function metric<Source extends string>(
   value: number,
   unit: ResourceMetric['unit'],
-  source: string,
+  source: Source,
   scope = 'whole_system',
   duration = 120,
-): ResourceMetric {
+): ResourceMetric<Source> {
   return {
     average: value,
     minimum: value,
@@ -30,12 +30,12 @@ export function createResourceTelemetryFixture(
   hardware: Hardware,
   duration = 120,
 ): ResourceTelemetry {
-  const sampled = (
+  const sampled = <Source extends string>(
     value: number,
     unit: ResourceMetric['unit'],
-    source: string,
+    source: Source,
     scope = 'whole_system',
-  ): ResourceMetric => metric(value, unit, source, scope, duration);
+  ): ResourceMetric<Source> => metric(value, unit, source, scope, duration);
   const memory = (value: number, scope = 'whole_system'): ResourceMetric =>
     sampled(value * gib, 'bytes', 'get_performance_info', scope);
   const fileMemory = (value: number, scope = 'whole_system'): ResourceMetric =>

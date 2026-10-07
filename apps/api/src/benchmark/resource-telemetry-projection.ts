@@ -1,6 +1,8 @@
 import type { ResourceMetric, ResourceTelemetry, ResourceTelemetrySummary } from '@timmy/contracts';
 
-function projectMetric(metric: ResourceMetric): ResourceMetric {
+function projectMetric<Source extends string>(
+  metric: ResourceMetric<Source>,
+): ResourceMetric<Source> {
   return {
     average: metric.average,
     minimum: metric.minimum,

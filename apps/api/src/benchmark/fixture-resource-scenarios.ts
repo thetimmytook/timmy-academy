@@ -12,6 +12,7 @@ export const resourceScenarios = [
   'partial',
   'unavailable',
   'multiple_pagefiles',
+  'nvapi',
 ] as const;
 export type ResourceScenario = (typeof resourceScenarios)[number] | 'uma';
 
@@ -155,6 +156,10 @@ export function createResourceScenario(
   normal(telemetry);
 
   switch (scenario) {
+    case 'nvapi':
+      telemetry.gpu.graphics_utilization.source = 'nvapi_gpu_graphics_utilization';
+      break;
+
     case 'near_full_vram': {
       const capacity = telemetry.gpu.dedicated_vram_capacity.value! / gib;
       statistics(telemetry.gpu.dedicated_memory_used, [
@@ -196,6 +201,7 @@ export function createResourceScenario(
       multiplePagefiles(telemetry);
       break;
     case 'uma':
+      telemetry.gpu.graphics_utilization.source = 'adlx_gpu_usage';
       telemetry.gpu.memory_architecture = 'unified';
       telemetry.gpu.dedicated_vram_capacity = {
         ...telemetry.gpu.dedicated_vram_capacity,

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 
 import { MAX_LOGICAL_PROCESSORS, MAX_PAGEFILES } from './limits';
 import { resourceTelemetrySchema } from './resource-telemetry';
@@ -8,7 +8,11 @@ import {
   createUnavailableMetricFixture as unavailable,
 } from './resource-telemetry.fixture';
 
-import type { ResourceTelemetry } from './resource-telemetry';
+import type {
+  GraphicsUtilizationSource,
+  ResourceTelemetry,
+  ResourceTelemetrySummary,
+} from './resource-telemetry';
 
 const gib = 2 ** 30;
 
@@ -25,6 +29,85 @@ function partial(data: ResourceTelemetry, duration = 119.4, coverage = 0.995): v
 }
 
 describe('capture-window telemetry contract', () => {
+  it('keeps the graphics source a closed literal union in full and owner contracts', () => {
+    expectTypeOf<GraphicsUtilizationSource>().toEqualTypeOf<
+      'pdh_gpu_engine_3d_busiest_engine' | 'nvapi_gpu_graphics_utilization' | 'adlx_gpu_usage'
+    >();
+    expectTypeOf<
+      ResourceTelemetrySummary['gpu']['graphics_utilization']['source']
+    >().toEqualTypeOf<GraphicsUtilizationSource>();
+  });
+  it.each([
+    'pdh_gpu_engine_3d_busiest_engine',
+    'nvapi_gpu_graphics_utilization',
+    'adlx_gpu_usage',
+  ] as const)('retains %s through measured, partial and unavailable summaries', source => {
+    const data = fixture(120, source);
+    expect(resourceTelemetrySchema.parse(data)).toEqual(data);
+    Object.assign(data.gpu.graphics_utilization, {
+      status: 'partial',
+      coverage: 0.75,
+      valid_duration_sec: 90,
+      valid_sample_count: 90,
+      reason_codes: ['partial_coverage'],
+    });
+    data.status = 'partial';
+    data.warnings = ['partial_coverage'];
+    expect(resourceTelemetrySchema.parse(data)).toEqual(data);
+    data.gpu.graphics_utilization = unavailable(
+      data.gpu.graphics_utilization,
+      'collector_unavailable',
+    );
+    data.warnings = ['collector_unavailable'];
+    expect(resourceTelemetrySchema.parse(data)).toEqual(data);
+
+    for (const status of ['unavailable', 'not_collected'] as const) {
+      const missing = missingTelemetry(status);
+      missing.gpu.graphics_utilization.source = source;
+      expect(resourceTelemetrySchema.parse(missing)).toEqual(missing);
+    }
+  });
+
+  it.each([
+    'pdh_gpu_engine_3d_busiest_engine',
+    'nvapi_gpu_graphics_utilization',
+    'adlx_gpu_usage',
+  ] as const)('keeps %s statistics, scope, unit and privacy constraints strict', source => {
+    for (const overrides of [
+      { source: 'unknown_gpu_utilization' },
+      { source: null },
+      { unit: 'bytes' },
+      { scope: 'process' },
+      { maximum: 101 },
+      { average: null },
+      { minimum: -1 },
+      { last: 101 },
+      { valid_sample_count: 10001 },
+      { valid_duration_sec: 121 },
+      { coverage: 1.1 },
+      { status: 'partial' },
+      { reason_codes: ['native_error'] },
+      { raw_samples: [85] },
+      { pid: 123 },
+      { application_name: 'private' },
+      { path: 'private' },
+      { device_id: 'private' },
+    ]) {
+      const data = fixture(120, source);
+      Object.assign(data.gpu.graphics_utilization, overrides);
+      expect(resourceTelemetrySchema.safeParse(data).success).toBe(false);
+    }
+
+    const data = fixture(120, source);
+    data.gpu.graphics_utilization.valid_sample_count = 80;
+
+    // Existing PDH interval support remains 1.5 s; vendor gauges retain the 1 s cap.
+    expect(resourceTelemetrySchema.safeParse(data).success).toBe(source.startsWith('pdh_'));
+    data.gpu.graphics_utilization.valid_sample_count = 120;
+    Object.assign(data.gpu.dedicated_memory_used, { source });
+    expect(resourceTelemetrySchema.safeParse(data).success).toBe(false);
+  });
+
   it('retains all supported C# summary fields, units, scopes, sources and explicit nulls', () => {
     for (const data of [
       fixture(),
@@ -246,7 +329,7 @@ describe('capture-window telemetry contract', () => {
       data.cpu.total_utilization.unit = 'bytes';
     },
     (data: ResourceTelemetry): void => {
-      data.cpu.total_utilization.source = 'native error';
+      Object.assign(data.cpu.total_utilization, { source: 'native error' });
     },
     (data: ResourceTelemetry): void => {
       data.cpu.total_utilization.valid_sample_count = 1;

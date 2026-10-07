@@ -2,7 +2,13 @@ import { css } from '../../styled-system/css';
 import { DefinitionList } from '../elements/DefinitionList';
 
 import { words } from './format';
-import { resourceCoverage, resourceReasons, resourceValue } from './resource-telemetry-format';
+import {
+  graphicsUtilizationDisplay,
+  GRAPHICS_UTILIZATION_CAVEAT,
+  resourceCoverage,
+  resourceReasons,
+  resourceValue,
+} from './resource-telemetry-format';
 import { muted } from './styles';
 
 import type { ResourceMetric, ResourceTelemetrySummary as SummaryData } from '@timmy/contracts';
@@ -24,6 +30,8 @@ function summaryValue(
 export function ResourceTelemetrySummary({
   telemetry,
 }: Readonly<{ telemetry: SummaryData }>): JSX.Element {
+  const graphics = graphicsUtilizationDisplay(telemetry.gpu.graphics_utilization.source);
+
   return (
     <details>
       <summary className={css({ cursor: 'pointer', fontWeight: 'semibold', mb: '3' })}>
@@ -44,7 +52,12 @@ export function ResourceTelemetrySummary({
             values={[
               ['Selected GPU adapter', telemetry.gpu.adapter_name ?? 'Unknown'],
               ['CPU average', summaryValue(telemetry.cpu.total_utilization, 'average')],
-              ['GPU graphics average', summaryValue(telemetry.gpu.graphics_utilization, 'average')],
+              [
+                `${graphics.label} average`,
+                summaryValue(telemetry.gpu.graphics_utilization, 'average'),
+              ],
+              ['Graphics load source', telemetry.gpu.graphics_utilization.source],
+              ['GPU scope', `Whole adapter (${telemetry.gpu.graphics_utilization.scope})`],
               [
                 'Dedicated VRAM capacity',
                 telemetry.gpu.memory_architecture === 'unified'
@@ -60,6 +73,9 @@ export function ResourceTelemetrySummary({
               ['Minimum commit headroom', summaryValue(telemetry.commit.headroom, 'minimum')],
             ]}
           />
+          <p className={muted}>
+            {graphics.description} {GRAPHICS_UTILIZATION_CAVEAT}
+          </p>
         </>
       )}
     </details>

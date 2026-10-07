@@ -1,15 +1,15 @@
 import type { ResourceMetric } from './resource-metric';
-import type { ResourceTelemetry } from './resource-telemetry';
+import type { GraphicsUtilizationSource, ResourceTelemetry } from './resource-telemetry';
 
 const gib = 2 ** 30;
 
-function metric(
+function metric<Source extends string>(
   value: number,
   unit: ResourceMetric['unit'],
-  source: string,
+  source: Source,
   scope = 'whole_system',
   duration = 120,
-): ResourceMetric {
+): ResourceMetric<Source> {
   return {
     average: value,
     minimum: value,
@@ -26,13 +26,16 @@ function metric(
   };
 }
 
-export function createResourceTelemetryFixture(duration = 120): ResourceTelemetry {
-  const sampled = (
+export function createResourceTelemetryFixture(
+  duration = 120,
+  graphicsSource: GraphicsUtilizationSource = 'pdh_gpu_engine_3d_busiest_engine',
+): ResourceTelemetry {
+  const sampled = <Source extends string>(
     value: number,
     unit: ResourceMetric['unit'],
-    source: string,
+    source: Source,
     scope = 'whole_system',
-  ): ResourceMetric => metric(value, unit, source, scope, duration);
+  ): ResourceMetric<Source> => metric(value, unit, source, scope, duration);
   const memory = (value: number, scope = 'whole_system'): ResourceMetric =>
     sampled(value * gib, 'bytes', 'get_performance_info', scope);
   const fileMemory = (value: number, scope = 'whole_system'): ResourceMetric =>
@@ -75,18 +78,14 @@ export function createResourceTelemetryFixture(duration = 120): ResourceTelemetr
       })),
     },
     gpu: {
-      adapter_name: 'GeForce RTX 4070 SUPER',
+      adapter_name:
+        graphicsSource === 'adlx_gpu_usage' ? 'Radeon RX 7700 XT' : 'GeForce RTX 4070 SUPER',
       scope: 'whole_adapter',
       memory_architecture: 'discrete',
       selection_method: 'tarkov_graphics_activity',
       selection_status: 'selected',
       dedicated_vram_capacity: capacity(12, 'dxgi_dedicated_video_memory', 'whole_adapter'),
-      graphics_utilization: sampled(
-        85,
-        'percent',
-        'pdh_gpu_engine_3d_busiest_engine',
-        'whole_adapter',
-      ),
+      graphics_utilization: sampled(85, 'percent', graphicsSource, 'whole_adapter'),
       dedicated_memory_used: sampled(
         8 * gib,
         'bytes',
@@ -122,10 +121,10 @@ export function createResourceTelemetryFixture(duration = 120): ResourceTelemetr
   };
 }
 
-export function createUnavailableMetricFixture(
-  metric: ResourceMetric,
+export function createUnavailableMetricFixture<Source extends string>(
+  metric: ResourceMetric<Source>,
   reason: 'collector_unavailable' | 'not_collected' | 'active_adapter_unknown',
-): ResourceMetric {
+): ResourceMetric<Source> {
   return {
     ...metric,
     average: null,

@@ -6,6 +6,7 @@ import {
   groupSearchResponseSchema,
   publicRunDetailSchema,
   ownerRunLookupSchema,
+  ownerRunsResponseSchema,
   moderationQueueSchema,
   MAX_LOGICAL_PROCESSORS,
   MAX_PAGEFILES,
@@ -13,7 +14,6 @@ import {
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { D1ModerationRepository } from '../admin/d1-moderation-repository';
 import { AuthenticationDenied } from '../auth/application-principal';
 import { createClerkBrowserAdapter } from '../auth/clerk-browser-adapter';
 import {
@@ -46,6 +46,8 @@ const cacheControl = 'Cache-Control';
 const submissionSequenceQuery = 'SELECT sequence FROM benchmark_submissions';
 const publicRunPath = '/api/bench/v1/runs/';
 const clientLookupPath = '/by-client-id/';
+const storedDetailQuery = 'SELECT detail FROM benchmark_runs';
+const storedSubmissionQuery = 'SELECT * FROM benchmark_submissions';
 const dto = {
   schema_version: 1,
   client_run_id: '00000000-0000-4000-8000-000000000001',
@@ -83,12 +85,14 @@ async function request(
   type = contentType,
   suffix = '',
   method = 'POST',
+  endpoint = path,
 ): Promise<Response> {
   return createApp().request(
-    path + suffix,
+    endpoint + suffix,
     { method, body: method === 'POST' ? body : null, headers: { 'Content-Type': type } },
     {
       BENCHMARK_DB: db,
+      BENCHMARK_CURSOR_SECRET: 'test-signing-secret',
       APP_ORIGIN: 'https://timmy.example',
       CLERK_ISSUER: 'https://browser.clerk.accounts.dev',
       CLERK_PUBLISHABLE_KEY: 'pk_test_fixture',
@@ -362,7 +366,7 @@ describe('protected submission upload', () => {
   });
   it('ignores JSON key order on an exact retry and preserves the stored record', async () => {
     expect((await request()).status).toBe(202);
-    const before = await db.prepare('SELECT * FROM benchmark_submissions').first();
+    const before = await db.prepare(storedSubmissionQuery).first();
     const reordered = {
       ...dto,
       hardware: { ram_gb: 32, gpu_name: dto.hardware.gpu_name, cpu_name: dto.hardware.cpu_name },
@@ -371,7 +375,7 @@ describe('protected submission upload', () => {
       (await request(JSON.stringify(Object.fromEntries(Object.entries(reordered).reverse()))))
         .status,
     ).toBe(202);
-    expect(await db.prepare('SELECT * FROM benchmark_submissions').first()).toEqual(before);
+    expect(await db.prepare(storedSubmissionQuery).first()).toEqual(before);
     expect(before?.request_fingerprint).toMatch(/^[a-f0-9]{64}$/);
     await counts(1);
   });
@@ -392,6 +396,24 @@ describe('protected submission upload', () => {
     expect(responses.map(response => response.status)).toEqual([202, 202, 202]);
     await counts(1);
   });
+  it.each(['nvapi_gpu_graphics_utilization', 'adlx_gpu_usage'] as const)(
+    'fingerprints a change to %s without changing FPS duplicate detection',
+    async source => {
+      expect((await request()).status).toBe(202);
+      const before = await db.prepare(storedDetailQuery).first('detail');
+      const resource_telemetry = structuredClone(dto.resource_telemetry);
+      resource_telemetry.gpu.graphics_utilization.source = source;
+      const input = { ...dto, resource_telemetry };
+      const conflict = await request(JSON.stringify(input));
+      expect(conflict.status).toBe(409);
+      expect(await conflict.json()).toMatchObject({ code: 'idempotency_conflict' });
+      const duplicate = await request(JSON.stringify({ ...input, client_run_id: secondClientId }));
+      expect(duplicate.status).toBe(409);
+      expect(await duplicate.json()).toMatchObject({ code: 'duplicate_run' });
+      expect(await db.prepare(storedDetailQuery).first('detail')).toBe(before);
+      await counts(1);
+    },
+  );
   it.each(['pending_review', 'published', 'rejected'])(
     'rejects a new client ID for the same %s measurement',
     async status => {
@@ -511,8 +533,13 @@ describe('protected submission upload', () => {
     expect((await request(body, type, suffix)).status).toBe(status);
     await counts(0);
   });
-  it('accepts telemetry with 512 logical processors and 32 anonymous pagefiles', async () => {
+  it.each([
+    'pdh_gpu_engine_3d_busiest_engine',
+    'nvapi_gpu_graphics_utilization',
+    'adlx_gpu_usage',
+  ] as const)('accepts %s with 512 logical processors and 32 anonymous pagefiles', async source => {
     const resource_telemetry = structuredClone(dto.resource_telemetry);
+    resource_telemetry.gpu.graphics_utilization.source = source;
     const processor = resource_telemetry.cpu.logical_processors[0]!;
     const gib = 2 ** 30;
     Object.assign(processor.utilization, {
@@ -554,6 +581,25 @@ describe('protected submission upload', () => {
     expect((await request(body)).status).toBe(202);
     await counts(1);
   });
+  it.each(['unknown_gpu_utilization', 'nvapi_gpu_graphics_utilization', 'adlx_gpu_usage'])(
+    'rejects unknown sources or private nested additions in %s before writing',
+    async source => {
+      const telemetry = structuredClone(dto.resource_telemetry);
+      Object.assign(telemetry.gpu.graphics_utilization, { source });
+
+      if (source !== 'unknown_gpu_utilization') {
+        Object.assign(telemetry.gpu.graphics_utilization, {
+          raw_samples: [85],
+          device_id: 'private',
+        });
+      }
+
+      const response = await request(JSON.stringify({ ...dto, resource_telemetry: telemetry }));
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({ code: 'invalid_input' });
+      await counts(0);
+    },
+  );
   it('rejects missing telemetry, an oversized capture window and private nested fields before writing', async () => {
     const { resource_telemetry, ...missing } = dto;
     const privateField = {
@@ -584,39 +630,109 @@ describe('protected submission upload', () => {
 
     await counts(0);
   });
-  it('preserves telemetry through review and approval, returning compact owner cards and full public details', async () => {
-    expect((await request()).status).toBe(202);
-    const storedBefore = await db
-      .prepare('SELECT detail FROM benchmark_runs')
-      .first<string>('detail');
-    expect(publicRunDetailSchema.parse(JSON.parse(storedBefore!)).resource_telemetry).toEqual(
-      dto.resource_telemetry,
-    );
-    const pending = moderationQueueSchema.parse(
-      await new D1ModerationRepository(db).pending({ limit: 20 }),
-    );
-    expect(pending.items[0]!.run.resource_telemetry).toEqual(dto.resource_telemetry);
-    const lookup = await request('', contentType, clientLookupPath + dto.client_run_id, 'GET');
-    const item = ownerRunLookupSchema.parse(await lookup.json()).item;
-    expect(item).toMatchObject({
-      resource_telemetry: projectResourceTelemetrySummary(dto.resource_telemetry),
-    });
-    expect(item).not.toHaveProperty('resource_telemetry.cpu.logical_processors');
-    expect(item).not.toHaveProperty('resource_telemetry.pagefile.files');
-    const approved = await new D1SubmissionApproval(db).approve(pending.items[0]!.submission_id);
-    const publicResponse = await createApp().request(
-      publicRunPath + approved!.publicRunId,
-      {},
-      { BENCHMARK_DB: db },
-    );
-    expect(publicResponse.status).toBe(200);
-    expect(publicRunDetailSchema.parse(await publicResponse.json()).resource_telemetry).toEqual(
-      dto.resource_telemetry,
-    );
-    expect(await db.prepare('SELECT detail FROM benchmark_runs').first('detail')).toBe(
-      storedBefore,
-    );
-  });
+  it.each(
+    (
+      [
+        'pdh_gpu_engine_3d_busiest_engine',
+        'nvapi_gpu_graphics_utilization',
+        'adlx_gpu_usage',
+      ] as const
+    ).flatMap(source =>
+      ['available', 'partial', 'unavailable'].map(status => ({ source, status })),
+    ),
+  )(
+    'preserves $source ($status) through retries, moderation, owner API and public detail',
+    async ({ source, status }) => {
+      const telemetry = structuredClone(dto.resource_telemetry);
+      const metric = telemetry.gpu.graphics_utilization;
+      metric.source = source;
+
+      if (status === 'partial') {
+        Object.assign(metric, {
+          status,
+          coverage: 0.75,
+          valid_duration_sec: 90,
+          valid_sample_count: 90,
+          reason_codes: ['partial_coverage'],
+        });
+        telemetry.status = 'partial';
+        telemetry.warnings = ['partial_coverage'];
+      } else if (status === 'unavailable') {
+        Object.assign(metric, {
+          status,
+          average: null,
+          minimum: null,
+          maximum: null,
+          last: null,
+          coverage: 0,
+          valid_duration_sec: 0,
+          valid_sample_count: 0,
+          reason_codes: ['counter_unavailable'],
+        });
+        telemetry.status = 'partial';
+        telemetry.warnings = ['counter_unavailable'];
+      }
+
+      const body = JSON.stringify({ ...dto, resource_telemetry: telemetry });
+      expect((await request(body)).status).toBe(202);
+      const storedBefore = await db.prepare(storedDetailQuery).first<string>('detail');
+      expect(publicRunDetailSchema.parse(JSON.parse(storedBefore!)).resource_telemetry).toEqual(
+        telemetry,
+      );
+      const submissionBefore = await db.prepare(storedSubmissionQuery).first();
+      expect((await request(body)).status).toBe(202);
+      expect(await db.prepare(storedSubmissionQuery).first()).toEqual(submissionBefore);
+      authenticate.mockResolvedValue({
+        accountId: owner,
+        emailVerified: true,
+        canModerate: true,
+        session: { kind: 'browser', expiresAt: Date.now() + 60000 },
+      });
+      const queue = await request('', contentType, '', 'GET', '/api/admin/v1/approvals');
+      expect(queue.status).toBe(200);
+      const pending = moderationQueueSchema.parse(await queue.json());
+      expect(pending.items[0]!.run.resource_telemetry).toEqual(telemetry);
+      const lookup = await request('', contentType, clientLookupPath + dto.client_run_id, 'GET');
+      const item = ownerRunLookupSchema.parse(await lookup.json()).item;
+      expect(item).toMatchObject({
+        resource_telemetry: projectResourceTelemetrySummary(telemetry),
+      });
+      expect(item).not.toHaveProperty('resource_telemetry.cpu.logical_processors');
+      expect(item).not.toHaveProperty('resource_telemetry.pagefile.files');
+      const ownerList = await request('', contentType, '', 'GET');
+      expect(ownerList.status).toBe(200);
+      const list = ownerRunsResponseSchema.parse(await ownerList.json());
+      expect(list.items[0]!.resource_telemetry).toEqual(projectResourceTelemetrySummary(telemetry));
+      expect(
+        (
+          await request(
+            '',
+            contentType,
+            `/${pending.items[0]!.submission_id}/approve`,
+            'POST',
+            '/api/admin/v1/approvals',
+          )
+        ).status,
+      ).toBe(200);
+      const published = ownerRunLookupSchema.parse(
+        await (await request('', contentType, clientLookupPath + dto.client_run_id, 'GET')).json(),
+      ).item;
+      expect(published).toMatchObject({
+        publication_status: 'published',
+        resource_telemetry: projectResourceTelemetrySummary(telemetry),
+      });
+      const publicResponse = await createApp().request(
+        publicRunPath + published.public_run_id,
+        {},
+        { BENCHMARK_DB: db },
+      );
+      expect(publicResponse.status).toBe(200);
+      expect(publicRunDetailSchema.parse(await publicResponse.json()).resource_telemetry).toEqual(
+        telemetry,
+      );
+      expect(await db.prepare(storedDetailQuery).first('detail')).toBe(storedBefore);
+    },
+  );
   it('enforces the 256 KiB body boundary', async () => {
     const body = JSON.stringify(dto);
     expect((await request(body.padEnd(SUBMISSION_MAX_BODY_BYTES + 1))).status).toBe(413);

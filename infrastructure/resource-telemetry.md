@@ -1,10 +1,14 @@
 # Capture resource contract and desktop handoff
 
 The Academy API and web implementation require `resource_telemetry` in version-1
-submissions and stored run detail. The Windows sender in `C:/projects/tarkov-skills`
-still excludes it. This document specifies that separate desktop change. The Academy
-dataset transition completed on staging and production on 2026-10-06; desktop code
-and the Store release remain separate work.
+submissions and stored run detail. The desktop-session handoff reports that
+`C:/projects/tarkov-skills` now collects NVIDIA NVAPI graphics-domain utilization and
+AMD ADLX GPUUsage, with adapter memory still collected separately through Windows.
+Its vendor-source send guard depends on Academy accepting those sources.
+The vendor-source patch dated 2026-10-07 is prepared locally for review; it has not
+been deployed or applied to any existing dataset. The earlier full-summary dataset
+transition completed on staging and production on 2026-10-06. Desktop code and the
+Store release remain separate work; this session does not change that repository.
 
 ## Wire contract
 
@@ -59,21 +63,40 @@ Capacities contain `value`, `unit`, `source`, `scope`, `status`, `reason_codes`.
 `unavailable`. Available capacities have a value and no reasons; unavailable ones
 have null and non-partial reasons. UMA's known zero discrete VRAM is available.
 
-| Field                                                 | Shape / unit     | Exact source                                                                       | Scope               |
-| ----------------------------------------------------- | ---------------- | ---------------------------------------------------------------------------------- | ------------------- |
-| `cpu.total_utilization`                               | Metric / percent | `pdh_processor_information_processor_time`                                         | `whole_system`      |
-| `cpu.logical_processors[].utilization`                | Metric / percent | `pdh_processor_information_processor_time`                                         | `logical_processor` |
-| `gpu.dedicated_vram_capacity`                         | Capacity / bytes | `dxgi_dedicated_video_memory` or, for UMA, `d3d12_unified_memory_no_discrete_vram` | `whole_adapter`     |
-| `gpu.graphics_utilization`                            | Metric / percent | `pdh_gpu_engine_3d_busiest_engine`                                                 | `whole_adapter`     |
-| `gpu.dedicated_memory_used`                           | Metric / bytes   | `pdh_gpu_adapter_memory_dedicated`                                                 | `whole_adapter`     |
-| `gpu.shared_memory_used`                              | Metric / bytes   | `pdh_gpu_adapter_memory_shared`                                                    | `whole_adapter`     |
-| `ram.installed_capacity`                              | Capacity / bytes | `get_physically_installed_system_memory`                                           | `whole_system`      |
-| `ram.os_usable_capacity`                              | Capacity / bytes | `get_performance_info_physical_total`                                              | `whole_system`      |
-| `ram.physical_used`, `ram.physical_available`         | Metric / bytes   | `get_performance_info`                                                             | `whole_system`      |
-| `pagefile.file_count`                                 | Metric / count   | `enum_page_files`                                                                  | `whole_system`      |
-| `pagefile.allocated`, `pagefile.used`                 | Metric / bytes   | `enum_page_files`                                                                  | `whole_system`      |
-| `pagefile.files[].allocated`, `pagefile.files[].used` | Metric / bytes   | `enum_page_files`                                                                  | `pagefile`          |
-| `commit.used`, `commit.limit`, `commit.headroom`      | Metric / bytes   | `get_performance_info`                                                             | `whole_system`      |
+| Field                                                 | Shape / unit     | Exact source                                                                             | Scope               |
+| ----------------------------------------------------- | ---------------- | ---------------------------------------------------------------------------------------- | ------------------- |
+| `cpu.total_utilization`                               | Metric / percent | `pdh_processor_information_processor_time`                                               | `whole_system`      |
+| `cpu.logical_processors[].utilization`                | Metric / percent | `pdh_processor_information_processor_time`                                               | `logical_processor` |
+| `gpu.dedicated_vram_capacity`                         | Capacity / bytes | `dxgi_dedicated_video_memory` or, for UMA, `d3d12_unified_memory_no_discrete_vram`       | `whole_adapter`     |
+| `gpu.graphics_utilization`                            | Metric / percent | `pdh_gpu_engine_3d_busiest_engine`, `nvapi_gpu_graphics_utilization` or `adlx_gpu_usage` | `whole_adapter`     |
+| `gpu.dedicated_memory_used`                           | Metric / bytes   | `pdh_gpu_adapter_memory_dedicated`                                                       | `whole_adapter`     |
+| `gpu.shared_memory_used`                              | Metric / bytes   | `pdh_gpu_adapter_memory_shared`                                                          | `whole_adapter`     |
+| `ram.installed_capacity`                              | Capacity / bytes | `get_physically_installed_system_memory`                                                 | `whole_system`      |
+| `ram.os_usable_capacity`                              | Capacity / bytes | `get_performance_info_physical_total`                                                    | `whole_system`      |
+| `ram.physical_used`, `ram.physical_available`         | Metric / bytes   | `get_performance_info`                                                                   | `whole_system`      |
+| `pagefile.file_count`                                 | Metric / count   | `enum_page_files`                                                                        | `whole_system`      |
+| `pagefile.allocated`, `pagefile.used`                 | Metric / bytes   | `enum_page_files`                                                                        | `whole_system`      |
+| `pagefile.files[].allocated`, `pagefile.files[].used` | Metric / bytes   | `enum_page_files`                                                                        | `pagefile`          |
+| `commit.used`, `commit.limit`, `commit.headroom`      | Metric / bytes   | `get_performance_info`                                                                   | `whole_system`      |
+
+The three graphics-utilization sources above are the complete allowlist. Unknown
+sources, null/omitted sources, different units/scopes and extra nested properties
+are rejected. This is an additive schema-version-1 change; existing Windows-source
+payloads, nullability, statistics, coverage, array and 256 KiB body limits remain.
+The existing sample-support rule remains: PDH percent counters permit at most 1.5
+supported seconds per sample; vendor gauges permit at most one second. This support
+cap does not specify the vendor API's averaging period.
+
+Web detail and owner cards label the Windows source **Windows 3D utilization** and
+NVAPI/ADLX **Vendor GPU graphics load**, with the exact source and `whole_adapter`
+scope visible. NVIDIA documents the graphics-domain percentage as busy time over
+the trailing one-second interval in
+[NVAPI](https://docs.nvidia.com/nvapi/struct_n_v___g_p_u___d_y_n_a_m_i_c___p_s_t_a_t_e_s___i_n_f_o___e_x.html).
+The [ADLX GPUUsage documentation](https://gpuopen.com/manuals/adlx/adlx-sdk-references/adlx-interfaces/performance-monitoring/iadlxgpumetrics/gpuusage/)
+does not specify its averaging period. Do not treat these percentages as
+mathematically equivalent or infer a proven cause of FPS drops from a load value
+alone. Dedicated/shared GPU memory keeps its separate Windows sources and describes
+the entire selected adapter, including other applications.
 
 `cpu.logical_processors` is required, has at most 512 entries and unique `(group, index)`
 pairs. `group` is an integer 0–65,535 and `index` is an integer 0–63. Each entry
@@ -165,9 +188,13 @@ the telemetry block; the smaller unlinked measurement archive does not retain it
 Minima/peaks describe this capture, not Windows uptime; commit, resident RAM and pagefile
 use/allocation are separate measurements. One peak does not establish a cause of FPS drops.
 
-## Desktop implementation checklist
+## Original full-summary desktop implementation checklist
 
 Sources below are relative to `C:/projects/tarkov-skills`; this repository does not edit them.
+This is the original sender handoff from the full-summary transition, retained for
+desktop verification. Statements about the old sender/outbox describe that baseline;
+their current implementation status has not been audited in this session. The
+vendor-source delta and unblock criteria are below.
 
 1. **`src/TarkovSkills.Core/Academy/SubmissionPayload.cs` — `Create`.** Project
    `run.ResourceTelemetry` into the exact nested allowlist, with snake_case via the
@@ -259,3 +286,115 @@ published real run owned by the requester in the selected environment. An unavai
 owner mapping is not zero other users. Any future destructive dataset operation
 requires a newly reviewed scope and explicit authorization; ordinary deployment and
 demo seeding preserve existing data.
+
+## Vendor-source patch: checks and rollout (2026-10-07)
+
+The contract now accepts the exact three source literals above. Submission
+normalization, stored detail, moderation and public/owner projections already copy
+the source explicitly; no data rewrite, database migration or new grouping key is
+needed. The complete parsed request fingerprint includes source, so changing it
+under an existing client ID conflicts. Exact frozen retries keep their original
+source. FPS duplicate detection, search groups, cohorts and Position still exclude
+resource telemetry from their criteria.
+
+`GraphicsUtilizationSource` is inferred from the graphics metric schema as the
+closed union of those three literals. Metric builders, unavailable fixtures and
+projections preserve source types; the contracts fixture reuses the exported type.
+Web detail and owner cards share one exhaustive, typed `{ label, description }`
+mapping, so a source addition requires a matching display entry at compile time.
+There are no fallback labels/descriptions for an unknown source.
+
+Automated checks cover all three sources with measured, partial and unavailable
+GPU metrics; explicit nulls and not-collected summaries; unchanged Windows support;
+unknown sources; forbidden nested fields and the explicit public allowlist; maximum
+processor/pagefile arrays and the existing payload boundary. D1/API tests follow
+submission → exact retry → moderation queue/approval → owner list/lookup → anonymous
+public detail, comparing the full resource block in storage/moderation/public and
+the exact aggregate block in owner responses. Separate tests verify source-only
+idempotency conflicts and FPS duplicate rejection under a new client ID.
+
+Initial vendor-patch validation completed: **149** contract tests, **548** API tests, **153** web
+tests and **16** infrastructure tests; typecheck, lint, formatting and the full build
+(including Wrangler's Worker dry run) passed. The default 5-second API test limit
+timed out in the existing owner-pagination test that inserts 21 rows. That file
+passed separately, and the full API suite passed with
+`npm run test -w @timmy/api -- --testTimeout=15000`. No test assertions or repository
+timeout settings were relaxed. Remote Bruno checks and the desktop selected-run
+flow are prepared below and have not been executed for this patch.
+
+The P2 source-type follow-up passed **150** contract tests (including an exact
+literal-union assertion for full/owner contracts), **153** web tests and **30** API
+projection/fixture/demo-seed tests. Full typecheck, lint and build passed again;
+formatting was checked. This follow-up changes typing and consolidates display
+metadata; runtime validation, payloads and dataset/deployment state are unchanged.
+
+The demo generator retains **397** synthetic runs: **395** Windows-source captures,
+**1** NVAPI capture and **1** ADLX UMA capture. Windows, partial/unavailable, pressure,
+multiple-pagefile and UMA scenarios remain. Vendor examples are:
+
+- NVAPI: `br_test_desktop_0_lighthouse_local_1920_1` (GeForce RTX 4070 SUPER).
+- ADLX: `br_test_desktop_uma_lighthouse_local_1920_0` (Radeon 780M, UMA).
+
+The existing `demoSeedStatements` guard is unchanged. Conflict updates modify only
+`resource_telemetry` for generated IDs with `is_synthetic = 1`, the exact fixture
+contributor and no linked submission. Deletion acknowledgements are respected.
+Tests exercise older Windows-source rows transitioning to both vendor sources,
+idempotent reruns and protection of real/foreign/linked rows, IDs, visibility and
+other content. These tests use isolated ephemeral D1 databases; they do not reset
+local, staging or production data.
+
+**Current state:** fixtures are updated locally. The existing generator prepared
+397 guarded statements in ignored `infrastructure/.wrangler/demo-seed-staging.sql`
+using `npm run db:seed:demo:staging -- --generate-only`, without contacting D1.
+Existing local/staging/production demo rows have not been updated in this session.
+No deploy, reset or selected-run upload was performed. Production
+deployment and demo update require a separate decision.
+
+### Prepared staging sequence
+
+1. Review this patch, then separately authorize the staging API/web deployment of
+   the reviewed revision. Deploy before seeding vendor DTOs: the old API rejects
+   them. No migration is added. The normal deploy pipeline does not seed data and
+   requires separate production approval; do not approve production for this check.
+2. Generate reviewable SQL with
+   `npm run db:seed:demo:staging -- --generate-only`. This writes ignored
+   `infrastructure/.wrangler/demo-seed-staging.sql` without contacting D1. After
+   authorization, use `npm run db:seed:demo:staging` or the existing **Seed demo data**
+   workflow with **staging** selected, from the reviewed revision available on
+   `master`. Use no reset. Compare pre/post counts and confirm real submissions and
+   their stored blocks are unchanged; total counts may exceed 397 if real runs exist.
+   Rerunning the seed should make no further changes. Protected/conflicting fixture
+   IDs may retain their previous block by design; do not bypass the guard.
+3. Read the Windows example
+   `br_test_desktop_0_lighthouse_bsg_servers_1920_0` and both vendor examples through
+   `GET /api/bench/v1/runs/{public_run_id}`. Verify the exact source, full summary,
+   `percent`, `whole_adapter`, and independent Windows memory sources. Run the Bruno
+   smoke and Resource telemetry collection against staging; check the source labels,
+   scope, coverage and vendor explanation in web detail and owner cards.
+4. In the desktop session, validate a new run selected by the user against this
+   contract, including all required nullable keys and the full resource summary.
+   Confirm the staged endpoint supports its exact vendor source before removing the
+   local vendor-source block for that environment. Review the frozen prepared DTO;
+   preserve its source and all summary values. Sign-in, capture and history must not
+   send it. Only the user's **Send for review** action starts submission.
+5. Verify the pending owner card/lookup retains source and the aggregate summary,
+   while anonymous detail remains inaccessible. An authorized moderator inspects
+   the full block in `GET /api/admin/v1/approvals`, then explicitly approves that
+   selected submission. Read its public detail and compare every resource summary
+   field, processor/file summaries, window metadata, reasons and source to the frozen
+   request. Owner responses omit only the existing processor/file arrays; receipts
+   remain minimal. Verify exact retry keeps the stored block unchanged and no private
+   identifiers/raw samples appear in public output. Do not upload extra measurements
+   automatically for verification.
+
+### Desktop-session handoff
+
+Use schema version **1** and the existing `resource_telemetry.gpu.graphics_utilization`
+field. Allow exactly `pdh_gpu_engine_3d_busiest_engine`,
+`nvapi_gpu_graphics_utilization`, `adlx_gpu_usage`; preserve the collector's original
+source, statistics, nulls, coverage and whole-adapter scope in saved runs and frozen
+requests. Keep dedicated/shared memory on their Windows sources. Do not regenerate
+or relabel frozen requests, resubmit deleted publications or create automatic sends.
+Remove the local vendor-source send guard only after the intended environment has
+the reviewed API deployed and its vendor public-detail checks pass. Staging success
+does not authorize enabling production: that API deployment is agreed separately.

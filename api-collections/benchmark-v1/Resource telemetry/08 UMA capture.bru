@@ -19,6 +19,11 @@ tests {
     const telemetry = body.resource_telemetry;
     expect(telemetry.schema_version).to.equal(1);
     expect(telemetry.gpu.memory_architecture).to.equal('unified');
+    expect(telemetry.gpu.graphics_utilization.source).to.equal('adlx_gpu_usage');
+    expect(telemetry.gpu.graphics_utilization.unit).to.equal('percent');
+    expect(telemetry.gpu.graphics_utilization.scope).to.equal('whole_adapter');
+    expect(telemetry.gpu.dedicated_memory_used.source).to.equal('pdh_gpu_adapter_memory_dedicated');
+    expect(telemetry.gpu.shared_memory_used.source).to.equal('pdh_gpu_adapter_memory_shared');
     expect(telemetry.gpu.dedicated_vram_capacity.status).to.equal('available');
     expect(telemetry.gpu.dedicated_vram_capacity.value).to.equal(0);
     expect(telemetry.gpu.dedicated_vram_capacity.source).to.equal('d3d12_unified_memory_no_discrete_vram');

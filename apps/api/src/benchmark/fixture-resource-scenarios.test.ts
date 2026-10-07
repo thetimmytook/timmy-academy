@@ -120,6 +120,9 @@ describe('synthetic resource scenarios', () => {
       createResourceScenario(syntheticUmaHardware, 'uma'),
     );
     expect(telemetry.gpu.memory_architecture).toBe('unified');
+    expect(telemetry.gpu.graphics_utilization.source).toBe('adlx_gpu_usage');
+    expect(telemetry.gpu.dedicated_memory_used.source).toBe('pdh_gpu_adapter_memory_dedicated');
+    expect(telemetry.gpu.shared_memory_used.source).toBe('pdh_gpu_adapter_memory_shared');
     expect(telemetry.gpu.dedicated_vram_capacity.value).toBe(0);
     expect(telemetry.gpu.shared_memory_used.maximum).toBe(3 * gib);
     expect(telemetry.ram.os_usable_capacity.value).toBe(28 * gib);
@@ -131,5 +134,19 @@ describe('synthetic resource scenarios', () => {
     expect(runs.every(run => run.is_synthetic)).toBe(true);
     expect(runs.filter(run => run.resource_telemetry.status === 'available')).toHaveLength(22);
     expect(runs.filter(run => run.resource_telemetry.pagefile.files.length > 1)).toHaveLength(1);
+    expect(
+      runs.filter(
+        run =>
+          run.resource_telemetry.gpu.graphics_utilization.source ===
+          'nvapi_gpu_graphics_utilization',
+      ),
+    ).toHaveLength(1);
+    expect(
+      runs.filter(
+        run =>
+          run.resource_telemetry.gpu.graphics_utilization.source ===
+          'pdh_gpu_engine_3d_busiest_engine',
+      ),
+    ).toHaveLength(23);
   });
 });
