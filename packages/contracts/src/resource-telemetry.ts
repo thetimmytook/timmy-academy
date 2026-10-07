@@ -68,11 +68,11 @@ const telemetryDocumentSchema = z.strictObject({
       resourceCapacitySchema('dxgi_dedicated_video_memory', 'whole_adapter'),
       resourceCapacitySchema('d3d12_unified_memory_no_discrete_vram', 'whole_adapter'),
     ]),
-    graphics_utilization: sampledResourceSchema(
-      'percent',
-      'pdh_gpu_engine_3d_busiest_engine',
-      'whole_adapter',
-    ),
+    graphics_utilization: z.union([
+      sampledResourceSchema('percent', 'pdh_gpu_engine_3d_busiest_engine', 'whole_adapter'),
+      sampledResourceSchema('percent', 'nvapi_gpu_graphics_utilization', 'whole_adapter'),
+      sampledResourceSchema('percent', 'adlx_gpu_usage', 'whole_adapter'),
+    ]),
     dedicated_memory_used: sampledResourceSchema(
       'bytes',
       'pdh_gpu_adapter_memory_dedicated',
@@ -119,6 +119,7 @@ const telemetryDocumentSchema = z.strictObject({
 });
 
 export type ResourceTelemetry = z.infer<typeof telemetryDocumentSchema>;
+export type GraphicsUtilizationSource = ResourceTelemetry['gpu']['graphics_utilization']['source'];
 
 export const resourceTelemetrySchema = telemetryDocumentSchema.superRefine(checkResourceTelemetry);
 

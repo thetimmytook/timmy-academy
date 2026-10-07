@@ -19,6 +19,7 @@ tests {
     const telemetry = body.resource_telemetry;
     expect(telemetry.schema_version).to.equal(1);
     expect(telemetry.status).to.equal('available');
+    expect(telemetry.gpu.graphics_utilization.source).to.equal('pdh_gpu_engine_3d_busiest_engine');
     expect(telemetry.cpu.logical_processors.length).to.be.greaterThan(0);
     expect(telemetry.gpu.dedicated_memory_used.maximum).to.be.below(telemetry.gpu.dedicated_vram_capacity.value * 0.95);
     expect(telemetry.ram.physical_available.minimum).to.be.greaterThan(2 * 2 ** 30);

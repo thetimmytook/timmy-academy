@@ -1,0 +1,44 @@
+meta {
+  name: 09 NVAPI capture
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{base_url}}/api/bench/v1/runs/br_test_desktop_0_lighthouse_local_1920_1
+  body: none
+  auth: none
+}
+
+tests {
+  test('NVAPI capture retains vendor graphics load and separate Windows memory summaries', function () {
+    expect(res.getStatus()).to.equal(200);
+    const body = res.getBody();
+    expect(body.is_synthetic).to.equal(true);
+    expect(body.public_run_id).to.equal('br_test_desktop_0_lighthouse_local_1920_1');
+    const telemetry = body.resource_telemetry;
+    expect(telemetry.schema_version).to.equal(1);
+    expect(telemetry.status).to.equal('available');
+    const load = telemetry.gpu.graphics_utilization;
+    expect(load.source).to.equal('nvapi_gpu_graphics_utilization');
+    expect(load.unit).to.equal('percent');
+    expect(load.scope).to.equal('whole_adapter');
+    expect(load.status).to.equal('available');
+    expect(load.coverage).to.equal(1);
+    expect(load.valid_sample_count).to.equal(120);
+    expect(load.valid_duration_sec).to.equal(120);
+    expect(load.average).to.equal(85);
+    expect(load.minimum).to.equal(52);
+    expect(load.maximum).to.equal(96);
+    expect(load.last).to.equal(81);
+    expect(load.reason_codes).to.deep.equal([]);
+    expect(telemetry.gpu.dedicated_memory_used.source).to.equal('pdh_gpu_adapter_memory_dedicated');
+    expect(telemetry.gpu.shared_memory_used.source).to.equal('pdh_gpu_adapter_memory_shared');
+    expect(telemetry.cpu.logical_processors.length).to.be.greaterThan(0);
+    expect(telemetry.pagefile.files.length).to.equal(1);
+  });
+}
+
+docs {
+  Requires the vendor-source API and guarded 397-run demo seed in the selected environment. This request reads an invented example without uploading or changing data. Vendor percentages have different API definitions and do not establish a cause of FPS drops.
+}

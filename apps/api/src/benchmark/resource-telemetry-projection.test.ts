@@ -22,9 +22,14 @@ describe('resource telemetry projections', () => {
     expect(resourceTelemetrySummarySchema.safeParse(telemetry).success).toBe(false);
   });
 
-  it('removes private additions at every nested level before projecting a public detail', () => {
+  it.each([
+    'pdh_gpu_engine_3d_busiest_engine',
+    'nvapi_gpu_graphics_utilization',
+    'adlx_gpu_usage',
+  ] as const)('removes private additions at every nested level while retaining %s', source => {
     const run = createSyntheticRuns()[0]!;
     const telemetry = run.detail.resource_telemetry;
+    telemetry.gpu.graphics_utilization.source = source;
     const objects = [
       telemetry,
       telemetry.window,
@@ -63,6 +68,8 @@ describe('resource telemetry projections', () => {
         path: 'private-path',
         native_error: 'private-error',
         raw_samples: [123],
+        application_name: 'private-app',
+        device_id: 'private-device',
       });
     }
 
@@ -90,7 +97,7 @@ describe('resource telemetry projections', () => {
     run.detail.resource_telemetry.status = 'partial';
     run.detail.resource_telemetry.warnings = ['counter_unavailable'];
     expect(projectDetail(run).resource_telemetry.cpu.total_utilization.average).toBeNull();
-    metric.source = 'private native error';
+    Object.assign(metric, { source: 'private native error' });
     expect(() => projectDetail(run)).toThrow();
   });
 });

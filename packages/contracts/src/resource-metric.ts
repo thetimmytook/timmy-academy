@@ -38,17 +38,17 @@ const metricFields = z.strictObject({
   reason_codes: resourceReasonsSchema,
 });
 
-export type ResourceMetric = z.infer<typeof metricFields> & {
+export type ResourceMetric<Source extends string = string> = z.infer<typeof metricFields> & {
   unit: 'bytes' | 'percent' | 'count';
-  source: string;
+  source: Source;
   scope: string;
 };
 
-export function sampledResourceSchema(
+export function sampledResourceSchema<Source extends string>(
   unit: 'bytes' | 'percent' | 'count',
-  source: string,
+  source: Source,
   scope: string,
-): z.ZodType<ResourceMetric> {
+): z.ZodType<ResourceMetric<Source>> {
   const value = unit === 'percent' ? measuredValue.max(100) : measuredValue;
 
   return metricFields

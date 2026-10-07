@@ -98,6 +98,7 @@ it('seeds 397 valid demo measurements across all 11 maps without changing existi
     }>();
   expect(rows.results).toHaveLength(397);
   const mapCounts = new Map<string, number>();
+  const sourceCounts = new Map<string, number>();
 
   for (const row of rows.results) {
     const detail = publicRunDetailSchema.parse(JSON.parse(row.detail));
@@ -105,7 +106,15 @@ it('seeds 397 valid demo measurements across all 11 maps without changing existi
     expect(detail.is_synthetic).toBe(true);
     expect(detail.public_run_id).toBe(row.public_id);
     mapCounts.set(detail.conditions.map.id, (mapCounts.get(detail.conditions.map.id) ?? 0) + 1);
+    const source = detail.resource_telemetry.gpu.graphics_utilization.source;
+    sourceCounts.set(source, (sourceCounts.get(source) ?? 0) + 1);
   }
+
+  expect(Object.fromEntries(sourceCounts)).toEqual({
+    pdh_gpu_engine_3d_busiest_engine: 395,
+    nvapi_gpu_graphics_utilization: 1,
+    adlx_gpu_usage: 1,
+  });
 
   expect([...mapCounts.keys()].sort((a, b) => a.localeCompare(b))).toEqual(
     mapCatalog.map(map => map.id).sort((a, b) => a.localeCompare(b)),
@@ -192,21 +201,80 @@ it('refreshes only telemetry in all 396 older demo rows, preserving IDs, states 
   expect(await db.prepare(revisionSql).first('revision')).toBe(refreshedRevision);
 }, 30000);
 
-it.each(['non-synthetic', 'foreign contributor', 'linked submission'])(
-  'leaves a conflicting %s row unchanged even when it lacks telemetry',
-  async protection => {
-    await db.prepare(statements[0]!).run();
+it('refreshes both older Windows-source vendor demo rows without changing other fields or rows', async () => {
+  await applySeed();
+  const vendors = sourceRows.filter(
+    run =>
+      run.detail.resource_telemetry.gpu.graphics_utilization.source !==
+      'pdh_gpu_engine_3d_busiest_engine',
+  );
+  expect(vendors).toHaveLength(2);
+
+  for (const run of vendors) {
     await db
       .prepare(
-        "UPDATE benchmark_runs SET detail = json_remove(detail, '$.resource_telemetry') WHERE public_id = ?",
+        "UPDATE benchmark_runs SET detail = json_set(detail, '$.resource_telemetry.gpu.graphics_utilization.source', 'pdh_gpu_engine_3d_busiest_engine') WHERE public_id = ?",
       )
-      .bind(firstId)
+      .bind(run.detail.public_run_id)
+      .run();
+  }
+
+  const before = await storedRows();
+  const revision = await db.prepare(revisionSql).first<number>('revision');
+  await applySeed();
+  const after = await storedRows();
+  const expected = new Map(
+    vendors.map(run => [run.detail.public_run_id, run.detail.resource_telemetry]),
+  );
+  const updated = new Map(after.map(row => [row.public_id, row]));
+
+  for (const old of before) {
+    const telemetry = expected.get(old.public_id);
+
+    if (telemetry) {
+      expect(updated.get(old.public_id)).toEqual({
+        ...old,
+        detail: JSON.stringify({ ...JSON.parse(old.detail), resource_telemetry: telemetry }),
+      });
+    } else {
+      expect(updated.get(old.public_id)).toEqual(old);
+    }
+  }
+
+  expect(await db.prepare(revisionSql).first('revision')).toBe(revision! + 2);
+  await applySeed();
+  expect(await storedRows()).toEqual(after);
+  expect(await db.prepare(revisionSql).first('revision')).toBe(revision! + 2);
+}, 30000);
+
+it.each(
+  sourceRows.flatMap((run, index) =>
+    run.detail.resource_telemetry.gpu.graphics_utilization.source ===
+    'pdh_gpu_engine_3d_busiest_engine'
+      ? []
+      : ['non-synthetic', 'foreign contributor', 'linked submission'].map(protection => ({
+          protection,
+          index,
+          source: run.detail.resource_telemetry.gpu.graphics_utilization.source,
+        })),
+  ),
+)(
+  'leaves a conflicting $protection row unchanged when a demo would update it to $source',
+  async ({ protection, index }) => {
+    const runId = sourceRows.at(index)!.detail.public_run_id;
+    const statement = statements.at(index)!;
+    await db.prepare(statement).run();
+    await db
+      .prepare(
+        "UPDATE benchmark_runs SET detail = json_set(detail, '$.resource_telemetry.gpu.graphics_utilization.source', 'pdh_gpu_engine_3d_busiest_engine') WHERE public_id = ?",
+      )
+      .bind(runId)
       .run();
 
     if (protection === 'non-synthetic') {
       await db
         .prepare('UPDATE benchmark_runs SET is_synthetic = 0 WHERE public_id = ?')
-        .bind(firstId)
+        .bind(runId)
         .run();
     }
 
@@ -215,7 +283,7 @@ it.each(['non-synthetic', 'foreign contributor', 'linked submission'])(
         .prepare(
           "UPDATE benchmark_runs SET contributor_key = 'fictional-desktop-foreign' WHERE public_id = ?",
         )
-        .bind(firstId)
+        .bind(runId)
         .run();
     }
 
@@ -225,14 +293,14 @@ it.each(['non-synthetic', 'foreign contributor', 'linked submission'])(
         .prepare(
           "INSERT INTO benchmark_submissions(account_id, client_run_id, submitted_at, status, run_sequence) SELECT 'test-owner', '00000000-0000-4000-8000-000000000001', '2026-09-26T12:00:00Z', 'published', sequence FROM benchmark_runs WHERE public_id = ?",
         )
-        .bind(firstId)
+        .bind(runId)
         .run();
     }
 
     const before = await storedRows();
     const revision = await db.prepare(revisionSql).first('revision');
     const submissions = await db.prepare(submissionsSql).all();
-    await db.prepare(statements[0]!).run();
+    await db.prepare(statement).run();
     expect(await storedRows()).toEqual(before);
     expect((await db.prepare(submissionsSql).all()).results).toEqual(submissions.results);
     expect(await db.prepare(revisionSql).first('revision')).toBe(revision);

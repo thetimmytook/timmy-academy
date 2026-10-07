@@ -6,6 +6,8 @@ import { Message } from '../elements/Message';
 import { number, words } from './format';
 import {
   gpuSelection,
+  graphicsUtilizationDisplay,
+  GRAPHICS_UTILIZATION_CAVEAT,
   isNearFullVram,
   NEAR_FULL_VRAM_PERCENT,
   pagefilePolicy,
@@ -74,10 +76,10 @@ export function ResourceTelemetry({
             />
             <p className={`${muted} ${css({ mt: '3' })}`}>
               Coverage is the fraction of valid frame intervals supported by each measurement. Gauge
-              samples cover at most one second each; utilization counters cover their measured
-              interval. Gaps are excluded. Partial coverage describes less of the capture;
-              unavailable values have no valid measurements. The interval union can be shorter than
-              the summed FPS frametimes.
+              samples, including vendor GPU load, cover at most one second each; Windows utilization
+              counters cover their measured interval. Gaps are excluded. Partial coverage describes
+              less of the capture; unavailable values have no valid measurements. The interval union
+              can be shorter than the summed FPS frametimes.
             </p>
           </details>
           <section className={stack}>
@@ -158,6 +160,8 @@ function Capacity({
 }
 
 function GpuTelemetry({ gpu }: Readonly<{ gpu: TelemetryData['gpu'] }>): JSX.Element {
+  const graphics = graphicsUtilizationDisplay(gpu.graphics_utilization.source);
+
   return (
     <section className={stack}>
       <h3 className={heading}>GPU</h3>
@@ -166,6 +170,8 @@ function GpuTelemetry({ gpu }: Readonly<{ gpu: TelemetryData['gpu'] }>): JSX.Ele
           ['Selected adapter', gpu.adapter_name ?? 'Unknown'],
           ['Adapter selection', gpuSelection(gpu)],
           ['Memory architecture', words(gpu.memory_architecture)],
+          ['Graphics load source', gpu.graphics_utilization.source],
+          ['GPU scope', `Whole adapter (${gpu.graphics_utilization.scope})`],
         ]}
       />
       {gpu.memory_architecture === 'unified' ? (
@@ -180,6 +186,9 @@ function GpuTelemetry({ gpu }: Readonly<{ gpu: TelemetryData['gpu'] }>): JSX.Ele
         Shared GPU memory uses system RAM. It is not additional dedicated VRAM. Adapter measurements
         are not per-game memory use.
       </p>
+      <p className={muted}>
+        {graphics.description} {GRAPHICS_UTILIZATION_CAVEAT}
+      </p>
       {isNearFullVram(gpu) && (
         <Message tone="warning">
           Peak dedicated memory reached at least {NEAR_FULL_VRAM_PERCENT}% of VRAM capacity during
@@ -190,7 +199,7 @@ function GpuTelemetry({ gpu }: Readonly<{ gpu: TelemetryData['gpu'] }>): JSX.Ele
       <ResourceMetricTable
         caption="GPU measurements"
         rows={[
-          ['Graphics utilization', gpu.graphics_utilization],
+          [graphics.label, gpu.graphics_utilization],
           ['Dedicated memory used', gpu.dedicated_memory_used],
           ['Shared memory used', gpu.shared_memory_used],
         ]}

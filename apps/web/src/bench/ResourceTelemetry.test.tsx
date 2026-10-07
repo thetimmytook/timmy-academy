@@ -17,6 +17,8 @@ const gib = 2 ** 30;
 const cpuTable = 'CPU measurements';
 const cpuTotal = 'Total utilization';
 const gpuTable = 'GPU measurements';
+const vendorLoad = 'Vendor GPU graphics load';
+const sourceLabel = 'Graphics load source';
 const ramTable = 'Physical RAM measurements';
 const ramAvailable = 'Physical available';
 const pagefileTable = 'Pagefile measurements';
@@ -38,6 +40,67 @@ function row(table: string, label: string): HTMLElement {
 }
 
 describe('capture resources', () => {
+  it.each([
+    ['pdh_gpu_engine_3d_busiest_engine', 'Windows 3D utilization', /busiest 3D engine/],
+    ['nvapi_gpu_graphics_utilization', vendorLoad, /trailing one second/],
+    ['adlx_gpu_usage', vendorLoad, /averaging period is not specified/],
+  ] as const)(
+    'labels %s in detail and owner summary with source and scope',
+    (source, label, description) => {
+      const telemetry = createResourceTelemetryFixture(120, source);
+      show(telemetry);
+      expect(row(gpuTable, label).textContent).toContain('85%');
+      expect(screen.getByText(sourceLabel).nextElementSibling?.textContent).toBe(source);
+      expect(screen.getByText('GPU scope').nextElementSibling?.textContent).toBe(
+        'Whole adapter (whole_adapter)',
+      );
+      expect(screen.getByText(description)).toBeTruthy();
+      expect(
+        screen.getByText(/do not treat their values as mathematically equivalent/),
+      ).toBeTruthy();
+      expect(screen.getByText(/A load percentage alone does not establish the cause/)).toBeTruthy();
+      cleanup();
+      render(<ResourceTelemetrySummary telemetry={resourceTelemetrySchema.parse(telemetry)} />);
+      expect(screen.getByText(`${label} average`).nextElementSibling?.textContent).toBe(
+        '85% · 100% coverage',
+      );
+      expect(screen.getByText(sourceLabel).nextElementSibling?.textContent).toBe(source);
+      expect(screen.getByText('GPU scope').nextElementSibling?.textContent).toContain(
+        'whole_adapter',
+      );
+      expect(screen.getByText(description)).toBeTruthy();
+      expect(screen.getByText(/A load percentage alone does not establish the cause/)).toBeTruthy();
+    },
+  );
+
+  it.each(['nvapi_gpu_graphics_utilization', 'adlx_gpu_usage'] as const)(
+    'keeps %s partial coverage and unavailable nulls visible',
+    source => {
+      const telemetry = createResourceTelemetryFixture(120, source);
+      telemetry.status = 'partial';
+      Object.assign(telemetry.gpu.graphics_utilization, {
+        status: 'partial',
+        coverage: 0.75,
+        valid_duration_sec: 90,
+        valid_sample_count: 90,
+        reason_codes: ['partial_coverage'],
+      });
+      telemetry.warnings = ['partial_coverage'];
+      show(telemetry);
+      expect(row(gpuTable, vendorLoad).textContent).toContain('75%90 samples · 90 s valid');
+      cleanup();
+      telemetry.gpu.graphics_utilization = createUnavailableMetricFixture(
+        telemetry.gpu.graphics_utilization,
+        'collector_unavailable',
+      );
+      telemetry.warnings = ['collector_unavailable'];
+      show(telemetry);
+      expect(row(gpuTable, vendorLoad).textContent).toContain('Unavailable');
+      expect(screen.getByText(sourceLabel).nextElementSibling?.textContent).toBe(source);
+      expect(row(gpuTable, vendorLoad).textContent).not.toContain('85%');
+    },
+  );
+
   it('shows distinct capture statistics, capacities, scopes and units', () => {
     const telemetry = createResourceTelemetryFixture();
     Object.assign(telemetry.cpu.total_utilization, {
@@ -148,7 +211,11 @@ describe('capture resources', () => {
       expect(screen.queryByText(nearFullHint) !== null).toBe(percent >= 95);
 
       if (percent >= 95) {
-        expect(screen.getByText(/does not establish the cause of FPS drops/)).toBeTruthy();
+        expect(
+          screen.getByText(
+            /This may indicate a memory limit; it does not establish the cause of FPS drops/,
+          ),
+        ).toBeTruthy();
         expect(screen.getByText(/repeatable A\/B test/)).toBeTruthy();
       }
     },
@@ -193,7 +260,7 @@ describe('capture resources', () => {
     const telemetry = createMissingResourceTelemetryFixture('unavailable');
     show(telemetry);
     expect(screen.getByText('Adapter selection').nextElementSibling?.textContent).toBe('Unknown');
-    expect(row(gpuTable, 'Graphics utilization').textContent).toContain(
+    expect(row(gpuTable, 'Windows 3D utilization').textContent).toContain(
       'Active GPU adapter unknown',
     );
     expect(screen.queryByText(nearFullHint)).toBeNull();
