@@ -7,7 +7,7 @@
     "packages/*"
   ],
   "engines": {
-    "node": ">=24"
+    "node": "^24.22.1"
   },
   "scripts": {
     "prepare": "husky",
@@ -51,7 +51,7 @@
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/eslint-plugin-security": "^3.0.1",
     "@types/node": "^24.13.4",
-    "concurrently": "^10.0.5",
+    "concurrently": "^10.0.6",
     "eslint": "^10.11.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-import-resolver-typescript": "^4.4.5",
@@ -68,10 +68,16 @@
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.70.0",
-    "vitest": "^5.0.1"
+    "vitest": "^5.0.5"
   },
   "overrides": {
+    "@esbuild-kit/core-utils": {
+      "esbuild": "^0.25.12"
+    },
     "browserslist": "^4.29.0",
+    "miniflare": {
+      "undici": "^7.30.1"
+    },
     "postcss": "^8.5.28",
     "postcss-selector-parser": "^7.1.6"
   }
