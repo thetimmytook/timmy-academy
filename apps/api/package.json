@@ -14,14 +14,14 @@
     "@clerk/backend": "^3.18.1",
     "@timmy/contracts": "*",
     "drizzle-orm": "^0.45.3",
-    "hono": "^4.13.8",
-    "zod": "^4.6.5"
+    "hono": "^4.13.11",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260919.1",
     "drizzle-kit": "^0.31.11",
-    "miniflare": "^5.20260918.0-alpha",
+    "miniflare": "^5.20261019.2-beta",
     "tsx": "^4.23.15",
-    "wrangler": "^4.135.0"
+    "wrangler": "^4.152.0"
   }
 }

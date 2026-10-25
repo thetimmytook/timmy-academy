@@ -6,7 +6,8 @@ explicit seed commands; there is no runtime fixture fallback.
 
 ## Local development
 
-Use Node.js 24 and npm. From the repository root:
+Use Node.js 24.22.1 or a newer Node.js 24 patch and npm. The `.node-version` file pins the
+version used by CI and compatible local version managers. From the repository root:
 
 ```sh
 npm ci
